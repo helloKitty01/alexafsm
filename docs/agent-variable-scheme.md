@@ -1,5 +1,8 @@
 # Agent 工具结果变量化方案（Variable Handle）
 
+> **更新**：本文是 v1（框架侧提取规则）。Agent 与工具解耦的分层版见
+> [v2：分层解耦方案](./agent-variable-scheme-v2-decoupled.md)（整体存储 + `$export` 协议 + 句柄层）。
+
 > 解决问题：Agent loop / 多轮对话中，toolA 的结果包含超长内容（如绝对路径、签名 URL、文件内容），
 > 后续 tool 调用依赖该内容时，LLM 逐 token 复述会导致**增量推理时延高**且**容易抄错**。
 > 方案：长内容只在框架层流转，LLM 只输出短变量引用 `{{vN}}`，框架在工具执行前替换为真实值。
