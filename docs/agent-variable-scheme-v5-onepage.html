@@ -143,6 +143,62 @@ exec(command="curl -o /tmp/img.png <span class="tok-ref">${a3f8k2p9.img_uri}</sp
     </div>
   </div>
 
+  <div class="arch" style="border-color: var(--acc2);">
+    <h2 style="color: var(--acc2);">端到端示例 · "生成一张横幅图，裁剪成 16:9，下载到本地"</h2>
+    <div class="flow">
+      <div class="node"><b>1. 模型调 A</b><span>invoke("image_gen",<br>{"prompt": "产品横幅"})</span></div>
+      <div class="arrow">→</div>
+      <div class="node mem"><b>2. 框架包信封</b><span>A 返回 246 字符 URL<br>→ 原样存为 a3f8k2p9，信封给模型</span></div>
+      <div class="arrow">→</div>
+      <div class="node"><b>3. 模型调 B（引用）</b><span>invoke("edit_image", {"source":<br><span class="tok-ref">"${a3f8k2p9.img_uri}"</span>, "ratio": "16:9"})</span></div>
+      <div class="arrow">→</div>
+      <div class="node tool"><b>4. 替换执行</b><span>B 收到完整 URL 裁剪成功<br>新结果存为 k2m9x4qt</span></div>
+      <div class="arrow">→</div>
+      <div class="node"><b>5. 模型 exec 下载</b><span>exec(command="curl -o /tmp/b.png<br><span class="tok-ref">${k2m9x4qt.img_uri}</span>")</span></div>
+      <div class="arrow">→</div>
+      <div class="node tool"><b>6. 转义执行</b><span>框架单引号包裹后执行<br>curl -o /tmp/b.png '…&exp=…'</span></div>
+    </div>
+    <div class="row" style="margin-top: 10px;">
+      <div class="card" style="border-color: var(--err);">
+        <h2 class="c1">出错自纠（第 3 步若写错字段名）</h2>
+        <pre>invoke("edit_image", {"source": <span class="tok-ref">"${a3f8k2p9.imgUri}"</span>})   <span class="tok-cmt">// 字段名拼错</span>
+<span class="tok-cmt">// 框架不执行，回喂 →</span> {"error": "unknown_field",
+  "message": "a3f8k2p9 无字段 imgUri，可用：<span class="tok-ref">${a3f8k2p9.img_uri}</span>、${a3f8k2p9.createTime}"}
+<span class="tok-cmt">// 模型复制正确引用重试，成功</span></pre>
+      </div>
+      <div class="card">
+        <h2 class="c2">全程效果</h2>
+        <p style="font-size:12.5px;">模型两次传参共输出 <em>~16 tokens</em>（无变量方案约 160+ tokens）；
+        246 字符 URL 从未被模型复述过，对话历史里只在信封中出现一次；
+        第 5 步 exec 中 URL 的 <code class="inline">&amp;</code> 由框架转义，命令不会被截断。</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="row">
+    <div class="card" style="flex: 1.4;">
+      <h2 class="c3">Skill 如何引导 · 参数描述里写明（调用现场，遵循率最高）</h2>
+      <pre><span class="tok-key">name</span>: edit_image
+<span class="tok-key">description</span>: 裁剪/缩放图片
+<span class="tok-key">parameters</span>:
+  <span class="tok-key">source</span>:
+    <span class="tok-key">type</span>: string
+    <span class="tok-key">description</span>: >
+      图片地址。<span class="tok-str">该参数通常来自上游工具结果：直接填写上游信封中的
+      ${resultId.字段名} 占位符（如 ${a3f8k2p9.img_uri}），
+      不要复制粘贴 URL 内容，框架会在执行前自动替换为真实值。</span></pre>
+    </div>
+    <div class="card">
+      <h2 class="c3">三处引导，口径一致</h2>
+      <ul>
+        <li><em>参数描述</em>（如左）：写在依赖上游结果的参数上，调用现场提醒</li>
+        <li><em>system prompt 一条兜底</em>："工具结果信封含 resultId；引用其字段时输出 <code class="inline">${resultId.字段名}</code>，禁止抄写字段内容"</li>
+        <li><em>responseText 随信封提醒</em>："引用字段请写 ${a3f8k2p9.字段名}，勿抄写内容"</li>
+      </ul>
+      <p class="muted" style="font-size:12px; margin-top:6px;">边界：模型<b>自己创作</b>的内容（如新写的文案、自定的本地路径 /tmp/b.png）直接内联，不引用；只有"来自上游结果的值"才用 ${}。</p>
+    </div>
+  </div>
+
   <div class="strip">
     <div class="card" style="flex: 2;">
       <h2 class="c2">生命周期</h2>
