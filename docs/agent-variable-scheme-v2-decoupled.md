@@ -1,5 +1,8 @@
 # Agent 工具结果变量化方案 v2：分层解耦版
 
+> 系列文档：[v1 框架侧提取](./agent-variable-scheme.md) · **v2 分层解耦（本文）** ·
+> [v3 透明信封](./agent-variable-scheme-v3-envelope.md)（附 [HTML 幻灯片](./agent-variable-scheme-v3-slides.html)）
+>
 > 与 [v1 方案](./agent-variable-scheme.md) 的核心区别：**Agent 与工具彻底解耦**。
 > Agent 不再内置"哪些字段该提取"的规则，而是默认**整体存储每个 toolResult**，
 > 只认识两个协议标识：结果里的 `$export`（工具自述导出）与参数里的 `{{...}}`（引用）。

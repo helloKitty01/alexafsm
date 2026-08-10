@@ -1,0 +1,501 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Agent 变量方案 v3 · 透明信封（Envelope + Working Memory）</title>
+<style>
+  :root {
+    --bg: #0f1420;
+    --panel: #171e2e;
+    --panel2: #1e2740;
+    --ink: #e8ecf5;
+    --muted: #93a0b8;
+    --acc: #5b8cff;
+    --acc2: #38d39f;
+    --warn: #ffb454;
+    --err: #ff6b81;
+    --code-bg: #0b0f18;
+    --line: #2a3550;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; background: var(--bg); color: var(--ink);
+    font-family: "PingFang SC", "Microsoft YaHei", "Noto Sans CJK SC", -apple-system, "Segoe UI", sans-serif; }
+  .deck { height: 100vh; overflow: hidden; position: relative; }
+  .slide {
+    position: absolute; inset: 0; padding: 56px 84px 96px;
+    display: none; flex-direction: column; gap: 22px; overflow: auto;
+  }
+  .slide.active { display: flex; animation: fadein .25s ease; }
+  @keyframes fadein { from { opacity: 0; transform: translateY(8px);} to { opacity: 1; transform: none;} }
+
+  .kicker { color: var(--acc); font-size: 15px; letter-spacing: 3px; font-weight: 600; }
+  h1 { font-size: 44px; line-height: 1.25; font-weight: 700; }
+  h2 { font-size: 32px; font-weight: 700; }
+  h2 .num { color: var(--acc); margin-right: 12px; font-variant-numeric: tabular-nums; }
+  h3 { font-size: 19px; color: var(--acc2); margin-bottom: 6px; }
+  p, li { font-size: 17px; line-height: 1.75; color: var(--ink); }
+  .muted { color: var(--muted); }
+  .small { font-size: 14px; }
+  ul { padding-left: 22px; }
+  em { color: var(--warn); font-style: normal; font-weight: 600; }
+  strong { color: #fff; }
+
+  .cols { display: flex; gap: 24px; align-items: stretch; }
+  .cols > * { flex: 1; min-width: 0; }
+  .card {
+    background: var(--panel); border: 1px solid var(--line); border-radius: 14px;
+    padding: 20px 22px;
+  }
+  .card.accent { border-color: var(--acc); }
+  .card.good { border-color: var(--acc2); }
+  .card.warn { border-color: var(--warn); }
+  .card.err { border-color: var(--err); }
+
+  pre {
+    background: var(--code-bg); border: 1px solid var(--line); border-radius: 10px;
+    padding: 14px 16px; overflow: auto; font-size: 13.5px; line-height: 1.6;
+    font-family: "SF Mono", Consolas, "JetBrains Mono", monospace; color: #cdd7ea;
+  }
+  code.inline {
+    background: var(--code-bg); border: 1px solid var(--line); border-radius: 5px;
+    padding: 1px 7px; font-size: .92em;
+    font-family: "SF Mono", Consolas, monospace; color: #9fc0ff;
+  }
+  .tok-key { color: #7fb3ff; } .tok-str { color: #8ee6b8; } .tok-ref { color: #ffb454; font-weight: 700; }
+  .tok-cmt { color: #6b7a95; } .tok-err { color: #ff8fa0; }
+
+  /* 流程图 */
+  .flow { display: flex; align-items: stretch; gap: 0; flex-wrap: wrap; }
+  .flow .node {
+    background: var(--panel2); border: 1.5px solid var(--acc); border-radius: 12px;
+    padding: 14px 16px; min-width: 150px; flex: 1;
+    display: flex; flex-direction: column; gap: 4px; justify-content: center;
+  }
+  .flow .node b { font-size: 15.5px; color: #fff; }
+  .flow .node span { font-size: 13px; color: var(--muted); line-height: 1.5; }
+  .flow .node.tool { border-color: var(--acc2); }
+  .flow .node.mem  { border-color: var(--warn); }
+  .flow .node.err  { border-color: var(--err); }
+  .flow .arrow {
+    align-self: center; padding: 0 10px; color: var(--acc); font-size: 24px; font-weight: 700;
+    display: flex; flex-direction: column; align-items: center; line-height: 1.1;
+  }
+  .flow .arrow small { font-size: 11.5px; color: var(--muted); white-space: nowrap; }
+
+  .vflow { display: flex; flex-direction: column; gap: 0; }
+  .vflow .varrow { align-self: center; color: var(--acc); font-size: 22px; line-height: 1; padding: 2px 0; }
+
+  table { border-collapse: collapse; width: 100%; font-size: 15px; }
+  th, td { border: 1px solid var(--line); padding: 9px 13px; text-align: left; line-height: 1.55; }
+  th { background: var(--panel2); color: #fff; font-size: 14.5px; }
+  td { color: var(--ink); }
+  td .ok { color: var(--acc2); font-weight: 700; }
+  td .no { color: var(--err); }
+
+  .badge {
+    display: inline-block; border-radius: 999px; padding: 2px 12px; font-size: 12.5px;
+    font-weight: 600; margin-right: 6px; border: 1px solid;
+  }
+  .badge.b1 { color: var(--acc); border-color: var(--acc); }
+  .badge.b2 { color: var(--acc2); border-color: var(--acc2); }
+  .badge.b3 { color: var(--warn); border-color: var(--warn); }
+  .badge.b4 { color: var(--err); border-color: var(--err); }
+
+  .footer {
+    position: absolute; bottom: 0; left: 0; right: 0; height: 56px;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0 84px; color: var(--muted); font-size: 13px;
+    border-top: 1px solid var(--line); background: rgba(15,20,32,.9); z-index: 5;
+  }
+  .navbtns button {
+    background: var(--panel2); color: var(--ink); border: 1px solid var(--line);
+    border-radius: 8px; padding: 6px 16px; font-size: 14px; cursor: pointer; margin-left: 8px;
+  }
+  .navbtns button:hover { border-color: var(--acc); }
+  .progress { position: absolute; top: 0; left: 0; height: 3px; background: var(--acc); z-index: 6; transition: width .2s; }
+
+  .callout { border-left: 3px solid var(--acc2); padding: 8px 14px; background: var(--panel); border-radius: 0 10px 10px 0; }
+  .callout.w { border-left-color: var(--warn); }
+  .callout.e { border-left-color: var(--err); }
+
+  @media print {
+    .deck { height: auto; overflow: visible; }
+    .slide { display: flex !important; position: relative; page-break-after: always; height: 100vh; }
+    .footer, .progress { display: none; }
+  }
+</style>
+</head>
+<body>
+<div class="deck" id="deck">
+  <div class="progress" id="progress"></div>
+
+  <!-- 1 封面 -->
+  <section class="slide active">
+    <div style="margin: auto 0; display: flex; flex-direction: column; gap: 26px; max-width: 1000px;">
+      <div class="kicker">AGENT VARIABLE SCHEME · V3</div>
+      <h1>透明信封方案<br><span style="color: var(--acc);">Envelope + Working Memory + ${} 引用替换</span></h1>
+      <p class="muted" style="font-size: 19px;">
+        工具返回结果原样不动 · 框架统一包信封给模型 · 完整结果按 resultId 存入 Working Memory<br>
+        下游调用用 <code class="inline">${resultId.path}</code> 引用 · 框架在执行前替换（invoke 值语义 / exec 自动转义）
+      </p>
+      <div class="cols" style="max-width: 900px;">
+        <div class="card"><h3>解决什么</h3><p class="small muted">长内容（URL / 路径 / 文件）复述导致的 LLM 增量推理时延与抄写错误</p></div>
+        <div class="card"><h3>核心特点</h3><p class="small muted">工具零改动 · 结果对模型透明可推理 · skill 级引用指引 · 支持 exec 命令替换</p></div>
+        <div class="card"><h3>生命周期</h3><p class="small muted">loop / conversation 作用域 · touch 提升 · TTL / spill / rehydrate · 过期报错自纠</p></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 2 问题 -->
+  <section class="slide">
+    <h2><span class="num">01</span>问题：长内容复述 = 时延 + 出错</h2>
+    <div class="cols">
+      <div class="card err">
+        <h3 style="color: var(--err);">没有变量机制</h3>
+        <pre><span class="tok-cmt">// toolA 返回 246 字符签名 URL，模型调 toolB 时逐 token 复述：</span>
+invoke("edit_image", {
+  "source": <span class="tok-err">"https://cdn.example.com/imgs/2026/08/10/
+    f7c3a91e-7b3e-4e9d-a2c4-91f0e8d7b6a5-4096x1716_v1.png
+    ?sig=Kx7Qw9f2nQ9pXw2vYs8rTz5m...&exp=1754800000"</span>
+})</pre>
+        <ul class="small">
+          <li>输出 <em>80+ tokens</em>，增量推理时延线性放大</li>
+          <li>签名段抄错 1 个字符 → 403，任务失败</li>
+          <li>多轮对话中反复复述，上下文膨胀</li>
+        </ul>
+      </div>
+      <div class="card good">
+        <h3>v3 信封方案</h3>
+        <pre><span class="tok-cmt">// 模型只复制信封 refs 里的成品引用串：</span>
+invoke("edit_image", {
+  "source": <span class="tok-ref">"${a3f8k2p9.resultDataList[1].img_uri}"</span>
+})</pre>
+        <ul class="small">
+          <li>输出 <em>~12 tokens</em>，与内容长度无关</li>
+          <li>框架执行前替换真实值，<strong>零抄写错误</strong></li>
+          <li>历史中永远只有占位符，替换结果不回写</li>
+        </ul>
+      </div>
+    </div>
+    <div class="callout"><p class="small">三代方案：v1 框架侧字段提取 → v2 分层解耦（整体存储 + stub 替身）→ <strong>v3 透明信封：结果原文可见可推理，信封 + refs + skill 指引压制抄写</strong></p></div>
+  </section>
+
+  <!-- 3 架构总览 -->
+  <section class="slide">
+    <h2><span class="num">02</span>架构总览：一次工具调用的完整闭环</h2>
+    <div class="flow">
+      <div class="node"><b>LLM</b><span>输出 invoke(args) 或 exec(command)，参数含 ${…} 占位符</span></div>
+      <div class="arrow">→<small>tool call</small></div>
+      <div class="node"><b>Resolver（入方向）</b><span>解析 ${resultId.path}<br>按落点替换 + 转义</span></div>
+      <div class="arrow">→<small>真实值</small></div>
+      <div class="node tool"><b>工具层</b><span>原样返回结果<br>对变量机制零感知</span></div>
+      <div class="arrow">→<small>原始结果</small></div>
+      <div class="node"><b>Enveloper（出方向）</b><span>包信封 · 生成 resultId<br>阈值瘦身 · 生成 refs</span></div>
+    </div>
+    <div class="cols">
+      <div class="card mem" style="border-color: var(--warn);">
+        <h3 style="color: var(--warn);">Working Memory（KV）</h3>
+        <pre>a3f8k2p9 → { resultData: <span class="tok-cmt">完整原始结果</span>,
+             meta: { scope, TTL, lifetime, source } }</pre>
+        <p class="small muted">Enveloper 写入 · Resolver 读取 · 生命周期归框架管，随 checkpoint 持久</p>
+      </div>
+      <div class="card err">
+        <h3 style="color: var(--err);">Guardrails（错误回喂）</h3>
+        <p class="small muted">未知 id / 路径不存在 / 列表下标歧义 / 引用过期 / exec 不安全值 —— 一律<strong>不执行工具</strong>，构造 tool error 回喂，模型复制正确引用自纠</p>
+      </div>
+    </div>
+    <div class="callout"><p class="small"><strong>解耦要点</strong>：工具只管原样返回；模型只管复制 refs；框架承担存储、瘦身、替换、转义、生命周期全部职责。</p></div>
+  </section>
+
+  <!-- 4 信封解剖 -->
+  <section class="slide">
+    <h2><span class="num">03</span>信封结构解剖（模型看到的东西）</h2>
+    <div class="cols">
+      <div style="flex: 1.4;">
+<pre>{
+  <span class="tok-key">"toolName"</span>: <span class="tok-str">"image_gen"</span>,
+  <span class="tok-key">"responseText"</span>: <span class="tok-str">"已生成 2 张候选横幅图。完整 URL 已存入
+      a3f8k2p9，请复制 refs 中的占位串引用，勿抄写内容。"</span>,
+  <span class="tok-key">"resultId"</span>: <span class="tok-str">"a3f8k2p9"</span>,          <span class="tok-cmt">// 8 位随机 id，跨轮不撞名</span>
+  <span class="tok-key">"resultDataList"</span>: [
+    { <span class="tok-key">"img_uri"</span>: { <span class="tok-key">"$preview"</span>: <span class="tok-str">"https://cdn.example.com/…_v1.png?sig=Kx7Q…"</span>,
+                   <span class="tok-key">"$size"</span>: 246 },   <span class="tok-cmt">// 超阈值 → 瘦身</span>
+      <span class="tok-key">"createTime"</span>: <span class="tok-str">"2026-08-10T04:05:12Z"</span>,  <span class="tok-cmt">// 短值原样保留</span>
+      <span class="tok-key">"style"</span>: <span class="tok-str">"深色科技风"</span> },
+    { <span class="tok-cmt">…第 2 张（浅色简约风）…</span> }
+  ],
+  <span class="tok-key">"refs"</span>: {   <span class="tok-cmt">// 成品引用串：模型只复制，不拼装</span>
+    <span class="tok-key">"resultDataList[0].img_uri"</span>: <span class="tok-ref">"${a3f8k2p9.resultDataList[0].img_uri}"</span>,
+    <span class="tok-key">"resultDataList[1].img_uri"</span>: <span class="tok-ref">"${a3f8k2p9.resultDataList[1].img_uri}"</span>
+  }
+}</pre>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 14px;">
+        <div class="card"><h3>resultDataList = 工具原始返回</h3><p class="small muted">结构不变，模型可对内容推理（如按 style 选图）；只有超阈值叶子瘦身为 $preview + $size</p></div>
+        <div class="card good"><h3>refs = 抄写风险的终点</h3><p class="small muted">8 位随机 id 也有抄错风险 → 框架直接给成品引用串，模型复制即可，出错率低一个量级</p></div>
+        <div class="card warn"><h3>瘦身阈值是策略参数</h3><p class="small muted">阈值 = ∞ → 全文透明；阈值 = 0 → v2 的 stub 形态。按类型配置：base64 强制瘦身、URL 200、文本 1000</p></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 5 出方向管线 -->
+  <section class="slide">
+    <h2><span class="num">04</span>出方向管线：工具结果 → 信封 → 上下文</h2>
+    <div class="flow">
+      <div class="node tool"><b>① 工具原样返回</b><span>{"img_uri": "…246字符…", "createTime": "…"}</span></div>
+      <div class="arrow">→</div>
+      <div class="node mem"><b>② 整体入库</b><span>生成 resultId（8 位 base36，查重）<br>原始结果原样存 KV</span></div>
+      <div class="arrow">→</div>
+      <div class="node"><b>③ 阈值瘦身</b><span>超阈值叶子 → $preview/$size<br>短值原样保留</span></div>
+      <div class="arrow">→</div>
+      <div class="node"><b>④ 生成 refs</b><span>为瘦身字段与精确复述型字段<br>生成成品引用串</span></div>
+      <div class="arrow">→</div>
+      <div class="node"><b>⑤ 信封进上下文</b><span>responseText 提醒引用方式<br>原文长值不进历史</span></div>
+    </div>
+    <h3 style="margin-top: 8px;">Skill 级显式指引（v3 的遵循率关键）</h3>
+    <div class="cols">
+      <div class="card" style="flex: 1.5;">
+        <pre><span class="tok-cmt">// 下游工具（skill）描述中固定话术：</span>
+参数 source 通常来自上游工具结果。请<span class="tok-ref">直接复制上游信封 refs 中
+的 ${...} 占位串</span>作为参数值，不要抄写 URL/路径的具体内容。
+框架会在执行前自动替换为真实值。</pre>
+      </div>
+      <div class="card"><p class="small muted">全局 system prompt 只留一条兜底规则；细则随 skill 走——工具作者最清楚自己的参数来源。指引下沉到调用现场，遵循率显著高于全局规则。</p></div>
+    </div>
+  </section>
+
+  <!-- 6 入方向管线 -->
+  <section class="slide">
+    <h2><span class="num">05</span>入方向管线：${} 解析替换（按落点转义）</h2>
+    <div class="flow">
+      <div class="node"><b>① LLM 输出</b><span>invoke(args) / exec(command)<br>含 ${resultId.path}</span></div>
+      <div class="arrow">→</div>
+      <div class="node"><b>② 解析 + 校验</b><span>JSON 解析、schema 校验<br>占位符按字符串通过</span></div>
+      <div class="arrow">→</div>
+      <div class="node mem"><b>③ 查 Working Memory</b><span>id → 路径寻址 → touch 续期<br>spilled 则 rehydrate</span></div>
+      <div class="arrow">→</div>
+      <div class="node"><b>④ 按落点替换</b><span>invoke：值语义保类型<br>exec：自动 shell 转义</span></div>
+      <div class="arrow">→</div>
+      <div class="node tool"><b>⑤ 执行工具</b><span>收到真实值<br>替换结果不回写历史</span></div>
+    </div>
+    <div class="cols">
+      <table>
+        <tr><th>落点（sink）</th><th>替换语义</th><th>转义规则</th></tr>
+        <tr><td><code class="inline">invoke()</code> JSON 参数</td><td>值语义，保留类型</td><td>无需转义（JSON 序列化天然安全）</td></tr>
+        <tr><td><code class="inline">exec(command)</code></td><td>文本内插</td><td><strong>自动单引号包裹</strong>，内部 <code class="inline">'</code> 转义为 <code class="inline">'\''</code>；含换行/控制字符直接拒绝</td></tr>
+        <tr><td>最终回复文本（扩展）</td><td>文本内插</td><td>Markdown 转义</td></tr>
+      </table>
+    </div>
+    <div class="callout e"><p class="small"><strong>安全硬防线</strong>：工具结果内容不可信（间接提示注入）。凡进 shell 必须框架转义；可再加白名单——exec 只允许 <code class="inline">[A-Za-z0-9_-./:?&amp;=%]</code> 字符集的值，否则只准走 invoke 或落盘传路径。模型和 skill 都不承担转义责任。</p></div>
+  </section>
+
+  <!-- 7 示例总览 -->
+  <section class="slide">
+    <h2><span class="num">06</span>端到端示例：生图 → 裁剪 → 下载 → 上传</h2>
+    <p class="muted">Turn 1 用户："帮我生成一张产品发布会横幅图，裁剪成 16:9，下载到本地后上传到 CMS。"</p>
+    <div class="vflow">
+      <div class="flow">
+        <div class="node tool"><b>① image_gen</b><span>返回 2 张候选图（246 字符签名 URL）→ 信封 <code class="inline">a3f8k2p9</code>，img_uri 瘦身 + refs</span></div>
+        <div class="arrow">→</div>
+        <div class="node err"><b>② edit_image（首次）</b><span>省写下标 ${a3f8k2p9.img_uri}<br>→ <b>ambiguous_index 报错回喂</b></span></div>
+        <div class="arrow">→</div>
+        <div class="node good" style="border-color: var(--acc2);"><b>②' 自纠重试</b><span>复制 ${a3f8k2p9.resultDataList[1].img_uri}<br>→ 裁剪成功 → 新信封 <code class="inline">k2m9x4qt</code></span></div>
+      </div>
+      <div class="varrow">↓</div>
+      <div class="flow">
+        <div class="node"><b>③ exec 下载</b><span>command 内嵌 ${k2m9x4qt…img_uri}<br>框架<b>自动 shell 转义</b>后执行 curl</span></div>
+        <div class="arrow">→</div>
+        <div class="node tool"><b>④ cms_upload</b><span>本地短路径 /tmp/banner_169.png 内联<br>引用与内联混用</span></div>
+        <div class="arrow">→</div>
+        <div class="node mem"><b>Turn 1 结算</b><span>两个 resultId 被引用<br>→ 提升 conversation 作用域</span></div>
+      </div>
+    </div>
+    <div class="callout"><p class="small">模型全程没有复述过任何一个长 URL：选图靠 resultDataList 里的短字段（style）推理，传参靠复制 refs。</p></div>
+  </section>
+
+  <!-- 8 示例：歧义自纠 -->
+  <section class="slide">
+    <h2><span class="num">07</span>关键流程 A：列表歧义 → 报错回喂 → 自纠</h2>
+    <div class="cols">
+      <div class="card err">
+        <h3 style="color: var(--err);">模型首次输出（省写下标）</h3>
+        <pre>invoke("edit_image", {
+  "source": <span class="tok-err">"${a3f8k2p9.img_uri}"</span>,
+  "op": "crop", "ratio": "16:9"
+})</pre>
+        <p class="small muted">resultDataList 有 2 个元素 → 语法糖不成立。<strong>规则：不猜，不执行。</strong></p>
+      </div>
+      <div class="card warn">
+        <h3 style="color: var(--warn);">框架回喂（tool error）</h3>
+        <pre>{ "error": "ambiguous_index",
+  "message": "a3f8k2p9.resultDataList 含 2 个元素，
+   须显式下标。候选：
+   <span class="tok-ref">${a3f8k2p9.resultDataList[0].img_uri}</span>（深色科技风）
+   <span class="tok-ref">${a3f8k2p9.resultDataList[1].img_uri}</span>（浅色简约风）" }</pre>
+      </div>
+      <div class="card good">
+        <h3>模型自纠（复制候选串）</h3>
+        <pre>invoke("edit_image", {
+  "source": <span class="tok-ref">"${a3f8k2p9.resultDataList[1].img_uri}"</span>,
+  "op": "crop", "ratio": "16:9"
+})</pre>
+        <p class="small muted">Resolver 值语义替换 → edit_image 收到完整 246 字符 URL（工具零感知）</p>
+      </div>
+    </div>
+    <h3>错误处理全家桶（一律不执行 + 回喂 + 自纠）</h3>
+    <table>
+      <tr><th>unknown_result_id</th><th>unknown_path</th><th>ambiguous_index</th><th>reference_expired</th><th>unsafe_exec_value</th><th>复制检测（软）</th></tr>
+      <tr class="small">
+        <td>回喂可用 resultId 清单</td><td>回喂该 id 的全部 refs</td><td>回喂各下标候选串</td><td>回喂过期时间 + 重取建议</td><td>建议改 invoke 或落盘</td><td>提醒改用引用，不阻断</td>
+      </tr>
+    </table>
+  </section>
+
+  <!-- 9 示例：exec 转义 -->
+  <section class="slide">
+    <h2><span class="num">08</span>关键流程 B：exec 命令替换与自动转义</h2>
+    <div class="vflow">
+      <div class="card">
+        <h3>模型输出（占位符直接写进 shell 命令，约 14 tokens）</h3>
+        <pre>exec(command="curl -sS -o /tmp/banner_169.png <span class="tok-ref">${k2m9x4qt.resultDataList[0].img_uri}</span>")</pre>
+      </div>
+      <div class="varrow">↓ Resolver：识别落点为 exec → 白名单检查 → 自动单引号包裹</div>
+      <div class="card good">
+        <h3>实际执行的命令</h3>
+        <pre>curl -sS -o /tmp/banner_169.png <span class="tok-str">'https://cdn.example.com/imgs/2026/08/10/9d1f…_crop169.png?sig=Tz5m…&amp;exp=1754800000'</span></pre>
+      </div>
+    </div>
+    <div class="cols">
+      <div class="card warn"><h3 style="color: var(--warn);">为什么必须框架转义</h3><p class="small muted">URL 里的 <code class="inline">&amp;</code> 不转义会把命令截断成后台任务；模型手写转义既费 token 又不可靠。</p></div>
+      <div class="card err"><h3 style="color: var(--err);">为什么这是安全问题</h3><p class="small muted">工具结果可能被间接提示注入污染（如 <code class="inline">; rm -rf ~</code>）。单引号包裹使其只能作为字面量，无法逃逸执行。</p></div>
+      <div class="card"><h3>加严选项</h3><p class="small muted">exec 落点只允许安全字符集的值；含特殊字符的值只准走 invoke()，或先落盘成文件后传路径。</p></div>
+    </div>
+  </section>
+
+  <!-- 10 生命周期 -->
+  <section class="slide">
+    <h2><span class="num">09</span>生命周期：作用域、冷热分层、过期</h2>
+    <div class="flow">
+      <div class="node"><b>loop（默认）</b><span>信封生成即 loop 作用域<br>本轮 agent loop 内有效</span></div>
+      <div class="arrow">→<small>被引用 touch-to-promote</small></div>
+      <div class="node good" style="border-color: var(--acc2);"><b>conversation</b><span>跨轮可引用<br>TTL：N 轮未引用淘汰</span></div>
+      <div class="arrow">→<small>LRU / 容量</small></div>
+      <div class="node mem"><b>spilled（冷层）</b><span>降级磁盘，留 tombstone<br>再引用 → rehydrate</span></div>
+      <div class="arrow">→<small>TTL / lifetime 过期</small></div>
+      <div class="node err"><b>淘汰 / 过期</b><span>引用时报错回喂<br>附原因与重取建议</span></div>
+    </div>
+    <div class="cols">
+      <div class="card" style="flex: 1.4;">
+        <h3>Turn 2（次日）跨轮引用示例</h3>
+        <pre><span class="tok-cmt">&lt;available_results&gt;  // user message 末尾 append，保护前缀缓存</span>
+  a3f8k2p9  image_gen   2 张候选原图   conversation(spilled)  URL 已过期
+  k2m9x4qt  edit_image  16:9 裁剪图    conversation           URL 已过期
+<span class="tok-cmt">&lt;/available_results&gt;</span>
+
+<span class="tok-cmt">// 模型引用 ${k2m9x4qt…img_uri} → meta 中签名已过期：</span>
+{ "error": <span class="tok-err">"reference_expired"</span>,
+  "message": "签名已于 08-10T12:00Z 过期。本地文件
+   /tmp/banner_169.png 可能仍存在，或重新调用 edit_image。" }</pre>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 14px;">
+        <div class="card"><h3>随机 id 的优势</h3><p class="small muted">8 位 base36 全局唯一：跨轮、跨分支（对话回退重放）不撞名，优于序号命名</p></div>
+        <div class="card"><h3>checkpoint 一致性</h3><p class="small muted">Working Memory 随 agent 状态一起快照；只恢复历史不恢复 KV，所有 ${…} 都会悬垂</p></div>
+        <div class="card"><h3>续期粒度</h3><p class="small muted">引用任一子路径为整个 resultId 续期（KV 粒度 = 结果粒度，接受粗粒度）</p></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 11 对比与收益 -->
+  <section class="slide">
+    <h2><span class="num">10</span>三代方案对比与 token 收益</h2>
+    <table>
+      <tr><th></th><th>v1 框架侧提取</th><th>v2 分层解耦</th><th>v3 透明信封</th></tr>
+      <tr><td>工具改动</td><td><span class="no">需声明 exportable</span></td><td><span class="ok">零改动</span>（可选 $export）</td><td><span class="ok">零改动</span></td></tr>
+      <tr><td>模型能否看到结果内容</td><td><span class="no">只见 preview</span></td><td><span class="no">只见 preview</span></td><td><span class="ok">原文可见可推理</span>（超阈值瘦身）</td></tr>
+      <tr><td>引用出错率</td><td>记语义名</td><td>复制 stub $ref</td><td><span class="ok">复制 refs 成品串 + skill 指引</span></td></tr>
+      <tr><td>exec 命令落点</td><td>未定义</td><td>未定义</td><td><span class="ok">自动转义 + 白名单</span></td></tr>
+      <tr><td>输入 token</td><td><span class="ok">最省</span></td><td><span class="ok">最省</span></td><td>取决于瘦身阈值（可调到与 v2 等同）</td></tr>
+    </table>
+    <div class="cols">
+      <div class="card good">
+        <h3>输出侧收益（本示例实测口径）</h3>
+        <ul class="small">
+          <li>裁剪传参：80+ tokens → <em>12 tokens</em></li>
+          <li>exec 下载：100+ tokens → <em>14 tokens</em></li>
+          <li>抄写错误（403 / 命令截断）→ <em>结构性消除</em></li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>选型建议</h3>
+        <p class="small muted">三版共用同一套 Working Memory 与替换管线，差异只在"给模型看什么"（stub ↔ 信封）与指引位置（全局 ↔ skill）。<strong>推荐 v3 作为默认形态</strong>，瘦身阈值按内容类型配置，即可在透明与省 token 之间连续调节。</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- 12 落地清单 -->
+  <section class="slide">
+    <h2><span class="num">11</span>落地模块清单与安全约定</h2>
+    <table>
+      <tr><th>模块</th><th>职责</th><th>关键接口</th></tr>
+      <tr><td><code class="inline">Enveloper</code></td><td>包信封、生成 resultId、阈值瘦身、生成 refs、responseText 兜底</td><td>wrap(toolName, rawResult) → envelope</td></tr>
+      <tr><td><code class="inline">WorkingMemory</code></td><td>KV 存取、作用域/TTL/LRU、spill/rehydrate、checkpoint</td><td>put / get / touch / end_of_loop / snapshot</td></tr>
+      <tr><td><code class="inline">Resolver</code></td><td>${} 解析、路径寻址、按落点替换与转义</td><td>resolve(argsOrCommand, sink) → resolved</td></tr>
+      <tr><td><code class="inline">Guardrails</code></td><td>六类错误检测与回喂、exec 白名单、复制检测</td><td>check(…) → ok | error_envelope</td></tr>
+      <tr><td>Skill 规范</td><td>依赖上游结果的参数附固定引用指引话术</td><td>文档约定</td></tr>
+    </table>
+    <div class="cols">
+      <div class="card err"><h3 style="color: var(--err);">安全约定</h3>
+        <ul class="small">
+          <li>只在参数值 / 命令字符串位置替换，工具名与参数名不替换</li>
+          <li>工具结果原文中的 <code class="inline">${</code> 字面量入库时转义，防伪造引用与二次展开</li>
+          <li>exec 落点强制框架转义 + 字符白名单</li>
+          <li>子 agent 不共享 Working Memory，跨 agent 显式解析传值</li>
+        </ul>
+      </div>
+      <div class="card good"><h3>实施顺序建议</h3>
+        <ul class="small">
+          <li>① Enveloper + WorkingMemory + invoke 替换（核心闭环）</li>
+          <li>② Guardrails 六类错误回喂（自纠能力）</li>
+          <li>③ exec 落点转义与白名单（安全）</li>
+          <li>④ 生命周期完整版：TTL / spill / lifetime 过期 / checkpoint</li>
+        </ul>
+      </div>
+    </div>
+    <p class="muted small" style="margin-top: auto;">配套文档：docs/agent-variable-scheme.md（v1）· agent-variable-scheme-v2-decoupled.md（v2）· agent-variable-scheme-v3-envelope.md（v3 全文）</p>
+  </section>
+
+  <div class="footer">
+    <span>Agent 变量方案 v3 · 透明信封（Envelope + Working Memory）</span>
+    <span id="counter">1 / 12</span>
+    <span class="navbtns">
+      <button onclick="nav(-1)">← 上一页</button>
+      <button onclick="nav(1)">下一页 →</button>
+    </span>
+  </div>
+</div>
+<script>
+  const slides = Array.from(document.querySelectorAll('.slide'));
+  let cur = 0;
+  function show(i) {
+    cur = Math.max(0, Math.min(slides.length - 1, i));
+    slides.forEach((s, k) => s.classList.toggle('active', k === cur));
+    document.getElementById('counter').textContent = (cur + 1) + ' / ' + slides.length;
+    document.getElementById('progress').style.width = ((cur + 1) / slides.length * 100) + '%';
+    history.replaceState(null, '', '#' + (cur + 1));
+  }
+  function nav(d) { show(cur + d); }
+  document.addEventListener('keydown', e => {
+    if (['ArrowRight', 'PageDown', ' '].includes(e.key)) nav(1);
+    if (['ArrowLeft', 'PageUp'].includes(e.key)) nav(-1);
+    if (e.key === 'Home') show(0);
+    if (e.key === 'End') show(slides.length - 1);
+  });
+  document.getElementById('deck').addEventListener('click', e => {
+    if (e.target.closest('button, a, pre, table')) return;
+    nav(e.clientX > window.innerWidth / 2 ? 1 : -1);
+  });
+  show((parseInt(location.hash.slice(1), 10) || 1) - 1);
+</script>
+</body>
+</html>
