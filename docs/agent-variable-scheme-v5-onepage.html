@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Agent 变量方案 v5 · 一页纸</title>
+<style>
+  :root {
+    --bg: #0f1420; --panel: #171e2e; --panel2: #1e2740; --ink: #e8ecf5; --muted: #93a0b8;
+    --acc: #5b8cff; --acc2: #38d39f; --warn: #ffb454; --err: #ff6b81;
+    --code-bg: #0b0f18; --line: #2a3550;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--ink);
+    font-family: "PingFang SC", "Microsoft YaHei", "Noto Sans CJK SC", -apple-system, sans-serif;
+    padding: 26px 36px; min-height: 100vh; }
+  .page { max-width: 1560px; margin: 0 auto; display: flex; flex-direction: column; gap: 14px; }
+
+  .header { display: flex; align-items: baseline; gap: 18px; border-bottom: 2px solid var(--acc); padding-bottom: 10px; }
+  .header h1 { font-size: 26px; }
+  .header .one-liner { font-size: 15px; color: var(--muted); }
+  .header .one-liner b { color: var(--warn); }
+
+  .row { display: flex; gap: 14px; }
+  .row > * { flex: 1; min-width: 0; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 12px 16px; }
+  .card h2 { font-size: 15px; margin-bottom: 8px; letter-spacing: 1px; }
+  .card h2.c1 { color: var(--err); } .card h2.c2 { color: var(--acc2); } .card h2.c3 { color: var(--acc); }
+  .card p, .card li { font-size: 13px; line-height: 1.65; color: var(--ink); }
+  .card ul { padding-left: 18px; }
+  .muted { color: var(--muted); }
+  em { color: var(--warn); font-style: normal; font-weight: 600; }
+
+  .arch { background: var(--panel); border: 1px solid var(--acc); border-radius: 12px; padding: 14px 16px; }
+  .arch h2 { font-size: 15px; color: var(--acc); margin-bottom: 10px; letter-spacing: 1px; }
+  .flow { display: flex; align-items: stretch; }
+  .node { background: var(--panel2); border: 1.5px solid var(--acc); border-radius: 10px; padding: 9px 11px;
+    flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; justify-content: center; }
+  .node b { font-size: 13px; color: #fff; }
+  .node span { font-size: 11.5px; color: var(--muted); line-height: 1.5; }
+  .node.tool { border-color: var(--acc2); } .node.mem { border-color: var(--warn); }
+  .arrow { align-self: center; padding: 0 6px; color: var(--acc); font-size: 18px; font-weight: 700; flex: none; }
+  .loopback { text-align: center; font-size: 12px; color: var(--muted); margin-top: 6px; }
+  .loopback b { color: var(--acc2); }
+
+  pre { background: var(--code-bg); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px;
+    overflow: auto; font-size: 12px; line-height: 1.55; font-family: "SF Mono", Consolas, monospace; color: #cdd7ea; }
+  code.inline { background: var(--code-bg); border: 1px solid var(--line); border-radius: 4px; padding: 0 6px;
+    font-size: .92em; font-family: Consolas, monospace; color: #9fc0ff; }
+  .tok-key { color: #7fb3ff; } .tok-str { color: #8ee6b8; } .tok-ref { color: #ffb454; font-weight: 700; }
+  .tok-cmt { color: #6b7a95; }
+
+  .strip { display: flex; gap: 14px; align-items: stretch; }
+  .strip .card { display: flex; flex-direction: column; justify-content: center; }
+  .lifecycle { display: flex; align-items: center; gap: 6px; font-size: 12.5px; flex-wrap: wrap; }
+  .lifecycle .st { background: var(--panel2); border: 1px solid var(--line); border-radius: 999px; padding: 3px 12px; white-space: nowrap; }
+  .lifecycle .st.hot { border-color: var(--acc2); } .lifecycle .st.cold { border-color: var(--warn); } .lifecycle .st.dead { border-color: var(--err); }
+  .lifecycle .a { color: var(--acc); font-weight: 700; }
+
+  @media print {
+    body { padding: 10px; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <div class="header">
+    <h1>Agent 变量方案 <span style="color:var(--acc);">v5</span></h1>
+    <div class="one-liner">工具结果原样存入 Working Memory 并包信封给模型 · 模型用 <b>${resultId.字段名}</b> 引用 · 框架在执行下游工具前替换为真实值</div>
+  </div>
+
+  <div class="row">
+    <div class="card">
+      <h2 class="c1">背景 · 解决什么问题</h2>
+      <ul>
+        <li>toolA 结果常含<em>长值</em>（绝对路径、签名 URL），toolB 依赖它</li>
+        <li>模型逐 token 复述：<em>增量推理时延</em>随长度线性放大（246 字符 ≈ 80+ tokens）</li>
+        <li>抄错一个字符即失败（403 / 路径不存在），多轮对话反复复述使上下文膨胀</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h2 class="c2">方案原则</h2>
+      <ul>
+        <li><em>工具零修改</em>：A 原样返回，B 收到真实值，两端对机制零感知</li>
+        <li><em>Agent 系统不感知业务</em>：框架只认 resultId 与 <code class="inline">${}</code> 协议标识，不理解任何字段含义</li>
+        <li><em>模型零抄写</em>：只写引用不复述内容（skill 描述中一句指引）</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h2 class="c3">关键规则</h2>
+      <ul>
+        <li>替换时机：schema 校验之后、<em>工具执行之前</em>；真实值不回写对话历史</li>
+        <li>落点转义：invoke 值语义注入；exec 自动 shell 单引号包裹（防截断/注入）</li>
+        <li>出错回喂：id / 字段不存在、已过期 → 不执行，附可用字段清单，模型自纠</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="arch">
+    <h2>逻辑架构 · 完整流程</h2>
+    <div class="flow">
+      <div class="node"><b>① 模型调用 A</b><span>invoke("image_gen", {…})</span></div>
+      <div class="arrow">→</div>
+      <div class="node tool"><b>② A 原样执行返回</b><span>{"img_uri": "…246字符…",<br>"createTime": "…"}</span></div>
+      <div class="arrow">→</div>
+      <div class="node mem"><b>③ 框架存储 + 包信封</b><span>resultId=a3f8k2p9<br>原始结果原样存 Working Memory</span></div>
+      <div class="arrow">→</div>
+      <div class="node"><b>④ 信封给模型</b><span>toolName / responseText /<br>resultId / resultData（原样）</span></div>
+      <div class="arrow">→</div>
+      <div class="node"><b>⑤ 模型输出 B 调用</b><span>参数写 ${a3f8k2p9.img_uri}<br>不复制内容</span></div>
+      <div class="arrow">→</div>
+      <div class="node mem"><b>⑥ 框架替换变量</b><span>查 KV → 真实值<br>invoke 值注入 / exec 转义</span></div>
+      <div class="arrow">→</div>
+      <div class="node tool"><b>⑦ 执行 B</b><span>收到完整真实值<br>零感知</span></div>
+    </div>
+    <div class="loopback">B 的结果回到 <b>③</b> 同样处理 —— 每个工具结果都有自己的 resultId，agent loop 内与多轮对话中均可引用</div>
+  </div>
+
+  <div class="row">
+    <div class="card">
+      <h2 class="c3">③④ 信封 = 原始结果 + 元信息（resultData 原样，无任何加工）</h2>
+      <pre>{
+  <span class="tok-key">"toolName"</span>: <span class="tok-str">"image_gen"</span>,
+  <span class="tok-key">"responseText"</span>: <span class="tok-str">"已生成图片。引用字段请写 ${a3f8k2p9.字段名}，勿抄写内容。"</span>,
+  <span class="tok-key">"resultId"</span>: <span class="tok-str">"a3f8k2p9"</span>,        <span class="tok-cmt">// 框架生成，8 位随机，跨轮唯一</span>
+  <span class="tok-key">"resultData"</span>: {                  <span class="tok-cmt">// 工具原始返回，一字不改</span>
+    <span class="tok-key">"img_uri"</span>: <span class="tok-str">"https://cdn.example.com/imgs/2026/08/10/f7c3a91e-…-4096.png?sig=Kx7Qw9f2…&exp=1754800000"</span>,
+    <span class="tok-key">"createTime"</span>: <span class="tok-str">"2026-08-10T04:05:12Z"</span>
+  }
+}</pre>
+    </div>
+    <div class="card">
+      <h2 class="c3">⑤⑥ 引用与替换（两种落点）</h2>
+      <pre><span class="tok-cmt">// invoke：值语义注入，保留类型</span>
+invoke("edit_image", {"source": <span class="tok-ref">"${a3f8k2p9.img_uri}"</span>, "op": "crop"})
+
+<span class="tok-cmt">// exec：框架替换时自动 shell 转义</span>
+exec(command="curl -o /tmp/img.png <span class="tok-ref">${a3f8k2p9.img_uri}</span>")
+<span class="tok-cmt">// 实际执行 → curl -o /tmp/img.png 'https://cdn.example.com/…&exp=…'</span></pre>
+      <p class="muted" style="font-size:12.5px; margin-top:8px;">嵌套/数组结果按路径引用：<code class="inline">${a3f8k2p9.items[0].url}</code>；
+      工具结果原文中的 <code class="inline">${</code> 入库时转义，防伪造引用。</p>
+    </div>
+  </div>
+
+  <div class="strip">
+    <div class="card" style="flex: 2;">
+      <h2 class="c2">生命周期</h2>
+      <div class="lifecycle">
+        <span class="st">创建：默认 loop 作用域</span><span class="a">→ 被引用</span>
+        <span class="st hot">提升 conversation · 每次引用续期</span><span class="a">→ N 轮未引用</span>
+        <span class="st cold">TTL 淘汰（大值可先降级磁盘）</span><span class="a">→ 物理失效</span>
+        <span class="st dead">过期：引用报错 + 提示重取</span>
+        <span class="a">·</span><span class="st">随对话 checkpoint，恢复后 ${…} 不悬垂</span>
+      </div>
+    </div>
+    <div class="card">
+      <h2 class="c1">收益</h2>
+      <p style="font-size:12.5px;">B 调用传参 80+ tokens → <em>8 tokens</em>；抄写错误结构性归零；对话历史中长值只出现一次</p>
+    </div>
+  </div>
+
+</div>
+</body>
+</html>
