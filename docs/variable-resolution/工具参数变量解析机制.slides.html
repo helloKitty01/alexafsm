@@ -23,8 +23,8 @@
   body {
     font-family: "PingFang SC", "Microsoft YaHei", "Noto Sans SC", -apple-system, sans-serif;
     color: var(--text);
-    display: flex; flex-direction: column; align-items: center;
-    gap: 28px; padding: 28px 16px;
+    display: flex; justify-content: center; align-items: flex-start;
+    padding: 28px 16px; min-height: 100vh;
   }
   .slide {
     width: min(1280px, 96vw);
@@ -33,251 +33,235 @@
     border: 1px solid var(--card-border);
     border-radius: 18px;
     box-shadow: 0 22px 60px rgba(0,0,0,.5);
-    padding: 3.2% 3.8%;
+    padding: 2.6% 3.2%;
     display: flex; flex-direction: column;
     overflow: hidden; position: relative;
-    font-size: clamp(9px, 1.05vw, 14px);
+    font-size: clamp(10px, 1.18vw, 15.5px);
   }
   .slide::before {
     content: ""; position: absolute; inset: 0 0 auto 0; height: 4px;
     background: linear-gradient(90deg, var(--accent), var(--accent2));
     border-radius: 18px 18px 0 0;
   }
-  .page-no { position: absolute; bottom: 2.4%; right: 3.2%; color: var(--muted); font-size: .85em; }
-  .brand { position: absolute; bottom: 2.4%; left: 3.8%; color: var(--muted); font-size: .85em; letter-spacing: .08em; }
 
-  h1 { font-size: 2.1em; font-weight: 700; letter-spacing: .01em; }
+  /* ---- 标题区 ---- */
+  .header { display: flex; align-items: center; justify-content: space-between; gap: 2em; margin-bottom: 1.1em; }
+  h1 { font-size: 1.85em; font-weight: 700; white-space: nowrap; }
   h1 .hl { color: var(--accent); }
-  .subtitle { color: var(--muted); margin-top: .45em; font-size: 1.05em; }
-  h2 { font-size: 1.5em; font-weight: 700; margin-bottom: .2em; }
+  .syntax {
+    display: flex; align-items: center; gap: 1.2em;
+    background: linear-gradient(90deg, rgba(91,157,255,.12), rgba(79,214,167,.10));
+    border: 1px solid rgba(91,157,255,.3);
+    border-radius: 10px; padding: .55em 1.1em; flex: 1; min-width: 0;
+  }
+  .syntax .big { font-family: var(--mono); font-size: 1.15em; font-weight: 700; color: #fff; white-space: nowrap; }
+  .syntax .big .ns { color: var(--accent); }
+  .syntax .big .en { color: var(--accent2); }
+  .syntax .big .at { color: var(--warn); }
+  .syntax p { color: var(--muted); font-size: .88em; line-height: 1.4; }
+
+  /* ---- 布局 ---- */
+  .grid {
+    display: grid; gap: 1em; flex: 1; min-height: 0;
+    grid-template-columns: 1fr 1.55fr;
+    grid-template-rows: 1fr auto;
+  }
+  .card {
+    background: var(--card);
+    border: 1px solid var(--card-border);
+    border-radius: 12px;
+    padding: 1em 1.15em;
+    min-height: 0;
+  }
+  .card.flow-band { grid-column: 1 / -1; }
+
   h3 { font-size: 1.0em; font-weight: 700; margin-bottom: .5em; display: flex; align-items: center; gap: .5em; }
   h3 .dot { width: .55em; height: .55em; border-radius: 50%; background: var(--accent); flex: none; }
   h3.green .dot { background: var(--accent2); }
   h3.warn .dot { background: var(--warn); }
 
-  .header { margin-bottom: 1.6em; }
-  .grid { display: grid; gap: 1.1em; flex: 1; min-height: 0; }
-  .s1-grid { grid-template-columns: 1.05fr 1.3fr; grid-template-rows: auto 1fr; }
-  .s2-grid { grid-template-columns: 1.35fr 1fr; grid-template-rows: 1fr auto; }
-
-  .card {
-    background: var(--card);
-    border: 1px solid var(--card-border);
-    border-radius: 12px;
-    padding: 1.1em 1.25em;
-    min-height: 0;
-  }
   .card ul { list-style: none; }
-  .card li { color: var(--muted); line-height: 1.55; padding-left: 1.1em; position: relative; margin-bottom: .35em; }
+  .card li { color: var(--muted); line-height: 1.5; padding-left: 1.05em; position: relative; margin-bottom: .3em; }
   .card li::before { content: "•"; color: var(--accent); position: absolute; left: 0; }
   .card li strong, .card p strong { color: var(--text); font-weight: 600; }
-  .card p { color: var(--muted); line-height: 1.55; }
+  .card p { color: var(--muted); line-height: 1.5; }
 
   code {
-    font-family: var(--mono); font-size: .92em;
+    font-family: var(--mono); font-size: .9em;
     background: var(--code-bg); color: #cfe3ff;
-    padding: .12em .4em; border-radius: 5px;
+    padding: .1em .38em; border-radius: 5px;
   }
-  pre {
-    font-family: var(--mono); font-size: .88em; line-height: 1.55;
+
+  /* ---- 关键设计区 ---- */
+  .design { display: flex; flex-direction: column; gap: .8em; }
+  .design-block { display: flex; gap: .9em; align-items: flex-start; }
+  .design-block .label {
+    flex: none; width: 7.5em; font-weight: 700; color: var(--text); font-size: .92em;
+    padding-top: .15em;
+  }
+  .design-block .label small { display: block; font-weight: 400; color: var(--accent); font-size: .8em; margin-top: .15em; }
+  .design-block .body { flex: 1; min-width: 0; color: var(--muted); font-size: .92em; line-height: 1.55; }
+  .divider { border-top: 1px dashed rgba(255,255,255,.1); }
+
+  .tables { display: flex; gap: .8em; }
+  .mini-table {
+    flex: 1; background: var(--code-bg); border: 1px solid var(--card-border);
+    border-radius: 8px; padding: .55em .8em; font-size: .95em;
+  }
+  .mini-table .t-name { font-weight: 700; color: var(--text); margin-bottom: .25em; }
+  .mini-table .t-name span { color: var(--muted); font-weight: 400; font-size: .85em; }
+  .mini-table .t-row { font-family: var(--mono); font-size: .88em; color: #cfe3ff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .mini-table .t-row .arr { color: var(--accent2); }
+
+  .mini-flow { display: flex; align-items: center; gap: .5em; flex-wrap: nowrap; margin-top: .3em; }
+  .mini-flow .step {
     background: var(--code-bg); border: 1px solid var(--card-border);
-    border-radius: 9px; padding: .8em 1em; color: #cfe3ff;
-    overflow: hidden; white-space: pre;
+    border-radius: 7px; padding: .32em .6em; font-size: .85em; color: var(--text); white-space: nowrap;
   }
-  pre .c { color: #6f81a3; }
-  pre .k { color: #ff8bb5; }
-  pre .g { color: var(--accent2); }
+  .mini-flow .arr { color: var(--accent); font-weight: 700; flex: none; }
 
-  .syntax-banner {
-    grid-column: 1 / -1;
-    display: flex; align-items: center; gap: 1.4em;
-    background: linear-gradient(90deg, rgba(91,157,255,.12), rgba(79,214,167,.10));
-    border: 1px solid rgba(91,157,255,.3);
-    border-radius: 12px; padding: .9em 1.25em;
+  .skill-example {
+    font-family: var(--mono); font-size: .86em; color: #cfe3ff;
+    background: var(--code-bg); border: 1px solid var(--card-border);
+    border-radius: 8px; padding: .5em .8em; margin-top: .4em;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   }
-  .syntax-banner .big {
-    font-family: var(--mono); font-size: 1.35em; font-weight: 700; color: #fff; white-space: nowrap;
-  }
-  .syntax-banner .big .ns { color: var(--accent); }
-  .syntax-banner .big .en { color: var(--accent2); }
-  .syntax-banner .big .at { color: var(--warn); }
-  .syntax-banner p { color: var(--muted); line-height: 1.5; font-size: .95em; }
+  .skill-example .v { color: var(--accent2); }
 
+  /* ---- 流程区 ---- */
+  .flows { display: flex; gap: 1.2em; }
+  .flow-col { flex: 1; min-width: 0; }
   .tag {
     display: inline-block; font-size: .78em; font-weight: 600;
-    border-radius: 99px; padding: .18em .75em; margin-bottom: .55em;
+    border-radius: 99px; padding: .16em .7em; margin-bottom: .5em;
     background: rgba(91,157,255,.15); color: var(--accent); border: 1px solid rgba(91,157,255,.35);
   }
   .tag.green { background: rgba(79,214,167,.13); color: var(--accent2); border-color: rgba(79,214,167,.35); }
   .tag.warn  { background: rgba(255,180,84,.13); color: var(--warn);  border-color: rgba(255,180,84,.35); }
-
-  .flow { display: flex; flex-direction: column; gap: .8em; }
-  .path { display: flex; align-items: center; gap: .7em; flex-wrap: nowrap; }
+  .path { display: flex; align-items: center; gap: .55em; flex-wrap: nowrap; }
   .path .step {
     background: var(--card); border: 1px solid var(--card-border);
-    border-radius: 8px; padding: .45em .7em; font-size: .85em; color: var(--text);
-    white-space: nowrap; line-height: 1.35;
+    border-radius: 8px; padding: .42em .65em; font-size: .84em; color: var(--text);
+    white-space: nowrap; line-height: 1.35; min-width: 0;
   }
-  .path .step small { display: block; color: var(--muted); font-size: .85em; }
+  .path .step small { display: block; color: var(--muted); font-size: .84em; }
   .path .arr { color: var(--accent); font-weight: 700; flex: none; }
-  .path.p1 .step:first-child { border-color: rgba(79,214,167,.5); }
-  .path.p3 .step:first-child { border-color: rgba(255,180,84,.5); }
-
-  .kv { width: 100%; border-collapse: collapse; font-size: .9em; }
-  .kv td { padding: .42em .3em; border-bottom: 1px solid rgba(255,255,255,.06); vertical-align: top; line-height: 1.45; }
-  .kv td:first-child { color: var(--text); font-weight: 600; white-space: nowrap; padding-right: 1em; }
-  .kv td:last-child { color: var(--muted); }
-  .kv tr:last-child td { border-bottom: none; }
+  .path.ok .step:first-child { border-color: rgba(79,214,167,.5); }
+  .path.fb .step:first-child { border-color: rgba(255,180,84,.5); }
 
   .takeaway {
-    grid-column: 1 / -1;
-    background: linear-gradient(90deg, rgba(79,214,167,.12), rgba(91,157,255,.10));
-    border: 1px solid rgba(79,214,167,.32);
-    border-radius: 12px; padding: .85em 1.25em;
-    display: flex; align-items: center; gap: 1em;
+    margin-top: .8em; padding-top: .65em;
+    border-top: 1px dashed rgba(255,255,255,.12);
+    color: var(--text); font-size: .95em; line-height: 1.5;
   }
-  .takeaway .icon { font-size: 1.5em; }
-  .takeaway p { color: var(--text); font-size: 1.02em; line-height: 1.5; }
-  .takeaway p strong { color: var(--accent2); }
+  .takeaway strong { color: var(--accent2); }
 
   @media print {
-    body { padding: 0; gap: 0; background: #fff; }
-    .slide { width: 100%; border-radius: 0; box-shadow: none; page-break-after: always; }
+    body { padding: 0; background: #fff; }
+    .slide { width: 100%; border-radius: 0; box-shadow: none; }
   }
 </style>
 </head>
 <body>
 
-<!-- ============ 第 1 页：问题与核心设计 ============ -->
-<section class="slide" id="s1">
+<section class="slide">
   <div class="header">
     <h1>工具参数<span class="hl">变量解析机制</span>方案</h1>
-    <p class="subtitle">openClaw · 用 <code>${app.抖音.bundleName}</code> 消除多余 loop 与标识符幻觉 · 工具零改动</p>
+    <div class="syntax">
+      <span class="big">${ <span class="ns">app</span> . <span class="en">抖音</span> . <span class="at">bundleName</span> }</span>
+      <p><strong style="color:var(--text)">namespace . entity . attribute</strong> 三段式，命名空间可扩展；模型只表达"哪个应用"，真实标识符由框架在工具调用前查表求值。</p>
+    </div>
   </div>
 
-  <div class="grid s1-grid">
-    <div class="syntax-banner">
-      <span class="big">${ <span class="ns">app</span> . <span class="en">抖音</span> . <span class="at">bundleName</span> }</span>
-      <p><strong style="color:var(--text)">namespace . entity . attribute</strong> 三段式；<span style="color:var(--accent)">命名空间</span>经 Resolver 注册表扩展（未来支持 contact / device / result）；转义字面量写 <code>$${</code>。</p>
-    </div>
-
+  <div class="grid">
+    <!-- 左列：问题与目标 -->
     <div class="card">
-      <h3 class="warn"><span class="dot"></span>问题与约束</h3>
+      <h3 class="warn"><span class="dot"></span>问题</h3>
       <ul>
         <li><strong>两次 loop</strong>：模型须先调 <code>getAllInstalledApps</code> 查 bundleName，再调 <code>forbidPermission(bundleName, 权限)</code></li>
-        <li><strong>幻觉风险</strong>：模型凭记忆填写 bundleName 可能编造（如 <code>com.douyin.app</code>）</li>
-        <li><strong>硬约束</strong>：工具不可修改；带 bundleName 的工具很多，无法逐个改造</li>
+        <li><strong>幻觉风险</strong>：凭记忆填写 bundleName 可能编造（如 <code>com.douyin.app</code>）</li>
+        <li><strong>硬约束</strong>：工具不可修改，带 bundleName 的工具很多，无法逐个改造</li>
       </ul>
-      <h3 class="green" style="margin-top:1em"><span class="dot"></span>目标</h3>
+      <h3 class="green" style="margin-top:1.1em"><span class="dot"></span>目标</h3>
       <ul>
         <li>正常路径 <strong>1 次 loop</strong> 完成调用</li>
         <li><strong>工具零改动</strong>，同类工具自动全覆盖</li>
-        <li>模型只表达"哪个应用"，<strong>真实标识符永远来自查表</strong></li>
+        <li><strong>真实标识符永远来自查表</strong>，结构性消除幻觉</li>
       </ul>
     </div>
 
-    <div class="card">
-      <h3><span class="dot"></span>核心组件：框架层 Pre-call 拦截器</h3>
-      <pre><span class="c"># 工具分发统一入口，递归替换 args 中的 ${...}</span>
-RESOLVERS = {<span class="g">"app"</span>: AppResolver()}   <span class="c"># 新命名空间只需注册</span>
+    <!-- 右列：关键设计 -->
+    <div class="card design">
+      <h3 style="margin-bottom:.2em"><span class="dot"></span>关键设计</h3>
 
-<span class="k">class</span> AppResolver:
-    <span class="k">def</span> resolve(self, entity, attr):
-        canonical = alias_table.get(normalize(entity), entity)  <span class="c"># ① 同义词归一</span>
-        <span class="k">return</span> static_table.get(canonical, {}).get(attr)        <span class="c"># ② 查静态表</span>
-
-<span class="c"># 解析失败 → 短路抛错，绝不把 ${...} 字面量透传给工具</span></pre>
-      <p style="margin-top:.7em"><strong>两张表：</strong>静态表 <code>{"抖音": {"bundleName": "com.ss.android.ugc.aweme"}}</code>（高频应用）＋ 同义词表 <code>{"douyin"→"抖音"}</code>（查表前 normalize）。</p>
-    </div>
-  </div>
-
-  <span class="brand">openClaw · Agent 框架设计</span>
-  <span class="page-no">1 / 2</span>
-</section>
-
-<!-- ============ 第 2 页：执行路径 / 提示词分层 / 注意点 ============ -->
-<section class="slide" id="s2">
-  <div class="header">
-    <h2>执行路径 · 提示词分层 · 实现要点</h2>
-  </div>
-
-  <div class="grid s2-grid">
-    <div class="card">
-      <h3><span class="dot"></span>三条执行路径</h3>
-      <div class="flow">
-        <div>
-          <span class="tag green">正常路径 · 1 次 loop</span>
-          <div class="path p1">
-            <span class="step">模型输出<br><small>${app.抖音.bundleName}</small></span><span class="arr">→</span>
-            <span class="step">拦截器查表<br><small>同义词 + 静态表</small></span><span class="arr">→</span>
-            <span class="step">替换真实值<br><small>com.ss.android...</small></span><span class="arr">→</span>
-            <span class="step">执行工具</span>
+      <div class="design-block">
+        <div class="label">两张表<small>数据基础</small></div>
+        <div class="body">
+          <div class="tables">
+            <div class="mini-table">
+              <div class="t-name">同义词表 <span>· 别名归一</span></div>
+              <div class="t-row">douyin / Douyin <span class="arr">→</span> 抖音</div>
+            </div>
+            <div class="mini-table">
+              <div class="t-name">映射表 <span>· 规范名 → bundleName</span></div>
+              <div class="t-row">抖音 <span class="arr">→</span> com.ss.android.ugc.aweme</div>
+            </div>
           </div>
         </div>
-        <div>
-          <span class="tag">自愈路径 · 仍 1 次 loop（模型无感知）</span>
-          <div class="path p2">
-            <span class="step">解析失败</span><span class="arr">→</span>
-            <span class="step">框架自调<br><small>getAllInstalledApps</small></span><span class="arr">→</span>
-            <span class="step">增量更新缓存</span><span class="arr">→</span>
-            <span class="step">重试命中</span><span class="arr">→</span>
-            <span class="step">执行工具</span>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="design-block">
+        <div class="label">Pre-call 拦截器<small>框架层 · 工具无感知</small></div>
+        <div class="body">
+          工具调用前扫描参数中的 <code>${...}</code>，查表替换为真实值；解析失败则短路，不把变量字面量透传给工具。
+          <div class="mini-flow">
+            <span class="step">扫描 ${...}</span><span class="arr">→</span>
+            <span class="step">同义词归一</span><span class="arr">→</span>
+            <span class="step">查映射表</span><span class="arr">→</span>
+            <span class="step">替换真实值</span>
           </div>
         </div>
-        <div>
-          <span class="tag warn">兜底路径 · 2 次 loop（仅应用不存在 / 名字错误）</span>
-          <div class="path p3">
-            <span class="step">重试仍失败</span><span class="arr">→</span>
-            <span class="step">已安装列表 + 错误<br><small>作为 tool result 返回</small></span><span class="arr">→</span>
-            <span class="step">模型纠正应用名重试</span>
-          </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="design-block">
+        <div class="label">Skill 设计<small>提示词约定</small></div>
+        <div class="body">
+          bundleName 参数直接填 <code>${app.应用名.bundleName}</code>，无需先查已安装列表，禁止凭记忆编造标识符。
+          <div class="skill-example">forbidPermission(bundleName=<span class="v">"${app.抖音.bundleName}"</span>, permission=<span class="v">"麦克风"</span>)</div>
         </div>
       </div>
     </div>
 
-    <div class="card">
-      <h3><span class="dot"></span>提示词分层（两层都写，职责不同）</h3>
-      <table class="kv">
-        <tr>
-          <td>SystemPrompt<br><span style="color:var(--accent);font-size:.82em">通用机制</span></td>
-          <td>声明变量语法与 <code>app</code> 命名空间；约束"优先用变量、<strong style="color:var(--text)">禁止凭记忆编造标识符</strong>"</td>
-        </tr>
-        <tr>
-          <td>Skill<br><span style="color:var(--accent2);font-size:.82em">具体用法</span></td>
-          <td>落到具体工具参数 + few-shot：<br><code>forbidPermission(bundleName="${app.抖音.bundleName}", permission="麦克风")</code></td>
-        </tr>
-      </table>
-      <h3 style="margin-top:1em"><span class="dot"></span>实现注意点</h3>
-      <ul>
-        <li><strong>替换后校验</strong>参数 schema，避免类型静默出错</li>
-        <li>自愈缓存为 <strong>session 级</strong>；静态表只放高频，长尾靠自愈补</li>
-        <li>记录"原文 → 求值结果"<strong>日志</strong>，防禁错应用</li>
-        <li>Resolver <strong>只读查表</strong>，不执行表达式，防提示注入</li>
-        <li>扩展：<code>${result.tool[0].x}</code> 引用前序输出，进一步压缩 loop</li>
-      </ul>
-    </div>
-
-    <div class="takeaway">
-      <span class="icon">◎</span>
-      <p><strong>方案不变量：</strong>模型永远只表达"哪个应用"，真实标识符永远来自查表 —— 幻觉被结构性消除，绝大多数情况 loop 压到 1 次。</p>
+    <!-- 底部横条：关键流程 -->
+    <div class="card flow-band">
+      <div class="flows">
+        <div class="flow-col">
+          <span class="tag green">正常路径 · 1 次 loop</span>
+          <div class="path ok">
+            <span class="step">模型输出<br><small>${app.抖音.bundleName}</small></span><span class="arr">→</span>
+            <span class="step">拦截器查表<br><small>同义词表 + 映射表</small></span><span class="arr">→</span>
+            <span class="step">替换真实值<br><small>com.ss.android...</small></span><span class="arr">→</span>
+            <span class="step">执行工具</span>
+          </div>
+        </div>
+        <div class="flow-col">
+          <span class="tag warn">兜底路径 · 解析失败时</span>
+          <div class="path fb">
+            <span class="step">解析失败</span><span class="arr">→</span>
+            <span class="step">查询全量已安装应用<br><small>getAllInstalledApps</small></span><span class="arr">→</span>
+            <span class="step">列表 + 错误给模型<br><small>作为 tool result</small></span><span class="arr">→</span>
+            <span class="step">模型纠正后重试</span>
+          </div>
+        </div>
+      </div>
+      <div class="takeaway">◎ <strong>方案不变量：</strong>模型永远只表达"哪个应用"，真实标识符永远来自查表 —— 幻觉被结构性消除，绝大多数情况 loop 压到 1 次。</div>
     </div>
   </div>
-
-  <span class="brand">openClaw · Agent 框架设计</span>
-  <span class="page-no">2 / 2</span>
 </section>
 
-<script>
-  // 键盘翻页：↑↓ / PgUp PgDn / 空格
-  const slides = [...document.querySelectorAll('.slide')];
-  let cur = 0;
-  addEventListener('keydown', e => {
-    if (['ArrowDown','PageDown',' '].includes(e.key)) cur = Math.min(cur + 1, slides.length - 1);
-    else if (['ArrowUp','PageUp'].includes(e.key)) cur = Math.max(cur - 1, 0);
-    else return;
-    e.preventDefault();
-    slides[cur].scrollIntoView({ behavior: 'smooth', block: 'center' });
-  });
-</script>
 </body>
 </html>
