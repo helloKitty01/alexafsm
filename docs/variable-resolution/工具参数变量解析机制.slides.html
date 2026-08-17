@@ -36,7 +36,7 @@
     padding: 2.6% 3.2%;
     display: flex; flex-direction: column;
     overflow: hidden; position: relative;
-    font-size: clamp(10px, 1.18vw, 15.5px);
+    font-size: clamp(10px, 1.12vw, 14.5px);
   }
   .slide::before {
     content: ""; position: absolute; inset: 0 0 auto 0; height: 4px;
@@ -149,8 +149,21 @@
   .path.ok .step:first-child { border-color: rgba(79,214,167,.5); }
   .path.fb .step:first-child { border-color: rgba(255,180,84,.5); }
 
-  .takeaway {
+  .extras {
     margin-top: .8em; padding-top: .65em;
+    border-top: 1px dashed rgba(255,255,255,.12);
+    display: flex; align-items: flex-start; gap: 1em;
+  }
+  .extras .tag.ext {
+    flex: none; margin-bottom: 0; margin-top: .1em;
+    background: rgba(155,120,255,.14); color: #b79aff; border-color: rgba(155,120,255,.38);
+  }
+  .extra-items { display: flex; gap: 1.4em; min-width: 0; }
+  .extra-items > div { flex: 1; color: var(--muted); font-size: .88em; line-height: 1.5; }
+  .extra-items strong { color: var(--text); }
+
+  .takeaway {
+    margin-top: .7em; padding-top: .6em;
     border-top: 1px dashed rgba(255,255,255,.12);
     color: var(--text); font-size: .95em; line-height: 1.5;
   }
@@ -249,13 +262,20 @@
           </div>
         </div>
         <div class="flow-col">
-          <span class="tag warn">兜底路径 · 解析失败时</span>
+          <span class="tag warn">兜底路径 · 解析失败时（可选）</span>
           <div class="path fb">
             <span class="step">解析失败</span><span class="arr">→</span>
             <span class="step">查询全量已安装应用<br><small>getAllInstalledApps</small></span><span class="arr">→</span>
             <span class="step">列表 + 错误给模型<br><small>作为 tool result</small></span><span class="arr">→</span>
             <span class="step">模型纠正后重试</span>
           </div>
+        </div>
+      </div>
+      <div class="extras">
+        <span class="tag ext">进一步优化</span>
+        <div class="extra-items">
+          <div><strong>① 标准名列表注入：</strong>会话开始时把已安装应用的标准名称列表给到模型，从封闭词表选名，解决同义词覆盖不全，兜底触发概率大幅降低。</div>
+          <div><strong>② 工具 schema 改写：</strong>框架注册层把 <code>bundleName</code> 参数重定义为 <code>appName</code>，拦截器转换后调用原工具——模型直接传"抖音"，无需变量语法；变量语法保留为通用机制。</div>
         </div>
       </div>
       <div class="takeaway">◎ <strong>方案不变量：</strong>模型永远只表达"哪个应用"，真实标识符永远来自查表 —— 幻觉被结构性消除，绝大多数情况 loop 压到 1 次。</div>
