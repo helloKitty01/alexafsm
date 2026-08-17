@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Agent 变量方案 v4</title>
+<style>
+  :root {
+    --bg: #0f1420; --panel: #171e2e; --panel2: #1e2740; --ink: #e8ecf5; --muted: #93a0b8;
+    --acc: #5b8cff; --acc2: #38d39f; --warn: #ffb454; --err: #ff6b81;
+    --code-bg: #0b0f18; --line: #2a3550;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; background: var(--bg); color: var(--ink);
+    font-family: "PingFang SC", "Microsoft YaHei", "Noto Sans CJK SC", -apple-system, sans-serif; }
+  .deck { height: 100vh; overflow: hidden; position: relative; }
+  .slide { position: absolute; inset: 0; padding: 52px 80px 92px; display: none; flex-direction: column; gap: 20px; overflow: auto; }
+  .slide.active { display: flex; animation: fadein .25s ease; }
+  @keyframes fadein { from { opacity: 0; transform: translateY(8px);} to { opacity: 1; transform: none;} }
+
+  .kicker { color: var(--acc); font-size: 15px; letter-spacing: 3px; font-weight: 600; }
+  h1 { font-size: 42px; line-height: 1.3; }
+  h2 { font-size: 30px; } h2 .num { color: var(--acc); margin-right: 12px; }
+  h3 { font-size: 18px; color: var(--acc2); margin-bottom: 6px; }
+  p, li { font-size: 17px; line-height: 1.75; }
+  .muted { color: var(--muted); } .small { font-size: 14px; }
+  em { color: var(--warn); font-style: normal; font-weight: 600; }
+
+  .cols { display: flex; gap: 22px; align-items: stretch; }
+  .cols > * { flex: 1; min-width: 0; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 18px 20px; }
+  .card.good { border-color: var(--acc2); } .card.warn { border-color: var(--warn); } .card.err { border-color: var(--err); }
+
+  pre { background: var(--code-bg); border: 1px solid var(--line); border-radius: 10px; padding: 13px 15px;
+    overflow: auto; font-size: 13.5px; line-height: 1.6; font-family: "SF Mono", Consolas, monospace; color: #cdd7ea; }
+  code.inline { background: var(--code-bg); border: 1px solid var(--line); border-radius: 5px; padding: 1px 7px;
+    font-size: .92em; font-family: Consolas, monospace; color: #9fc0ff; }
+  .tok-key { color: #7fb3ff; } .tok-str { color: #8ee6b8; } .tok-ref { color: #ffb454; font-weight: 700; }
+  .tok-cmt { color: #6b7a95; } .tok-err { color: #ff8fa0; }
+
+  .flow { display: flex; align-items: stretch; flex-wrap: wrap; }
+  .flow .node { background: var(--panel2); border: 1.5px solid var(--acc); border-radius: 12px; padding: 13px 15px;
+    min-width: 140px; flex: 1; display: flex; flex-direction: column; gap: 4px; justify-content: center; }
+  .flow .node b { font-size: 15px; color: #fff; } .flow .node span { font-size: 12.5px; color: var(--muted); line-height: 1.5; }
+  .flow .node.tool { border-color: var(--acc2); } .flow .node.mem { border-color: var(--warn); }
+  .flow .arrow { align-self: center; padding: 0 8px; color: var(--acc); font-size: 22px; font-weight: 700;
+    display: flex; flex-direction: column; align-items: center; }
+  .flow .arrow small { font-size: 11px; color: var(--muted); white-space: nowrap; }
+
+  table { border-collapse: collapse; width: 100%; font-size: 15px; }
+  th, td { border: 1px solid var(--line); padding: 9px 13px; text-align: left; line-height: 1.55; }
+  th { background: var(--panel2); color: #fff; font-size: 14.5px; }
+
+  .callout { border-left: 3px solid var(--acc2); padding: 8px 14px; background: var(--panel); border-radius: 0 10px 10px 0; }
+  .callout.e { border-left-color: var(--err); }
+
+  .footer { position: absolute; bottom: 0; left: 0; right: 0; height: 54px; display: flex; align-items: center;
+    justify-content: space-between; padding: 0 80px; color: var(--muted); font-size: 13px;
+    border-top: 1px solid var(--line); background: rgba(15,20,32,.9); z-index: 5; }
+  .navbtns button { background: var(--panel2); color: var(--ink); border: 1px solid var(--line); border-radius: 8px;
+    padding: 6px 16px; font-size: 14px; cursor: pointer; margin-left: 8px; }
+  .navbtns button:hover { border-color: var(--acc); }
+  .progress { position: absolute; top: 0; left: 0; height: 3px; background: var(--acc); z-index: 6; transition: width .2s; }
+
+  @media print { .deck { height: auto; overflow: visible; } .slide { display: flex !important; position: relative; page-break-after: always; height: 100vh; } .footer, .progress { display: none; } }
+</style>
+</head>
+<body>
+<div class="deck" id="deck">
+  <div class="progress" id="progress"></div>
+
+  <!-- 1 封面 + 方案一句话 -->
+  <section class="slide active">
+    <div style="margin: auto 0; display: flex; flex-direction: column; gap: 24px; max-width: 1050px;">
+      <div class="kicker">AGENT VARIABLE SCHEME · V4</div>
+      <h1>Agent 变量方案<br><span style="color: var(--acc);">Working Memory + 信封 + ${resultId.key} 引用替换</span></h1>
+      <div class="card" style="border-color: var(--acc);">
+        <p style="font-size: 19px;"><strong>一句话</strong>：A 工具结果由框架存进 Working Memory 并包一层信封给模型，
+        模型调 B 工具时用 <code class="inline">${resultId.key}</code> 引用，框架在执行 B 之前替换成真实值。</p>
+      </div>
+      <div class="cols" style="max-width: 950px;">
+        <div class="card"><h3>解决什么</h3><p class="small muted">长内容（URL / 路径）复述导致的输出时延与抄写错误：80+ tokens → 8 tokens，抄错归零</p></div>
+        <div class="card"><h3>工具零改动</h3><p class="small muted">A 原样返回、B 收到真实值，两端对变量机制零感知</p></div>
+        <div class="card"><h3>模型零拼装</h3><p class="small muted">直接 id + 字段名引用：<code class="inline">${a3f8k2p9.img_uri}</code></p></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 2 完整流程 -->
+  <section class="slide">
+    <h2><span class="num">01</span>完整流程：A 执行 → 结果处理 → 模型 → B 替换执行</h2>
+    <div class="flow">
+      <div class="node tool"><b>① 执行 A 工具</b><span>image_gen 原样返回<br>{"img_uri": "…246字符…", "createTime": "…"}</span></div>
+      <div class="arrow">→</div>
+      <div class="node mem"><b>② 框架处理结果</b><span>生成 resultId=a3f8k2p9<br>原始结果原样存 Working Memory</span></div>
+      <div class="arrow">→</div>
+      <div class="node"><b>③ 信封给模型</b><span>长值瘦身 $preview<br>短值原样可推理</span></div>
+      <div class="arrow">→</div>
+      <div class="node"><b>④ 模型输出 B 调用</b><span>参数写 ${a3f8k2p9.img_uri}<br>（skill 中有指引）</span></div>
+      <div class="arrow">→</div>
+      <div class="node mem"><b>⑤ 框架替换变量</b><span>查 Working Memory<br>→ 完整真实值</span></div>
+      <div class="arrow">→</div>
+      <div class="node tool"><b>⑥ 执行 B 工具</b><span>收到真实值执行<br>B 的结果回到 ②</span></div>
+    </div>
+    <div class="cols">
+      <div class="callout"><p class="small"><strong>替换时机</strong>：schema 校验之后、执行之前的最后一步；替换后的真实值<strong>不回写对话历史</strong>，历史里永远是 <code class="inline">${…}</code>。</p></div>
+      <div class="callout"><p class="small"><strong>循环闭环</strong>：B 的结果同样走 ②③，每个工具结果都有自己的 resultId，多轮对话中随时可引用。</p></div>
+    </div>
+  </section>
+
+  <!-- 3 信封结构 -->
+  <section class="slide">
+    <h2><span class="num">02</span>信封：内存存什么 vs 模型看到什么</h2>
+    <div class="cols">
+      <div class="card warn">
+        <h3 style="color: var(--warn);">Working Memory 存的（KV，原样）</h3>
+        <pre>a3f8k2p9 → {
+  <span class="tok-key">"img_uri"</span>: <span class="tok-str">"https://cdn.example.com/imgs/2026/08/10/
+      f7c3a91e-…-4096.png?sig=Kx7Qw9f2…&exp=1754800000"</span>,
+  <span class="tok-key">"createTime"</span>: <span class="tok-str">"2026-08-10T04:05:12Z"</span>
+}</pre>
+        <p class="small muted">工具原始返回，一字不改。生命周期：默认当前 loop，被引用即提升为会话级并续期。</p>
+      </div>
+      <div class="card good">
+        <h3>模型看到的信封</h3>
+        <pre>{
+  <span class="tok-key">"toolName"</span>: <span class="tok-str">"image_gen"</span>,
+  <span class="tok-key">"responseText"</span>: <span class="tok-str">"已生成图片。引用时请使用
+      ${a3f8k2p9.字段名}，不要抄写内容。"</span>,
+  <span class="tok-key">"resultId"</span>: <span class="tok-str">"a3f8k2p9"</span>,
+  <span class="tok-key">"resultData"</span>: {
+    <span class="tok-key">"img_uri"</span>: { <span class="tok-key">"$preview"</span>: <span class="tok-str">"https://cdn.example.com/…?sig=Kx7Q…"</span>,
+                 <span class="tok-key">"$size"</span>: 246 },  <span class="tok-cmt">// 超阈值 → 瘦身</span>
+    <span class="tok-key">"createTime"</span>: <span class="tok-str">"2026-08-10T04:05:12Z"</span>  <span class="tok-cmt">// 短值原样</span>
+  }
+}</pre>
+      </div>
+    </div>
+    <table>
+      <tr><th>resultData = 原始结果的 key/value</th><th>resultId</th><th>responseText</th></tr>
+      <tr class="small">
+        <td>结构不变；超阈值（默认 200 字符）的 value 瘦身为 <code class="inline">{$preview, $size}</code>，短值原样保留供模型推理</td>
+        <td>框架生成的 8 位随机 id，跨轮唯一</td>
+        <td>工具提供，缺省框架生成；附一句引用提醒</td>
+      </tr>
+    </table>
+  </section>
+
+  <!-- 4 引用与替换 -->
+  <section class="slide">
+    <h2><span class="num">03</span>引用与替换：${resultId.key}，两种落点</h2>
+    <div class="cols">
+      <div class="card">
+        <h3>invoke() —— 值语义注入</h3>
+        <pre>invoke("edit_image", {
+  "source": <span class="tok-ref">"${a3f8k2p9.img_uri}"</span>,
+  "op": "crop", "ratio": "16:9"
+})</pre>
+        <p class="small muted">保留类型；字符串内可拼接 <code class="inline">${id.key}/sub/path</code>；嵌套结果按路径写 <code class="inline">${id.items[0].url}</code></p>
+      </div>
+      <div class="card">
+        <h3>exec(command) —— 自动 shell 转义</h3>
+        <pre>exec(command="curl -o /tmp/img.png <span class="tok-ref">${a3f8k2p9.img_uri}</span>")
+
+<span class="tok-cmt">// 框架替换 + 转义后实际执行：</span>
+curl -o /tmp/img.png <span class="tok-str">'https://cdn.example.com/…&exp=…'</span></pre>
+        <p class="small muted">单引号包裹：URL 中 <code class="inline">&amp;</code> 不会截断命令，注入载荷无法逃逸。转义由框架做，模型和 skill 不管。</p>
+      </div>
+    </div>
+    <div class="cols">
+      <div class="card good"><h3>Skill 指引（写进工具描述）</h3><p class="small muted">"参数值来自上游工具结果时，直接写 <code class="inline">${resultId.字段名}</code> 占位符，不要复制其内容，框架会自动替换。"</p></div>
+      <div class="card err"><h3 style="color: var(--err);">出错即回喂</h3><p class="small muted">id 不存在 / 字段不存在 / 已过期 → <strong>不执行工具</strong>，tool error 附该 resultId 可用字段清单，模型自纠重试</p></div>
+    </div>
+  </section>
+
+  <!-- 5 生命周期 + 落地 -->
+  <section class="slide">
+    <h2><span class="num">04</span>生命周期与落地</h2>
+    <div class="flow">
+      <div class="node"><b>创建</b><span>信封生成时入库<br>默认 loop 作用域</span></div>
+      <div class="arrow">→<small>被引用</small></div>
+      <div class="node" style="border-color: var(--acc2);"><b>提升 + 续期</b><span>conversation 作用域<br>跨轮可引用</span></div>
+      <div class="arrow">→<small>N 轮未引用</small></div>
+      <div class="node mem"><b>降级 / 淘汰</b><span>大值先降级磁盘（可读回）<br>TTL 到期淘汰</span></div>
+      <div class="arrow">→<small>物理失效</small></div>
+      <div class="node" style="border-color: var(--err);"><b>过期</b><span>签名 URL 等有效期<br>引用报错 + 提示重取</span></div>
+    </div>
+    <div class="cols">
+      <table style="flex: 1.3;">
+        <tr><th>模块</th><th>职责</th></tr>
+        <tr><td><code class="inline">Enveloper</code></td><td>生成 resultId、原始结果入库、长值瘦身、包信封</td></tr>
+        <tr><td><code class="inline">WorkingMemory</code></td><td>KV 存取、作用域/TTL、随对话 checkpoint（恢复后 ${…} 不悬垂）</td></tr>
+        <tr><td><code class="inline">Resolver</code></td><td>${} 解析、按落点替换与转义、错误回喂</td></tr>
+        <tr><td>Skill 规范</td><td>依赖上游结果的参数附一句引用指引</td></tr>
+      </table>
+      <div class="card err">
+        <h3 style="color: var(--err);">安全约定</h3>
+        <ul class="small">
+          <li>只替换参数值 / 命令字符串位置</li>
+          <li>工具结果原文中的 <code class="inline">${</code> 入库转义，防伪造引用</li>
+          <li>exec 落点强制框架转义</li>
+        </ul>
+      </div>
+    </div>
+    <p class="muted small" style="margin-top: auto;">全文：docs/agent-variable-scheme-v4.md</p>
+  </section>
+
+  <div class="footer">
+    <span>Agent 变量方案 v4 · Working Memory + 信封 + ${} 引用替换</span>
+    <span id="counter">1 / 5</span>
+    <span class="navbtns">
+      <button onclick="nav(-1)">← 上一页</button>
+      <button onclick="nav(1)">下一页 →</button>
+    </span>
+  </div>
+</div>
+<script>
+  const slides = Array.from(document.querySelectorAll('.slide'));
+  let cur = 0;
+  function show(i) {
+    cur = Math.max(0, Math.min(slides.length - 1, i));
+    slides.forEach((s, k) => s.classList.toggle('active', k === cur));
+    document.getElementById('counter').textContent = (cur + 1) + ' / ' + slides.length;
+    document.getElementById('progress').style.width = ((cur + 1) / slides.length * 100) + '%';
+    history.replaceState(null, '', '#' + (cur + 1));
+  }
+  function nav(d) { show(cur + d); }
+  document.addEventListener('keydown', e => {
+    if (['ArrowRight', 'PageDown', ' '].includes(e.key)) nav(1);
+    if (['ArrowLeft', 'PageUp'].includes(e.key)) nav(-1);
+    if (e.key === 'Home') show(0);
+    if (e.key === 'End') show(slides.length - 1);
+  });
+  document.getElementById('deck').addEventListener('click', e => {
+    if (e.target.closest('button, a, pre, table')) return;
+    nav(e.clientX > window.innerWidth / 2 ? 1 : -1);
+  });
+  show((parseInt(location.hash.slice(1), 10) || 1) - 1);
+</script>
+</body>
+</html>
