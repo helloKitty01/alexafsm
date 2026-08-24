@@ -20,7 +20,8 @@
 | [上下文工程与KV-Cache优化.v3.slides.html](./上下文工程与KV-Cache优化.v3.slides.html) | 汇报用 HTML 幻灯片 v3（7 页，已被 v4 取代，留档） |
 | [上下文工程与KV-Cache优化.v4.slides.html](./上下文工程与KV-Cache优化.v4.slides.html) | 汇报用 HTML 幻灯片 v4（7 页，已被 v5 取代，留档） |
 | [上下文工程与KV-Cache优化.v5.slides.html](./上下文工程与KV-Cache优化.v5.slides.html) | 汇报用 HTML 幻灯片 v5（已被 v6 取代，留档） |
-| [上下文工程与KV-Cache优化.v6.slides.html](./上下文工程与KV-Cache优化.v6.slides.html) | 汇报用 HTML 幻灯片 v6（正片 2 页 + 附录 A–D；目标页加厚 turn_context 与两通道细节、治①②④问题映射、视口满屏自适应 + F 键全屏） |
+| [上下文工程与KV-Cache优化.v6.slides.html](./上下文工程与KV-Cache优化.v6.slides.html) | 汇报用 HTML 幻灯片 v6（存在版面溢出问题，已被 v7 取代，留档） |
+| [上下文工程与KV-Cache优化.v7.slides.html](./上下文工程与KV-Cache优化.v7.slides.html) | 汇报用 HTML 幻灯片 v7（正片 2 页 + 附录 A–D；修复 v6 版面溢出、目标页四区布局、满屏自适应、F 键全屏、卡片溢出防御） |
 
 ## 背景共识
 
