@@ -303,7 +303,10 @@
   <span class="y">&lt;skills&gt;</span>available skills（方案 A 的注入位置）<span class="y">&lt;/skills&gt;</span>
 <span class="c">&lt;/turn_context&gt;</span>
 <span class="b">&lt;query&gt;</span>用户原文，永远置于消息最后<span class="b">&lt;/query&gt;</span></pre>
-        <p style="margin-top:.4em; font-size:.85em;">序列化<b>完全确定性</b>（标签与排序固定、空块省略、发出后永不回改）；检索内容与 query <b>物理相邻、留在时间线</b>——同时治问题③</p>
+        <ul style="margin-top:.4em;">
+          <li><b>拼接结果逐字节稳定</b>：标签顺序、条目排序固定，空块不输出，发出后不再修改——同样内容必须拼出同样文本，否则缓存悄悄失效</li>
+          <li>检索内容与 query <b>同消息相邻、永久留在历史</b>：模型可见对应关系，可去重、可审计（治问题③）</li>
+        </ul>
       </div>
       <div class="card grow">
         <h3>通道二 · 主动加载：<span class="hl">skills 以 T 进入 loop</span>　<span class="badc" style="font-size:.8em;">治①</span></h3>

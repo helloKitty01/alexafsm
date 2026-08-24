@@ -294,12 +294,12 @@ text(s, 0.55, ey + 6 * step + 0.02, 6.8, 0.44,
 
 # 右：通道一 / 通道二
 px, pw = 7.65, 5.33
-box(s, px, 0.98, pw, 2.6)
+box(s, px, 0.98, pw, 2.62)
 text(s, px + 0.18, 1.07, pw - 0.36, 0.28,
      [[("通道一 · 被动注入：", dict(size=10.5, bold=True)),
        ("turn_context 随 U 进入", dict(size=10.5, bold=True, color=BLUE)),
        ("　治①③", dict(size=8.5, color=RED, bold=True))]])
-box(s, px + 0.18, 1.4, pw - 0.36, 1.28, fill=CODE_BG, border=BORDER, rounded=False)
+box(s, px + 0.18, 1.4, pw - 0.36, 1.22, fill=CODE_BG, border=BORDER, rounded=False)
 code_lines = [
     [("<turn_context>", dict(size=8, color=MUTED, mono=True))],
     [("  <env>", dict(size=8, color=BLUE, mono=True)),
@@ -316,12 +316,14 @@ code_lines = [
      ("用户原文，永远置于消息最后", dict(size=8, color=TEXT, mono=True)),
      ("</query>", dict(size=8, color=BLUE, mono=True))],
 ]
-text(s, px + 0.3, 1.47, pw - 0.6, 1.16, code_lines, line_spacing=1.12)
-text(s, px + 0.18, 2.76, pw - 0.36, 0.74,
-     [[("序列化完全确定性（标签与排序固定、空块省略、发出后永不回改）；检索内容与 query ",
-        dict(size=8.8, color=MUTED)),
-       ("物理相邻、留在时间线", dict(size=8.8, color=TEXT, bold=True)),
-       ("——同时治问题③", dict(size=8.8, color=MUTED))]], line_spacing=1.05)
+text(s, px + 0.3, 1.46, pw - 0.6, 1.12, code_lines, line_spacing=1.1)
+text(s, px + 0.18, 2.68, pw - 0.36, 0.86,
+     [[("· 拼接结果逐字节稳定：标签顺序/条目排序固定、空块不输出、发出后不再修改（否则缓存悄悄失效）",
+        dict(size=8.4, color=MUTED))],
+      [("· 检索内容与 query ", dict(size=8.4, color=MUTED)),
+       ("同消息相邻、永久留在历史", dict(size=8.4, color=TEXT, bold=True)),
+       ("：对应关系模型可见，可去重、可审计（治问题③）", dict(size=8.4, color=MUTED))]],
+     line_spacing=1.12)
 
 box(s, px, 3.68, pw, 1.58)
 text(s, px + 0.18, 3.77, pw - 0.36, 0.28,
