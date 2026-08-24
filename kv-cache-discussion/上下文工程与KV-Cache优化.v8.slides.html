@@ -1,0 +1,554 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Agent 上下文工程与 KV Cache 优化 · v8</title>
+<style>
+  :root {
+    --bg: #0d1220;
+    --slide-bg: linear-gradient(135deg, #131a2e 0%, #0f1526 55%, #12203a 100%);
+    --card: rgba(255,255,255,.045);
+    --card-border: rgba(255,255,255,.09);
+    --text: #e8ecf6;
+    --muted: #9aa7c2;
+    --accent: #5b9dff;
+    --accent2: #4fd6a7;
+    --warn: #ffb454;
+    --bad: #ff6b6b;
+    --code-bg: rgba(0,0,0,.35);
+    --mono: "SF Mono", "JetBrains Mono", Consolas, "Courier New", monospace;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { background: var(--bg); height: 100%; }
+  body {
+    font-family: "PingFang SC", "Microsoft YaHei", "Noto Sans SC", -apple-system, sans-serif;
+    color: var(--text);
+    display: flex; justify-content: center; align-items: center;
+    padding: 16px 12px; min-height: 100vh;
+  }
+  /* 随视口满屏自适应：宽受限跟宽、高受限跟高；底部预留 44px 给翻页控件 */
+  .deck { position: relative; width: min(96vw, calc((100vh - 76px) * 1.7778)); padding-bottom: 44px; }
+  .slide {
+    width: 100%;
+    aspect-ratio: 16 / 9;
+    background: var(--slide-bg);
+    border: 1px solid var(--card-border);
+    border-radius: 18px;
+    box-shadow: 0 22px 60px rgba(0,0,0,.5);
+    padding: 2.4% 3.2%;
+    display: none; flex-direction: column;
+    overflow: hidden; position: relative;
+    /* em 预算恒定：高约 50em，与 v5 等效；大屏整体等比放大 */
+    font-size: clamp(9.5px, min(1.08vw, 1.92vh), 22px);
+  }
+  .slide.active { display: flex; }
+  .slide::before {
+    content: ""; position: absolute; inset: 0 0 auto 0; height: 4px;
+    background: linear-gradient(90deg, var(--accent), var(--accent2));
+    border-radius: 18px 18px 0 0;
+  }
+  h2 { font-size: 1.42em; font-weight: 700; margin-bottom: .45em; }
+  h2 .hl { color: var(--accent); }
+  h2 .num { color: var(--muted); font-weight: 600; margin-right: .4em; font-size: .8em; }
+  h2 .apx { color: var(--warn); font-weight: 600; margin-right: .4em; font-size: .78em; }
+  .sub { color: var(--muted); font-size: 1.05em; }
+
+  .card {
+    background: var(--card); border: 1px solid var(--card-border);
+    border-radius: 12px; padding: .9em 1.1em;
+    overflow: hidden; /* 防御：内容超预算时裁切而非压到相邻区块 */
+  }
+  .card h3 { font-size: 1.02em; margin-bottom: .4em; color: #fff; }
+  .card p, .card li { color: var(--muted); font-size: .93em; line-height: 1.5; }
+  .card li { margin-left: 1.2em; margin-bottom: .22em; }
+  .card b { color: var(--text); font-weight: 600; }
+  .good { color: var(--accent2) !important; }
+  .warnc { color: var(--warn) !important; }
+  .badc { color: var(--bad) !important; }
+  .mono { font-family: var(--mono); }
+  code {
+    font-family: var(--mono); background: var(--code-bg);
+    padding: .1em .4em; border-radius: 5px; font-size: .92em; color: #cfe0ff;
+  }
+  pre {
+    font-family: var(--mono); background: var(--code-bg);
+    border: 1px solid var(--card-border); border-radius: 10px;
+    padding: .7em .9em; font-size: .86em; line-height: 1.5;
+    color: #cfe0ff; overflow: hidden; white-space: pre;
+  }
+  pre .c { color: #6b7a99; }
+  pre .g { color: var(--accent2); }
+  pre .y { color: var(--warn); }
+  pre .b { color: var(--accent); }
+
+  .row { display: flex; gap: 1em; min-height: 0; }
+  .col { display: flex; flex-direction: column; gap: .75em; min-width: 0; }
+  .grow { flex: 1; min-height: 0; min-width: 0; }
+
+  .stack { display: flex; flex-direction: column; gap: .45em; }
+  .layer {
+    border-radius: 10px; padding: .55em .9em;
+    border: 1px solid var(--card-border); background: var(--card);
+    display: flex; align-items: baseline; gap: .8em;
+  }
+  .layer .lv { font-family: var(--mono); font-weight: 700; font-size: .93em; white-space: nowrap; }
+  .layer .desc { color: var(--muted); font-size: .87em; line-height: 1.45; }
+  .layer .desc b { color: var(--text); }
+  .layer.new   { border-color: rgba(91,157,255,.45); background: rgba(91,157,255,.08); }
+  .layer.new .lv { color: var(--accent); }
+
+  .banner {
+    border-radius: 10px; padding: .55em 1.1em; font-size: .95em;
+    background: linear-gradient(90deg, rgba(91,157,255,.12), rgba(79,214,167,.10));
+    border: 1px solid rgba(91,157,255,.3); color: var(--text);
+  }
+  .banner b { color: var(--accent); }
+  .banner.alert {
+    background: rgba(255,107,107,.08); border-color: rgba(255,107,107,.4);
+  }
+  .banner.alert b { color: var(--bad); }
+
+  table { border-collapse: collapse; width: 100%; font-size: .9em; }
+  th, td { text-align: left; padding: .42em .7em; border-bottom: 1px solid var(--card-border); }
+  th { color: var(--accent); font-weight: 600; white-space: nowrap; }
+  td { color: var(--muted); line-height: 1.4; }
+  td b { color: var(--text); }
+
+  .kpi { display: flex; gap: 1em; }
+  .kpi .card { flex: 1; text-align: center; padding: .55em .5em; }
+  .kpi .big { font-size: 1.35em; font-weight: 700; color: var(--accent); font-family: var(--mono); }
+  .kpi .big.g { color: var(--accent2); }
+  .kpi .big.w { color: var(--warn); }
+  .kpi .lbl { color: var(--muted); font-size: .8em; margin-top: .22em; line-height: 1.32; }
+
+  /* ---- 纵向三列结构图 ---- */
+  .vgrid {
+    display: grid;
+    grid-template-columns: 6.8em 1fr 2.5em;
+    gap: 5px;
+  }
+  .ent {
+    border: 1px dashed rgba(255,255,255,.3); border-radius: 10px;
+    display: flex; flex-direction: column; justify-content: center; align-items: center;
+    text-align: center; padding: .4em .3em; gap: .25em;
+    font-size: .8em; font-weight: 700; color: var(--text); line-height: 1.3;
+  }
+  .ent span { font-weight: 400; font-size: .82em; color: var(--muted); line-height: 1.3; }
+  .vrow {
+    border-radius: 9px; padding: .5em .8em;
+    border: 1px solid var(--card-border); background: var(--card);
+    display: flex; align-items: center; gap: .7em; min-width: 0;
+  }
+  .vrow .nm { font-family: var(--mono); font-weight: 700; font-size: .88em; white-space: nowrap; }
+  .vrow .ds { color: var(--muted); font-size: .8em; line-height: 1.35; min-width: 0; }
+  .vrow .ds b { color: var(--text); }
+  .vrow.ok    { border-color: rgba(79,214,167,.45); }
+  .vrow.ok .nm { color: var(--accent2); }
+  .vrow.bad   { border-color: rgba(255,107,107,.7); background: rgba(255,107,107,.12); }
+  .vrow.bad .nm { color: var(--bad); }
+  .vrow.tools { border-color: rgba(255,180,84,.55); background: rgba(255,180,84,.07); }
+  .vrow.tools .nm { color: var(--warn); }
+  .vrow.uat   { border-color: rgba(91,157,255,.4); background: rgba(91,157,255,.06); }
+  .vrow.uat .nm { color: var(--accent); }
+  .vrow.frozen { border-color: rgba(79,214,167,.5); background: rgba(79,214,167,.08); border-style: dashed; }
+  .vrow.frozen .nm { color: var(--accent2); }
+  .vrow.ghost { border-style: dashed; opacity: .9; }
+  .delta {
+    margin-left: auto; flex: none; border-radius: 999px;
+    padding: .18em .6em; font-size: .68em; font-weight: 700; white-space: nowrap;
+    border: 1px solid var(--card-border); color: var(--muted); background: rgba(0,0,0,.25);
+  }
+  .delta.same { border-color: rgba(79,214,167,.4); color: var(--accent2); }
+  .delta.fix  { border-color: rgba(79,214,167,.6); color: var(--accent2); background: rgba(79,214,167,.1); }
+  .delta.del  { border-color: rgba(255,107,107,.55); color: var(--bad); }
+  .delta.add  { border-color: rgba(91,157,255,.55); color: var(--accent); background: rgba(91,157,255,.1); }
+  .vmark {
+    writing-mode: vertical-rl; text-orientation: mixed;
+    display: flex; align-items: center; justify-content: center;
+    border-radius: 8px; font-size: .72em; line-height: 1.35; padding: .6em .2em;
+    letter-spacing: .08em;
+  }
+  .vmark.red { background: linear-gradient(180deg, rgba(255,107,107,.3), rgba(255,107,107,.1)); border: 1px solid rgba(255,107,107,.5); color: #ffc0c0; }
+  .vmark.green { background: linear-gradient(180deg, rgba(79,214,167,.25), rgba(79,214,167,.08)); border: 1px solid rgba(79,214,167,.45); color: #bef2de; }
+
+  /* ---- loop 胶囊 ---- */
+  .caps { display: flex; align-items: center; gap: .35em; flex-wrap: nowrap; min-width: 0; }
+  .chip {
+    border-radius: 999px; padding: .26em .65em; font-size: .78em; white-space: nowrap;
+    border: 1px solid var(--card-border); background: var(--card); color: var(--text); font-family: var(--mono);
+  }
+  .chip.u { border-color: rgba(91,157,255,.55); color: var(--accent); }
+  .chip.a { border-color: rgba(255,255,255,.3); }
+  .chip.t { border-color: rgba(79,214,167,.55); color: var(--accent2); }
+  .arr { color: var(--muted); font-size: .85em; flex: none; }
+  .loopbox {
+    border: 1px dashed rgba(79,214,167,.5); border-radius: 10px; padding: .45em .5em .3em;
+    display: flex; align-items: center; gap: .3em; position: relative; margin-top: .5em;
+  }
+  .loopbox .looplbl { position: absolute; top: -.85em; left: .6em; font-size: .66em; color: var(--accent2); background: #111930; padding: 0 .4em; white-space: nowrap; }
+  .capnote { font-size: .74em; color: var(--muted); white-space: nowrap; }
+  .capnote b { color: var(--text); }
+
+  .footer {
+    margin-top: auto; padding-top: .6em; display: flex;
+    justify-content: space-between; color: var(--muted); font-size: .82em;
+  }
+  .footer .apxtag { color: var(--warn); }
+
+  /* 翻页控件位于幻灯片下方的预留区，不与内容重叠 */
+  .nav {
+    position: absolute; bottom: 4px; right: 4px;
+    display: flex; gap: .5em; align-items: center; z-index: 10;
+    font-size: clamp(9.5px, min(1.08vw, 1.92vh), 22px);
+  }
+  .nav button {
+    background: var(--card); border: 1px solid var(--card-border); color: var(--text);
+    border-radius: 8px; width: 2.2em; height: 2.2em; cursor: pointer; font-size: 1em;
+  }
+  .nav button:hover { border-color: var(--accent); color: var(--accent); }
+  .nav .pg { color: var(--muted); font-family: var(--mono); font-size: .9em; padding: 0 .4em; }
+  .dots { position: absolute; bottom: 16px; left: 4px; display: flex; gap: .45em; z-index: 10; }
+  .dots i {
+    width: .55em; height: .55em; border-radius: 50%;
+    background: rgba(255,255,255,.18); cursor: pointer;
+  }
+  .dots i.on { background: var(--accent); }
+</style>
+</head>
+<body>
+<div class="deck">
+
+<!-- ============ P1 现状与问题 ============ -->
+<section class="slide active">
+  <h2><span class="num">01</span>现状与问题：<span class="hl">命中率为何只有 66%</span>——失效范围含 Tools 与全部历史</h2>
+  <div class="kpi" style="margin-bottom:.7em;">
+    <div class="card"><div class="big w">66%</div><div class="lbl">现网 KV cache 命中率</div></div>
+    <div class="card"><div class="big">37K / 25K</div><div class="lbl">平均每请求输入 / 命中（miss 12K）</div></div>
+    <div class="card"><div class="big">~60K</div><div class="lbl">会话上下文规模</div></div>
+  </div>
+  <div class="row grow">
+    <div class="card" style="flex:1.15; display:flex; flex-direction:column;">
+      <h3>三个独立实体的物理拼接（自上而下 = 前缀从前到后）</h3>
+      <div class="vgrid" style="margin-top:.5em;">
+        <div class="ent" style="grid-row:1/4; grid-column:1;">① System Prompt<span>单字段<br>产品/会话/query级<br>拼于正文内</span></div>
+        <div class="vrow ok" style="grid-row:1; grid-column:2;"><span class="nm">产品级</span><span class="ds">agent 关键原则，所有用户相同 ✓</span></div>
+        <div class="vrow ok" style="grid-row:2; grid-column:2;"><span class="nm">会话级</span><span class="ds">用户信息、长期记忆，多轮更新一次 ✓</span></div>
+        <div class="vrow bad" style="grid-row:3; grid-column:2;"><span class="nm">query级</span><span class="ds">available skills（基于 query 搜索）+ 相关知识/用户信息 + 环境上下文，<b>每 query 原位重写 ✗</b></span></div>
+        <div class="vmark red" style="grid-row:3/8; grid-column:3;">⚡ 每 query 从此失效：query级 + Tools + UAT 全部历史</div>
+        <div class="ent" style="grid-row:4; grid-column:1;">② Tools<span>独立字段</span></div>
+        <div class="vrow tools" style="grid-row:4; grid-column:2;"><span class="nm">Tools块</span><span class="ds">内容稳定，但模板拼接于 SP 之后 → <b>被 query级重写连带 ✗</b></span></div>
+        <div class="ent" style="grid-row:5/8; grid-column:1;">③ UAT<span>messages 消息流<br>loop级</span></div>
+        <div class="vrow uat" style="grid-row:5; grid-column:2;"><span class="nm">loop 1（最旧）</span><span class="ds">U→[A⇄T ×n]→A　<b class="badc">⚡ 10 轮滑窗从此裁剪，每轮再断一次</b></span></div>
+        <div class="vrow uat" style="grid-row:6; grid-column:2;"><span class="nm">loop 2</span><span class="ds">U→[A⇄T ×n]→A，loop 内迭代可命中</span></div>
+        <div class="vrow uat ghost" style="grid-row:7; grid-column:2;"><span class="nm">loop 3 …</span><span class="ds">追加中</span></div>
+      </div>
+      <div class="caps" style="margin-top:.7em;">
+        <span class="capnote">loop 内部：</span>
+        <span class="chip u">U query</span><span class="arr">→</span>
+        <span class="chip a">A call</span><span class="arr">⇄</span><span class="chip t">T result</span><span class="arr">×n →</span>
+        <span class="chip a">A 答复</span>
+        <span class="capnote" style="margin-left:.6em;"><b class="badc">新 query（loop 切换）= miss 点</b>｜<b class="good">loop 内迭代 = 追加命中</b></span>
+      </div>
+    </div>
+    <div class="col" style="flex:1;">
+      <div class="card grow">
+        <h3><span class="badc">①</span>　query 切换点全量 miss</h3>
+        <p>query级内容重写 → 失效 = <b>query级 + Tools + UAT 全部历史</b>，随轮数线性增长；Tools 内容稳定却被连带重算。loop 内可命中，损失集中在每个新 query 首轮。</p>
+      </div>
+      <div class="card grow">
+        <h3><span class="badc">②</span>　10 轮滑窗裁剪 = 长对话每轮全量 miss</h3>
+        <p>聊过 10 轮后<b>每新一轮裁最旧一轮</b>，前缀头部每轮变化；T 体积大（skill 正文）被单独高频裁剪，进一步打碎前缀。<b>长对话阶段比①更严重。</b></p>
+      </div>
+      <div class="card grow">
+        <h3><span class="badc">③</span>　相关性绑定丢失 + 历史证据被覆盖</h3>
+        <p>query级槽位与 query <b>无显式对应</b>；每轮覆盖式更新，第 N 轮依赖第 N-2 轮检索结果时证据已丢，<b>去重无从谈起</b>。</p>
+      </div>
+      <div class="card grow">
+        <h3><span class="badc">④</span>　驻留竞争（eviction）</h3>
+        <p>自建集群缓存容量有限，被<b>全网用户流量逐出</b>——前缀不变 ≠ 命中。现网 34% miss 中两类占比未拆分。</p>
+      </div>
+    </div>
+  </div>
+  <div class="banner alert" style="margin-top:.7em;">综上，缓存失效有两个来源：<b>问题① query级内容每次重写</b> ＋ <b>问题② 滑窗裁剪每轮改历史</b>；另有问题④ 驻留竞争需集群侧配合 —— 下页逐项治理</div>
+  <div class="footer"><span>现状与问题</span></div>
+</section>
+
+<!-- ============ P2 目标方案 ============ -->
+<section class="slide">
+  <h2 style="margin-bottom:.15em;"><span class="num">02</span>目标方案：<span class="hl">上下文只增不改，缓存全程命中</span></h2>
+  <p class="sub" style="font-size:.88em; margin-bottom:.55em;">与现状图同构对照：<b class="badc">治问题①③</b>（query级下沉，两条通道）· <b class="badc">治问题②</b>（裁剪改造）· <b class="badc">答问题④</b>（驻留诉求）</p>
+  <div class="row" style="flex:1.4; min-height:0;">
+    <div class="card" style="flex:1.1; display:flex; flex-direction:column;">
+      <h3>同一物理序列，改动点逐行标注</h3>
+      <div class="vgrid" style="margin-top:.5em;">
+        <div class="ent" style="grid-row:1/4; grid-column:1;">① System Prompt<span>仅产品级+会话级<br>会话内字节不变</span></div>
+        <div class="vrow ok" style="grid-row:1; grid-column:2;"><span class="nm">产品级</span><span class="ds">agent 关键原则</span><span class="delta same">不变</span></div>
+        <div class="vrow ok" style="grid-row:2; grid-column:2;"><span class="nm">会话级</span><span class="ds">用户信息、长期记忆，会话冻结、更新攒批</span><span class="delta same">策略化</span></div>
+        <div class="vmark green" style="grid-row:1/7; grid-column:3;">✓ 每轮前缀 = 上一轮严格超集，排布性 miss 归零</div>
+        <div class="vrow bad ghost" style="grid-row:3; grid-column:2;"><span class="nm">query级</span><span class="ds"><b>槽位已取消</b> → 内容经两条通道下沉至 UAT（见右侧）</span><span class="delta del">取消 · 治①③</span></div>
+        <div class="ent" style="grid-row:4; grid-column:1;">② Tools<span>独立字段</span></div>
+        <div class="vrow tools" style="grid-row:4; grid-column:2;"><span class="nm">Tools块</span><span class="ds">前方不再有改写位置，<b>稳定命中</b></span><span class="delta fix">被解救 ✓</span></div>
+        <div class="ent" style="grid-row:5/7; grid-column:1;">③ UAT<span>messages 消息流<br>loop级</span></div>
+        <div class="vrow frozen" style="grid-row:5; grid-column:2;"><span class="nm">已裁剪区</span><span class="ds">按长度水位、一次裁足，裁剪由<b>每轮降为几十轮一次</b></span><span class="delta add">改造 · 治②</span></div>
+        <div class="vrow uat" style="grid-row:6; grid-column:2;"><span class="nm">loop 原文＋追加</span><span class="ds">U（<b>turn_context</b>）→[A⇄T（<b>search/load</b>）]→A，仅为增量付 prefill</span><span class="delta add">注入增强</span></div>
+      </div>
+      <p style="margin-top:.6em; font-size:.82em; color:var(--muted);">对照上页现状图逐行阅读：query级槽位取消后，System Prompt 与 Tools 在会话内完全静态；UAT 只增不改，动态内容全部经右侧两条通道进入消息流。</p>
+    </div>
+    <div class="col" style="flex:1;">
+      <div class="card grow">
+        <h3>通道一 · 被动注入：<span class="hl">turn_context 随 U 进入</span>　<span class="badc" style="font-size:.8em;">治①③</span></h3>
+<pre style="font-size:.8em;"><span class="c">&lt;turn_context&gt;</span>
+  <span class="b">&lt;env&gt;</span>环境增量（首轮全量快照，此后只注增量）<span class="b">&lt;/env&gt;</span>
+  <span class="g">&lt;retrieved&gt;</span>相关知识 / 用户信息（ID 去重，只注新条目）<span class="g">&lt;/retrieved&gt;</span>
+  <span class="y">&lt;skills&gt;</span>available skills（方案 A 的注入位置）<span class="y">&lt;/skills&gt;</span>
+<span class="c">&lt;/turn_context&gt;</span>
+<span class="b">&lt;query&gt;</span>用户原文，永远置于消息最后<span class="b">&lt;/query&gt;</span></pre>
+        <p style="margin-top:.4em; font-size:.85em;">序列化<b>完全确定性</b>（标签与排序固定、空块省略、发出后永不回改）；检索内容与 query <b>物理相邻、留在时间线</b>——同时治问题③</p>
+      </div>
+      <div class="card grow">
+        <h3>通道二 · 主动加载：<span class="hl">skills 以 T 进入 loop</span>　<span class="badc" style="font-size:.8em;">治①</span></h3>
+        <p style="font-size:.88em;"><code>search_skill(query)</code> → T: available skills → <code>load_skill(name)</code> → T: 正文（load 机制沿用现状）</p>
+        <ul style="margin-top:.35em;">
+          <li><b>方案 A（先行）</b>：保留系统侧 skill search，结果随 U 注入（上方 <code>&lt;skills&gt;</code> 块），只改注入位置、检索链路不动</li>
+          <li><b>方案 B（演进）</b>：search 工具化，模型自主决定检索时机与关键词，可按阶段多次检索（对比见附录 A）</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+  <div class="row" style="margin-top:.65em;">
+    <div class="card" style="flex:1;">
+      <h3>裁剪机制改造　<span class="badc" style="font-size:.8em;">治②</span></h3>
+      <p style="font-size:.88em;">触发：<b>按轮数（10 轮）→ 按 token 长度水位</b>；比例：<b>一次裁足到低水位</b>（80% 触发、裁至 40%）；T 与 UAT 攒批同刻处理。效果：裁剪从每轮降为<b>几十轮一次</b>（细节见附录 B）</p>
+    </div>
+    <div class="card" style="flex:1;">
+      <h3>对推理集群的诉求　<span class="badc" style="font-size:.8em;">答④</span></h3>
+      <p style="font-size:.88em;"><b>诉求一</b>：同一多轮对话及 loop 内，KV cache 会话存续期内<b>不被逐出</b>；<b>诉求二</b>：命中率按<b>排布性 / 驻留性拆分度量</b>（参考方向见附录 C）</p>
+    </div>
+  </div>
+  <div class="kpi" style="margin-top:.65em;">
+    <div class="card"><div class="big g">66% → ~92%</div><div class="lbl">命中率：现网实测 → 目标预估（miss 12K → ~3K / 请求）</div></div>
+    <div class="card"><div class="big g">-56%</div><div class="lbl">每请求等效输入成本：14.5K → 6.4K 等效 token</div></div>
+    <div class="card"><div class="big g">-75%</div><div class="lbl">每请求 prefill 计算量：12K → 3K，TTFT 与吞吐同步改善</div></div>
+  </div>
+  <div class="banner" style="margin-top:.55em;">落地节奏：<b>① 命中率拆分度量</b> → <b>② 裁剪改造</b> → <b>③ skills 迁移</b> → ④ 结构化注入 → ⑤ 驻留治理（推导与路径详见附录 D）</div>
+  <div class="footer"><span>目标方案</span></div>
+</section>
+
+<!-- ============ 附录 A 渐进式加载 ============ -->
+<section class="slide">
+  <h2><span class="apx">附录 A</span>渐进式加载：<span class="hl">一个 loop 的完整形态</span> + skills 迁移双方案</h2>
+  <div class="card" style="padding-bottom:.6em;">
+    <div class="caps" style="overflow:hidden;">
+      <span class="chip u">U：turn_context + query</span><span class="arr">→</span>
+      <div class="loopbox" style="margin-top:.6em;"><span class="looplbl">loop：全部以追加进入，命中 ✓</span>
+        <span class="chip a">A search_skill</span><span class="arr">→</span>
+        <span class="chip t">T available skills</span><span class="arr">→</span>
+        <span class="chip a">A load_skill</span><span class="arr">→</span>
+        <span class="chip t">T skill 正文</span><span class="arr">→</span>
+        <span class="chip a">A 执行…</span>
+      </div>
+      <span class="arr">→</span><span class="chip a">A 答复</span>
+    </div>
+    <p style="margin-top:.5em; font-size:.82em; color:var(--muted);">通道一（被动注入）作用于 <b style="color:var(--accent);">U</b>；通道二（主动加载）以 <b style="color:var(--accent2);">T</b> 进入 loop——两条通道都不触碰 System Prompt 与 Tools 两个实体</p>
+  </div>
+  <div class="row grow" style="margin-top:.8em;">
+    <div class="col" style="flex:1.1;">
+      <div class="card grow">
+        <h3>通道一 · 被动注入（系统检索，随当轮 U）</h3>
+<pre><span class="c">&lt;turn_context&gt;</span>
+  <span class="b">&lt;env&gt;</span>首轮全量快照，后续仅相对上轮的增量<span class="b">&lt;/env&gt;</span>
+  <span class="g">&lt;retrieved&gt;</span>仅未注入过的条目（ID 去重，固定排序）<span class="g">&lt;/retrieved&gt;</span>
+  <span class="y">&lt;skills&gt;</span>方案 A：skill search 的 available skills<span class="y">&lt;/skills&gt;</span>
+<span class="c">&lt;/turn_context&gt;</span>
+<span class="b">&lt;query&gt;</span>用户原文，永远放在消息最后<span class="b">&lt;/query&gt;</span></pre>
+        <ul style="margin-top:.5em;">
+          <li>序列化<b>完全确定性</b>：标签与排序固定，空块省略，发出后永不回改</li>
+          <li>会话级状态仅 <code>env_snapshot</code> 与 <code>injected_ids</code></li>
+        </ul>
+      </div>
+    </div>
+    <div class="col" style="flex:1;">
+      <div class="card">
+        <h3>方案 A · search 结果随 U 注入（改动最小）</h3>
+        <ul>
+          <li>保留系统侧 skill search，available skills 从 query级槽位<b>挪进当轮 U</b>（左侧 <code>&lt;skills&gt;</code> 块）</li>
+          <li>检索链路不动，只改注入位置；<b>load 机制不变</b></li>
+        </ul>
+      </div>
+      <div class="card grow">
+        <h3>方案 B · search 工具化，以 T 进入（更彻底）</h3>
+        <ul>
+          <li>模型<b>自主决定检索时机与关键词</b>，结果为 tool result，不依赖产品级放索引</li>
+          <li>多步任务中可<b>按阶段多次检索</b>，比"query 切换时检索一次"更贴合需要</li>
+          <li>与上方 loop 图的 <code>search_skill → load_skill</code> 链路一致</li>
+        </ul>
+      </div>
+      <div class="banner">A 先行落地拿缓存收益，B 作为演进方向；可 A → B 平滑过渡</div>
+    </div>
+  </div>
+  <div class="footer"><span class="apxtag">附录 A · 渐进式加载设计</span></div>
+</section>
+
+<!-- ============ 附录 B 裁剪与压缩改造 ============ -->
+<section class="slide">
+  <h2><span class="apx">附录 B</span>裁剪改造细节：<span class="hl">按轮数滑窗 → 按长度双水位</span></h2>
+  <div class="row grow">
+    <div class="col" style="flex:1;">
+      <div class="card">
+        <h3 class="badc">现状（反模式）</h3>
+        <ul>
+          <li>UAT 按<b>轮数</b>（10 轮）滑窗：聊过 10 轮后<b>每新一轮裁最旧一轮</b> = 每轮重写前缀 = 每轮全量 miss</li>
+          <li>T（tool result）单独高频裁剪，skill 正文 token 大，裁剪更频繁，前缀被反复打碎</li>
+        </ul>
+      </div>
+      <div class="card grow">
+        <h3 class="good">目标：按 token 长度、双水位、攒批、产物冻结</h3>
+        <ul>
+          <li><b>按长度触发</b>：达到 ~80% 容量才裁，与轮数解耦（轮数不反映真实占用，skill 大 T 尤其如此）</li>
+          <li><b>一次多裁</b>：直接裁到 ~40% 低水位，避免"裁一点→又满→再裁"的每轮抖动</li>
+          <li><b>攒批</b>：T 的裁剪与 UAT 裁剪合并到同一时刻，一次 miss 付清所有账</li>
+          <li><b>产物冻结</b>：裁剪/摘要产物写入后字节级不再改动，两次裁剪之间全部轮次命中（分代冻结与堆叠式详见文档 07）</li>
+        </ul>
+      </div>
+    </div>
+    <div class="col" style="flex:1.05;">
+      <div class="card grow">
+        <h3>从远到近分级保真（可恢复优先于有损丢弃）</h3>
+        <table>
+          <tr><th>内容</th><th>裁剪处理</th><th>恢复方式</th></tr>
+          <tr><td><b>已 load 的 skill 正文</b></td><td>退化为"名称+已加载标记"</td><td class="mono">re-load</td></tr>
+          <tr><td><b>retrieved 正文</b></td><td>退化为 ID 指针</td><td class="mono">按 ID 重拉</td></tr>
+          <tr><td><b>env 旧增量</b></td><td>丢弃，摘要给当前快照</td><td>无需恢复</td></tr>
+          <tr><td><b>大 tool result</b></td><td>落盘，留路径 + 摘要</td><td class="mono">重新读取</td></tr>
+          <tr><td><b>远端 loop</b></td><td>结构化摘要（目标/结论/待办）</td><td>—（有损）</td></tr>
+          <tr><td><b>近端 K 个 loop</b></td><td><b class="good">原文保留</b></td><td>—</td></tr>
+        </table>
+        <p style="margin-top:.6em;">skill 正文和检索条目是最大的 token 占用，也恰好<b>最容易指针化恢复</b>——优先指针化，少做有损摘要。</p>
+      </div>
+      <div class="banner">裁剪的真正代价是<b>信息丢失</b>而非那一次 prefill——重心放在可恢复指针与摘要保真上</div>
+    </div>
+  </div>
+  <div class="footer"><span class="apxtag">附录 B · 裁剪与压缩改造</span></div>
+</section>
+
+<!-- ============ 附录 C 缓存驻留 ============ -->
+<section class="slide">
+  <h2><span class="apx">附录 C</span>缓存驻留诉求的<span class="hl">参考实现方向</span>（自建集群）</h2>
+  <div class="row grow">
+    <div class="col" style="flex:1;">
+      <div class="card grow">
+        <h3>问题模型</h3>
+        <ul>
+          <li>实际命中率 = <b>排布正确性 × 驻留概率</b>：排布做对了，缓存仍可能被全网用户流量按 LRU 逐出</li>
+          <li>两类 miss 成因不同：<b>排布性 miss</b>（前缀被改写，可根除）vs <b>驻留性 miss</b>（容量竞争，只能缓解）</li>
+          <li>度量上要拆开：同会话相邻请求间隔短仍 miss → 排布问题；间隔长后 miss → 驻留问题</li>
+          <li>现网 66% 命中率中两类 miss 的占比，需度量拆分后校正收益预估</li>
+        </ul>
+      </div>
+      <div class="banner">先根除排布性 miss，驻留治理才有意义——否则每 query 都在重建，驻留无从谈起</div>
+    </div>
+    <div class="col" style="flex:1.05;">
+      <div class="card">
+        <h3>降低被逐出的概率</h3>
+        <ul>
+          <li><b>会话亲和路由</b>：同一会话固定路由到同一推理实例，避免跨实例必然 miss</li>
+          <li><b>产品级 + Tools 公共前缀天然常驻</b>：全网用户共享，是集群里最热的条目，几乎不会被逐出</li>
+          <li><b>缓存分层扩容</b>：HBM 之外用 CPU 内存 / 本地盘做 KV offload（vLLM / SGLang / LMCache 类方案）</li>
+          <li>loop 内迭代间隔短，天然处于驻留窗口内；<b>危险区在用户两次 query 之间的长间隔</b></li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>降低被逐出后的损失</h3>
+        <ul>
+          <li><b>前缀瘦身</b>：重建成本正比于前缀长度，按长度双水位裁剪直接控制损失上限</li>
+          <li>指针化内容（skill / retrieved）本身不占前缀，被逐出后无需重建</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+  <div class="footer"><span class="apxtag">附录 C · 缓存驻留</span></div>
+</section>
+
+<!-- ============ 附录 D 量化收益与落地路径 ============ -->
+<section class="slide">
+  <h2><span class="apx">附录 D</span>量化收益推导（基于现网基线）与<span class="hl">落地路径</span></h2>
+  <div class="row" style="flex:1; min-height:0;">
+    <div class="col" style="flex:1.25;">
+      <div class="card grow">
+        <h3>迁移前后对比</h3>
+        <table>
+          <tr><th>维度</th><th>现状</th><th>目标</th></tr>
+          <tr><td><b>query 切换</b></td><td class="badc">query级+Tools+全部历史 miss，随轮数恶化</td><td class="good">严格超集，只为增量付费</td></tr>
+          <tr><td><b>Tools块</b></td><td class="badc">位于 query级之后，被连带重算</td><td class="good">前方无重写点，稳定命中</td></tr>
+          <tr><td><b>裁剪机制</b></td><td class="badc">10 轮滑窗+T 高频裁，长对话每轮 miss</td><td class="good">按长度双水位，miss 被摊销</td></tr>
+          <tr><td><b>query 相关性</b></td><td class="badc">槽位无绑定</td><td class="good">物理相邻、显式绑定</td></tr>
+          <tr><td><b>历史证据</b></td><td class="badc">每轮覆盖，时间线断裂</td><td class="good">完整保留，ID 去重</td></tr>
+          <tr><td><b>驻留</b></td><td class="badc">未治理</td><td class="good">诉求一/诉求二 + 参考方向（附录 C）</td></tr>
+        </table>
+        <p style="margin-top:.55em; font-size:.8em;">估算口径：现网输入 37K/请求（命中 25K、miss 12K）；缓存价 0.1×；目标态 miss ≈ 当轮新增 ~2K + 裁剪/尾部剔除摊销 ~1K；驻留性 miss 占比待路径①度量校正。敏感性：目标 miss ±1K，成本降幅在 -50% ~ -59% 区间。</p>
+        <p style="margin-top:.4em; font-size:.8em;"><b>为什么上限是 ~92% 而非 100%</b>：命中率分母含每轮<b>首次出现</b>的 token（新 query、工具结果、检索增量），缓存中不存在、必然 miss（~2K/37K ≈ 5 个点）；口径与业界一致（hit_tokens / prompt_tokens），DeepSeek V4 agent/RAG 生产负载社区实测为 90–96%，本预估处于该区间。若按"可缓存部分的命中率"口径（剔除首次出现内容），目标即接近 100%。</p>
+      </div>
+      <div class="kpi">
+        <div class="card"><div class="big g">66% → ~92%</div><div class="lbl">命中率（miss 12K → ~3K / 请求）</div></div>
+        <div class="card"><div class="big g">-56%</div><div class="lbl">每请求等效输入成本</div></div>
+        <div class="card"><div class="big g">-75%</div><div class="lbl">每请求 prefill 计算量</div></div>
+      </div>
+    </div>
+    <div class="col" style="flex:1;">
+      <div class="card grow">
+        <h3>落地路径（按依赖与出血点排序）</h3>
+        <div class="stack" style="margin-top:.4em;">
+          <div class="layer new"><span class="lv">①</span><span class="desc"><b>加度量</b>：prefix cache 命中率按排布性 / 驻留性拆分——校正收益预估的前提</span></div>
+          <div class="layer new"><span class="lv">②</span><span class="desc"><b>裁剪改造</b>：轮数滑窗 → 按长度双水位 + T 攒批指针化（长对话最大出血点，改动独立）</span></div>
+          <div class="layer new"><span class="lv">③</span><span class="desc"><b>skills 迁移</b>：available skills 移出 query级槽位，先方案 A（随 U 注入），演进到方案 B（search 工具化）</span></div>
+          <div class="layer new"><span class="lv">④</span><span class="desc"><b>消息结构化注入</b>：知识 / 用户信息 / 环境增量随 U，ID 去重</span></div>
+          <div class="layer new"><span class="lv">⑤</span><span class="desc"><b>驻留治理</b>：会话亲和路由 → KV 分层扩容（offload）</span></div>
+        </div>
+      </div>
+      <div class="banner">①–③ 完成即可消除两大重写点（并解救被连带的 Tools）；④⑤ 渐进叠加</div>
+    </div>
+  </div>
+  <div class="footer"><span class="apxtag">附录 D · 量化收益与落地路径</span></div>
+</section>
+
+<div class="dots" id="dots"></div>
+<div class="nav">
+  <button id="prev" aria-label="上一页">‹</button>
+  <span class="pg" id="pg">1 / 6</span>
+  <button id="next" aria-label="下一页">›</button>
+</div>
+</div>
+
+<script>
+  const slides = [...document.querySelectorAll('.slide')];
+  const dots = document.getElementById('dots');
+  slides.forEach((_, i) => {
+    const d = document.createElement('i');
+    d.onclick = () => go(i);
+    dots.appendChild(d);
+  });
+  let cur = 0;
+  function go(i) {
+    cur = Math.max(0, Math.min(slides.length - 1, i));
+    slides.forEach((s, j) => s.classList.toggle('active', j === cur));
+    [...dots.children].forEach((d, j) => d.classList.toggle('on', j === cur));
+    document.getElementById('pg').textContent = (cur + 1) + ' / ' + slides.length;
+  }
+  document.getElementById('prev').onclick = () => go(cur - 1);
+  document.getElementById('next').onclick = () => go(cur + 1);
+  function toggleFS() {
+    if (document.fullscreenElement) document.exitFullscreen();
+    else document.documentElement.requestFullscreen();
+  }
+  document.addEventListener('keydown', e => {
+    if (['ArrowRight', 'PageDown', ' '].includes(e.key)) go(cur + 1);
+    if (['ArrowLeft', 'PageUp'].includes(e.key)) go(cur - 1);
+    if (e.key === 'Home') go(0);
+    if (e.key === 'End') go(slides.length - 1);
+    if (e.key === 'f' || e.key === 'F') toggleFS();
+  });
+  go(0);
+</script>
+</body>
+</html>
