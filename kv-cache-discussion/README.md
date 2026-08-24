@@ -12,6 +12,7 @@
 | [03-压缩策略.md](./03-压缩策略.md) | 超长上下文"从远到近"压缩的缓存代价分析与改进 |
 | [04-开放问题.md](./04-开放问题.md) | 待讨论、待确认的问题清单 |
 | [05-渐进式加载详细设计.md](./05-渐进式加载详细设计.md) | L2 内容随 user message 结构化注入的详细方案（消息规范、去重、压缩交互） |
+| [06-模型侧拼接细节.md](./06-模型侧拼接细节.md) | DeepSeek V4 / GLM 5.2 的 tools 拼接位置、defer_loading、reasoning 剔除与验证脚本 |
 | [上下文工程与KV-Cache优化.slides.html](./上下文工程与KV-Cache优化.slides.html) | 汇报用 HTML 幻灯片 v1（6 页，已被 v2 取代，留档） |
 | [上下文工程与KV-Cache优化.v2.slides.html](./上下文工程与KV-Cache优化.v2.slides.html) | 汇报用 HTML 幻灯片 v2（7 页：四问题 / skill 迁移双方案 / 裁剪改造 / 缓存驻留 / 落地路径） |
 
