@@ -18,7 +18,8 @@
 | [上下文工程与KV-Cache优化.slides.html](./上下文工程与KV-Cache优化.slides.html) | 汇报用 HTML 幻灯片 v1（6 页，已被 v2 取代，留档） |
 | [上下文工程与KV-Cache优化.v2.slides.html](./上下文工程与KV-Cache优化.v2.slides.html) | 汇报用 HTML 幻灯片 v2（7 页，已被 v3 取代，留档） |
 | [上下文工程与KV-Cache优化.v3.slides.html](./上下文工程与KV-Cache优化.v3.slides.html) | 汇报用 HTML 幻灯片 v3（7 页，已被 v4 取代，留档） |
-| [上下文工程与KV-Cache优化.v4.slides.html](./上下文工程与KV-Cache优化.v4.slides.html) | 汇报用 HTML 幻灯片 v4（7 页：纵向三实体结构图 / P2-P3 同构对照 / 现网基线 66% 与量化收益 / 裁剪改造 / 缓存驻留 / 落地路径） |
+| [上下文工程与KV-Cache优化.v4.slides.html](./上下文工程与KV-Cache优化.v4.slides.html) | 汇报用 HTML 幻灯片 v4（7 页，已被 v5 取代，留档） |
+| [上下文工程与KV-Cache优化.v5.slides.html](./上下文工程与KV-Cache优化.v5.slides.html) | 汇报用 HTML 幻灯片 v5（正片 2 页：现状与问题（含 66% 基线）/ 目标方案（含两通道、裁剪改造、驻留诉求、量化收益）；附录 A–D 4 页备查） |
 
 ## 背景共识
 
