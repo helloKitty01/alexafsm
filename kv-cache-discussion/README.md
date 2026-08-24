@@ -15,7 +15,8 @@
 | [06-模型侧拼接细节.md](./06-模型侧拼接细节.md) | DeepSeek V4 / GLM 5.2 的 tools 拼接位置、defer_loading、reasoning 剔除与验证脚本 |
 | [07-分代冻结详解.md](./07-分代冻结详解.md) | 分代冻结机制展开：合并式 vs 堆叠式、时间线算账、字节级冻结的工程陷阱 |
 | [上下文工程与KV-Cache优化.slides.html](./上下文工程与KV-Cache优化.slides.html) | 汇报用 HTML 幻灯片 v1（6 页，已被 v2 取代，留档） |
-| [上下文工程与KV-Cache优化.v2.slides.html](./上下文工程与KV-Cache优化.v2.slides.html) | 汇报用 HTML 幻灯片 v2（7 页：四问题 / skill 迁移双方案 / 裁剪改造 / 缓存驻留 / 落地路径） |
+| [上下文工程与KV-Cache优化.v2.slides.html](./上下文工程与KV-Cache优化.v2.slides.html) | 汇报用 HTML 幻灯片 v2（7 页，已被 v3 取代，留档） |
+| [上下文工程与KV-Cache优化.v3.slides.html](./上下文工程与KV-Cache优化.v3.slides.html) | 汇报用 HTML 幻灯片 v3（7 页：三实体物理序列图 / query×loop 回合结构 / Tools 连带失效 / 裁剪改造 / 缓存驻留 / 落地路径） |
 
 ## 背景共识
 
