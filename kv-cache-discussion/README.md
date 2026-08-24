@@ -22,7 +22,8 @@
 | [上下文工程与KV-Cache优化.v5.slides.html](./上下文工程与KV-Cache优化.v5.slides.html) | 汇报用 HTML 幻灯片 v5（已被 v6 取代，留档） |
 | [上下文工程与KV-Cache优化.v6.slides.html](./上下文工程与KV-Cache优化.v6.slides.html) | 汇报用 HTML 幻灯片 v6（存在版面溢出问题，已被 v7 取代，留档） |
 | [上下文工程与KV-Cache优化.v7.slides.html](./上下文工程与KV-Cache优化.v7.slides.html) | 汇报用 HTML 幻灯片 v7（已被 v8 取代，留档） |
-| [上下文工程与KV-Cache优化.v8.slides.html](./上下文工程与KV-Cache优化.v8.slides.html) | 汇报用 HTML 幻灯片 v8（翻页控件移出幻灯片区、术语规范（query级/Tools块）、附录 D 增补"为何非 100%"口径说明） |
+| [上下文工程与KV-Cache优化.v8.slides.html](./上下文工程与KV-Cache优化.v8.slides.html) | 汇报用 HTML 幻灯片 v8（基于 v7：术语规范 query级/Tools块、目标页标题"挑战 90%+ 命中率"、删输入输出比卡、附录 D 增补"为何非 100%"口径说明） |
+| [上下文工程与KV-Cache优化.pptx](./上下文工程与KV-Cache优化.pptx) | 真实 PPT（浅色系，2 页：现状与问题 / 目标方案），由 [make_pptx.py](./make_pptx.py) 生成 |
 
 ## 背景共识
 

@@ -27,8 +27,8 @@
     display: flex; justify-content: center; align-items: center;
     padding: 16px 12px; min-height: 100vh;
   }
-  /* 随视口满屏自适应：宽受限跟宽、高受限跟高；底部预留 44px 给翻页控件 */
-  .deck { position: relative; width: min(96vw, calc((100vh - 76px) * 1.7778)); padding-bottom: 44px; }
+  /* 随视口满屏自适应：宽受限跟宽、高受限跟高 */
+  .deck { position: relative; width: min(96vw, calc((100vh - 32px) * 1.7778)); }
   .slide {
     width: 100%;
     aspect-ratio: 16 / 9;
@@ -196,9 +196,8 @@
   }
   .footer .apxtag { color: var(--warn); }
 
-  /* 翻页控件位于幻灯片下方的预留区，不与内容重叠 */
   .nav {
-    position: absolute; bottom: 4px; right: 4px;
+    position: absolute; bottom: 3.5%; right: 3.2%;
     display: flex; gap: .5em; align-items: center; z-index: 10;
     font-size: clamp(9.5px, min(1.08vw, 1.92vh), 22px);
   }
@@ -208,7 +207,7 @@
   }
   .nav button:hover { border-color: var(--accent); color: var(--accent); }
   .nav .pg { color: var(--muted); font-family: var(--mono); font-size: .9em; padding: 0 .4em; }
-  .dots { position: absolute; bottom: 16px; left: 4px; display: flex; gap: .45em; z-index: 10; }
+  .dots { position: absolute; bottom: 4.2%; left: 3.2%; display: flex; gap: .45em; z-index: 10; }
   .dots i {
     width: .55em; height: .55em; border-radius: 50%;
     background: rgba(255,255,255,.18); cursor: pointer;
@@ -271,12 +270,12 @@
     </div>
   </div>
   <div class="banner alert" style="margin-top:.7em;">综上，缓存失效有两个来源：<b>问题① query级内容每次重写</b> ＋ <b>问题② 滑窗裁剪每轮改历史</b>；另有问题④ 驻留竞争需集群侧配合 —— 下页逐项治理</div>
-  <div class="footer"><span>现状与问题</span></div>
+  <div class="footer"><span>现状与问题</span><span>1 / 6</span></div>
 </section>
 
 <!-- ============ P2 目标方案 ============ -->
 <section class="slide">
-  <h2 style="margin-bottom:.15em;"><span class="num">02</span>目标方案：<span class="hl">上下文只增不改，缓存全程命中</span></h2>
+  <h2 style="margin-bottom:.15em;"><span class="num">02</span>目标方案：上下文只增不改，<span class="hl">挑战 90%+ 命中率</span></h2>
   <p class="sub" style="font-size:.88em; margin-bottom:.55em;">与现状图同构对照：<b class="badc">治问题①③</b>（query级下沉，两条通道）· <b class="badc">治问题②</b>（裁剪改造）· <b class="badc">答问题④</b>（驻留诉求）</p>
   <div class="row" style="flex:1.4; min-height:0;">
     <div class="card" style="flex:1.1; display:flex; flex-direction:column;">
@@ -332,7 +331,7 @@
     <div class="card"><div class="big g">-75%</div><div class="lbl">每请求 prefill 计算量：12K → 3K，TTFT 与吞吐同步改善</div></div>
   </div>
   <div class="banner" style="margin-top:.55em;">落地节奏：<b>① 命中率拆分度量</b> → <b>② 裁剪改造</b> → <b>③ skills 迁移</b> → ④ 结构化注入 → ⑤ 驻留治理（推导与路径详见附录 D）</div>
-  <div class="footer"><span>目标方案</span></div>
+  <div class="footer"><span>目标方案</span><span>2 / 6</span></div>
 </section>
 
 <!-- ============ 附录 A 渐进式加载 ============ -->
@@ -387,7 +386,7 @@
       <div class="banner">A 先行落地拿缓存收益，B 作为演进方向；可 A → B 平滑过渡</div>
     </div>
   </div>
-  <div class="footer"><span class="apxtag">附录 A · 渐进式加载设计</span></div>
+  <div class="footer"><span class="apxtag">附录 A · 渐进式加载设计</span><span>3 / 6</span></div>
 </section>
 
 <!-- ============ 附录 B 裁剪与压缩改造 ============ -->
@@ -429,7 +428,7 @@
       <div class="banner">裁剪的真正代价是<b>信息丢失</b>而非那一次 prefill——重心放在可恢复指针与摘要保真上</div>
     </div>
   </div>
-  <div class="footer"><span class="apxtag">附录 B · 裁剪与压缩改造</span></div>
+  <div class="footer"><span class="apxtag">附录 B · 裁剪与压缩改造</span><span>4 / 6</span></div>
 </section>
 
 <!-- ============ 附录 C 缓存驻留 ============ -->
@@ -467,7 +466,7 @@
       </div>
     </div>
   </div>
-  <div class="footer"><span class="apxtag">附录 C · 缓存驻留</span></div>
+  <div class="footer"><span class="apxtag">附录 C · 缓存驻留</span><span>5 / 6</span></div>
 </section>
 
 <!-- ============ 附录 D 量化收益与落地路径 ============ -->
@@ -487,7 +486,7 @@
           <tr><td><b>驻留</b></td><td class="badc">未治理</td><td class="good">诉求一/诉求二 + 参考方向（附录 C）</td></tr>
         </table>
         <p style="margin-top:.55em; font-size:.8em;">估算口径：现网输入 37K/请求（命中 25K、miss 12K）；缓存价 0.1×；目标态 miss ≈ 当轮新增 ~2K + 裁剪/尾部剔除摊销 ~1K；驻留性 miss 占比待路径①度量校正。敏感性：目标 miss ±1K，成本降幅在 -50% ~ -59% 区间。</p>
-        <p style="margin-top:.4em; font-size:.8em;"><b>为什么上限是 ~92% 而非 100%</b>：命中率分母含每轮<b>首次出现</b>的 token（新 query、工具结果、检索增量），缓存中不存在、必然 miss（~2K/37K ≈ 5 个点）；口径与业界一致（hit_tokens / prompt_tokens），DeepSeek V4 agent/RAG 生产负载社区实测为 90–96%，本预估处于该区间。若按"可缓存部分的命中率"口径（剔除首次出现内容），目标即接近 100%。</p>
+        <p style="margin-top:.4em; font-size:.8em;"><b>为什么上限是 ~92% 而非 100%</b>：命中率分母含每轮<b>首次出现</b>的 token（新 query、工具结果、检索增量），缓存中不存在、必然 miss（~2K/37K ≈ 5 个点）；口径与业界一致（hit_tokens / prompt_tokens），DeepSeek V4 agent/RAG 生产负载社区实测为 90–96%，本预估处于该区间。若按"可缓存部分的命中率"口径（剔除首次出现内容），目标即接近 100%。故对外目标定为<b>挑战 90%+</b>，预留驻留性 miss 的不确定性空间。</p>
       </div>
       <div class="kpi">
         <div class="card"><div class="big g">66% → ~92%</div><div class="lbl">命中率（miss 12K → ~3K / 请求）</div></div>
@@ -509,7 +508,7 @@
       <div class="banner">①–③ 完成即可消除两大重写点（并解救被连带的 Tools）；④⑤ 渐进叠加</div>
     </div>
   </div>
-  <div class="footer"><span class="apxtag">附录 D · 量化收益与落地路径</span></div>
+  <div class="footer"><span class="apxtag">附录 D · 量化收益与落地路径</span><span>6 / 6</span></div>
 </section>
 
 <div class="dots" id="dots"></div>
