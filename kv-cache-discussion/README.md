@@ -19,7 +19,8 @@
 | [上下文工程与KV-Cache优化.v2.slides.html](./上下文工程与KV-Cache优化.v2.slides.html) | 汇报用 HTML 幻灯片 v2（7 页，已被 v3 取代，留档） |
 | [上下文工程与KV-Cache优化.v3.slides.html](./上下文工程与KV-Cache优化.v3.slides.html) | 汇报用 HTML 幻灯片 v3（7 页，已被 v4 取代，留档） |
 | [上下文工程与KV-Cache优化.v4.slides.html](./上下文工程与KV-Cache优化.v4.slides.html) | 汇报用 HTML 幻灯片 v4（7 页，已被 v5 取代，留档） |
-| [上下文工程与KV-Cache优化.v5.slides.html](./上下文工程与KV-Cache优化.v5.slides.html) | 汇报用 HTML 幻灯片 v5（正片 2 页：现状与问题（含 66% 基线）/ 目标方案（含两通道、裁剪改造、驻留诉求、量化收益）；附录 A–D 4 页备查） |
+| [上下文工程与KV-Cache优化.v5.slides.html](./上下文工程与KV-Cache优化.v5.slides.html) | 汇报用 HTML 幻灯片 v5（已被 v6 取代，留档） |
+| [上下文工程与KV-Cache优化.v6.slides.html](./上下文工程与KV-Cache优化.v6.slides.html) | 汇报用 HTML 幻灯片 v6（正片 2 页 + 附录 A–D；目标页加厚 turn_context 与两通道细节、治①②④问题映射、视口满屏自适应 + F 键全屏） |
 
 ## 背景共识
 
