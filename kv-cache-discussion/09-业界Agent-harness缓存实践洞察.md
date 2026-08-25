@@ -147,6 +147,45 @@ P6/附录 C 的判断一致。
 | KV 命中率作为北极星指标上看板 | Manus | 落地路径① | 强化：拆分口径 + 长期看板 |
 | PYTHONHASHSEED 等一致性细节 | vLLM/Mooncake 文档 | 未覆盖 | 集群配置 checklist |
 
+## 附：defer_loading 机制详解
+
+**解决的问题**：工具 schema 全集渲染在前缀区。工具一多（几百个），
+既撑爆上下文（多 MCP 场景 50K+ token），又打击选择准确率
+（超过 30–50 个工具后明显退化）；按 query 检索 top-k 塞前缀
+又每轮重写、破坏缓存。defer_loading 的本质是：
+**工具定义仍然全量随请求提交，但标记的工具不渲染进上下文前缀。**
+
+**Anthropic 版完整工作流**：
+
+1. 请求 tools 数组含全部工具；可选工具标 `defer_loading: true`；
+   至少一个非 defer（通常是 tool search 工具本身，~500 token）。
+2. API 渲染 prompt 时**跳过 deferred 工具**——前缀只含 search 工具
+   与常驻核心工具。
+3. 模型需要能力时发起搜索（BM25 自然语言或 regex 两种变体；
+   检索范围含工具名、描述、参数名、参数描述）。
+4. API 以 `tool_search_tool_result` 返回命中的 `tool_reference` 块
+   （每次最多 5 个），**内联追加进消息流**，服务端把引用展开为完整
+   schema 供模型调用。
+5. 缓存性质：前缀字节不变 → 缓存保留；被发现的工具定义以**追加**
+   形式进入消息流，随后也成为可缓存前缀的一部分。
+6. 限制：每请求最多 10,000 个 deferred 工具；regex ≤200 字符、
+   BM25 查询 ≤500 字符；不允许全部工具 defer。
+7. 官方效果：~77K → ~8.7K token（-85%）；MCP 评测准确率
+   Opus 从 49% → 74%。
+
+**GLM 5.2 原生版**：chat template 渲染 `# Tools` 块时跳过
+`defer_loading: true` 的工具（见 06）。即模板层已支持
+"定义在请求里、不占前缀"；但**运行时发现机制需自建**——
+自实现 search_skill 工具，命中后由框架把工具 schema 以追加形式
+注入消息流（GLM 模板在 tool_response 中会附带匹配工具的 JSON 定义），
+具体行为需实测。DeepSeek V4 参考编码器未见等价机制，
+在其上落地方案 B 需用"schema 以文本进 T + 约定调用格式"或 meta-tool。
+
+**与方案 B 的关系**：defer_loading 是方案 B 的平台级实现，
+且比"skill 文档纯文本注入"更进一步——被发现的工具以**正式 schema**
+形态可调用，适合确实需要参数约束的工具型 skill；
+纯提示词型 skill 仍走 load 文本即可。
+
 ## 5. 一句话总结
 
 我们方案的主体（分层排布、注入式动态内容、低频裁剪、驻留诉求）
