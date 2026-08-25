@@ -149,3 +149,8 @@ class EnvResolver:
 - 唯一要守住的纪律：**不要**为了"刷新前台应用"去原位改写历史消息里的旧值，
   旧值留在历史里没关系，模型以最近一次出现的值为准（可在 system prompt 的
   静态规则里写明"环境变量以消息流中最近一次出现为准"）。
+
+## 七、业界对照
+
+业界实现（Anthropic Agent Skills、Claude Code、computer-use harness、移动端 GUI agent、
+LangGraph、Manus）与本方案的对应关系及可借鉴细节，见[业界实现调研](./业界实现调研.md)。
