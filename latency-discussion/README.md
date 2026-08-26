@@ -16,6 +16,7 @@
 | [02-loop次数优化.md](./02-loop次数优化.md) | 幻觉纠错、工具粒度、并行工具调用、错误消息工程 |
 | [03-快慢双系统.md](./03-快慢双系统.md) | skill+loop 慢系统向 function call 快系统的迁移设计 |
 | [Agent-loop时延分析与优化.slides.v3.html](./Agent-loop时延分析与优化.slides.v3.html) | **汇报材料（当前版本，2 页）**：P1 现状端到端架构图（SkillLoad ×0~3，含预加载最优账）；P2 时延方程 + 按时延构成逐项方案 + 敏感性对比 + 落地顺序 |
+| [推理性能与KV-cache优化.slides.html](./推理性能与KV-cache优化.slides.html) | **专题单页**：KV cache 命中率 60%→90% 时延测算（glm5.2 / ds-v4）、端到端收益阶梯（13s→9s→7s）、可达性分析与四层业界优化方案（排布/路由/容量/引擎） |
 | [Agent-loop时延分析与优化.slides.v2.html](./Agent-loop时延分析与优化.slides.v2.html) | v2（5 页，已被 v3 取代，留档） |
 | [Agent-loop时延分析与优化.slides.html](./Agent-loop时延分析与优化.slides.html) | 初版（4 页，留档） |
 
