@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Agent 上下文工程与 KV Cache 优化</title>
+<style>
+  :root {
+    --bg: #0d1220;
+    --slide-bg: linear-gradient(135deg, #131a2e 0%, #0f1526 55%, #12203a 100%);
+    --card: rgba(255,255,255,.045);
+    --card-border: rgba(255,255,255,.09);
+    --text: #e8ecf6;
+    --muted: #9aa7c2;
+    --accent: #5b9dff;
+    --accent2: #4fd6a7;
+    --warn: #ffb454;
+    --bad: #ff6b6b;
+    --code-bg: rgba(0,0,0,.35);
+    --mono: "SF Mono", "JetBrains Mono", Consolas, "Courier New", monospace;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { background: var(--bg); height: 100%; }
+  body {
+    font-family: "PingFang SC", "Microsoft YaHei", "Noto Sans SC", -apple-system, sans-serif;
+    color: var(--text);
+    display: flex; justify-content: center; align-items: center;
+    padding: 24px 16px; min-height: 100vh;
+  }
+  .deck { position: relative; width: min(1280px, 96vw); }
+  .slide {
+    width: 100%;
+    aspect-ratio: 16 / 9;
+    background: var(--slide-bg);
+    border: 1px solid var(--card-border);
+    border-radius: 18px;
+    box-shadow: 0 22px 60px rgba(0,0,0,.5);
+    padding: 2.6% 3.2%;
+    display: none; flex-direction: column;
+    overflow: hidden; position: relative;
+    font-size: clamp(10px, 1.12vw, 14.5px);
+  }
+  .slide.active { display: flex; }
+  .slide::before {
+    content: ""; position: absolute; inset: 0 0 auto 0; height: 4px;
+    background: linear-gradient(90deg, var(--accent), var(--accent2));
+    border-radius: 18px 18px 0 0;
+  }
+  h1 { font-size: 1.85em; font-weight: 700; margin-bottom: .15em; }
+  h1 .hl { color: var(--accent); }
+  h2 { font-size: 1.5em; font-weight: 700; margin-bottom: .5em; }
+  h2 .hl { color: var(--accent); }
+  h2 .num { color: var(--muted); font-weight: 600; margin-right: .4em; font-size: .8em; }
+  .sub { color: var(--muted); font-size: 1.05em; }
+
+  .card {
+    background: var(--card); border: 1px solid var(--card-border);
+    border-radius: 12px; padding: 1em 1.2em;
+  }
+  .card h3 { font-size: 1.05em; margin-bottom: .45em; color: #fff; }
+  .card h3 .tag { font-size: .8em; }
+  .card p, .card li { color: var(--muted); font-size: .95em; line-height: 1.55; }
+  .card li { margin-left: 1.2em; margin-bottom: .25em; }
+  .card b { color: var(--text); font-weight: 600; }
+  .good { color: var(--accent2) !important; }
+  .warnc { color: var(--warn) !important; }
+  .badc { color: var(--bad) !important; }
+  .mono { font-family: var(--mono); }
+  code {
+    font-family: var(--mono); background: var(--code-bg);
+    padding: .1em .4em; border-radius: 5px; font-size: .92em; color: #cfe0ff;
+  }
+  pre {
+    font-family: var(--mono); background: var(--code-bg);
+    border: 1px solid var(--card-border); border-radius: 10px;
+    padding: .8em 1em; font-size: .88em; line-height: 1.55;
+    color: #cfe0ff; overflow: hidden; white-space: pre;
+  }
+  pre .c { color: #6b7a99; }
+  pre .g { color: var(--accent2); }
+  pre .y { color: var(--warn); }
+  pre .r { color: var(--bad); }
+  pre .b { color: var(--accent); }
+
+  .row { display: flex; gap: 1em; min-height: 0; }
+  .col { display: flex; flex-direction: column; gap: 1em; min-width: 0; }
+  .grow { flex: 1; min-height: 0; min-width: 0; }
+
+  /* 分层堆叠图 */
+  .stack { display: flex; flex-direction: column; gap: .45em; }
+  .layer {
+    border-radius: 10px; padding: .6em .9em;
+    border: 1px solid var(--card-border); background: var(--card);
+    display: flex; align-items: baseline; gap: .8em;
+  }
+  .layer .lv { font-family: var(--mono); font-weight: 700; font-size: .95em; white-space: nowrap; }
+  .layer .desc { color: var(--muted); font-size: .88em; line-height: 1.45; }
+  .layer .desc b { color: var(--text); }
+  .layer.ok    { border-color: rgba(79,214,167,.4); }
+  .layer.ok .lv { color: var(--accent2); }
+  .layer.bad   { border-color: rgba(255,107,107,.65); background: rgba(255,107,107,.10); }
+  .layer.bad .lv { color: var(--bad); }
+  .layer.hit   { border-color: rgba(255,107,107,.35); background: rgba(255,107,107,.05); border-style: dashed; }
+  .layer.hit .lv { color: var(--bad); }
+  .layer.new   { border-color: rgba(91,157,255,.45); background: rgba(91,157,255,.08); }
+  .layer.new .lv { color: var(--accent); }
+
+  .banner {
+    border-radius: 10px; padding: .65em 1.1em; font-size: 1em;
+    background: linear-gradient(90deg, rgba(91,157,255,.12), rgba(79,214,167,.10));
+    border: 1px solid rgba(91,157,255,.3); color: var(--text);
+  }
+  .banner b { color: var(--accent); }
+  .banner.alert {
+    background: rgba(255,107,107,.08); border-color: rgba(255,107,107,.4);
+  }
+  .banner.alert b { color: var(--bad); }
+
+  table { border-collapse: collapse; width: 100%; font-size: .92em; }
+  th, td { text-align: left; padding: .45em .8em; border-bottom: 1px solid var(--card-border); }
+  th { color: var(--accent); font-weight: 600; white-space: nowrap; }
+  td { color: var(--muted); line-height: 1.45; }
+  td b { color: var(--text); }
+
+  .kpi { display: flex; gap: 1em; }
+  .kpi .card { flex: 1; text-align: center; padding: .9em .6em; }
+  .kpi .big { font-size: 1.7em; font-weight: 700; color: var(--accent); font-family: var(--mono); }
+  .kpi .big.g { color: var(--accent2); }
+  .kpi .big.w { color: var(--warn); }
+  .kpi .lbl { color: var(--muted); font-size: .88em; margin-top: .3em; line-height: 1.4; }
+
+  .steps { display: flex; gap: .7em; align-items: stretch; }
+  .step { flex: 1; position: relative; }
+  .step .card { height: 100%; }
+  .step .idx {
+    font-family: var(--mono); font-weight: 700; color: var(--accent);
+    font-size: 1.1em; margin-bottom: .2em;
+  }
+
+  .footer {
+    margin-top: auto; padding-top: .8em; display: flex;
+    justify-content: space-between; color: var(--muted); font-size: .82em;
+  }
+
+  /* 导航 */
+  .nav {
+    position: absolute; bottom: 3.5%; right: 3.2%;
+    display: flex; gap: .5em; align-items: center; z-index: 10;
+    font-size: clamp(10px, 1.12vw, 14.5px);
+  }
+  .nav button {
+    background: var(--card); border: 1px solid var(--card-border); color: var(--text);
+    border-radius: 8px; width: 2.2em; height: 2.2em; cursor: pointer; font-size: 1em;
+  }
+  .nav button:hover { border-color: var(--accent); color: var(--accent); }
+  .nav .pg { color: var(--muted); font-family: var(--mono); font-size: .9em; padding: 0 .4em; }
+  .dots { position: absolute; bottom: 4.2%; left: 3.2%; display: flex; gap: .45em; z-index: 10; }
+  .dots i {
+    width: .55em; height: .55em; border-radius: 50%;
+    background: rgba(255,255,255,.18); cursor: pointer;
+  }
+  .dots i.on { background: var(--accent); }
+</style>
+</head>
+<body>
+<div class="deck">
+
+<!-- ============ P1 封面 ============ -->
+<section class="slide active">
+  <div style="flex:1; display:flex; flex-direction:column; justify-content:center; gap:1.6em;">
+    <div>
+      <div class="sub" style="letter-spacing:.2em; margin-bottom:.8em;">CONTEXT ENGINEERING / KV CACHE</div>
+      <h1 style="font-size:2.6em;">Agent 上下文工程与 <span class="hl">KV Cache</span> 优化</h1>
+      <p class="sub" style="margin-top:.6em; font-size:1.15em;">现状与问题 · 目标方案 · 收益与落地路径</p>
+    </div>
+    <div class="kpi" style="margin-top:1em;">
+      <div class="card">
+        <div class="big">逐 token 一致</div>
+        <div class="lbl">KV cache 命中条件：前缀完全一致<br>改动一个 token，其后全部失效</div>
+      </div>
+      <div class="card">
+        <div class="big g">~100 : 1</div>
+        <div class="lbl">Agent loop 输入输出比<br>成本几乎全在输入 prefill</div>
+      </div>
+      <div class="card">
+        <div class="big w">~10×</div>
+        <div class="lbl">缓存命中与否的价差<br>同时决定 TTFT（首 token 延迟）</div>
+      </div>
+    </div>
+    <div class="banner">一切上下文组织决策，都要回答同一个问题：<b>这次改动会让缓存从哪个位置断掉？</b></div>
+  </div>
+  <div class="footer"><span>Agent 上下文工程与 KV Cache 优化</span><span>1 / 6</span></div>
+</section>
+
+<!-- ============ P2 现状与问题 ============ -->
+<section class="slide">
+  <h2><span class="num">02</span>现状架构：<span class="hl">分层意图正确</span>，但 L2 是致命重写点</h2>
+  <div class="row grow">
+    <div class="col" style="flex:1.05;">
+      <div class="card grow">
+        <h3>现状四层结构（从前到后）</h3>
+        <div class="stack" style="margin-top:.5em;">
+          <div class="layer ok">
+            <span class="lv">L0 产品级</span>
+            <span class="desc">system / agent 关键原则 + 工具全集（tools 参数）<b class="good">　稳定 ✓</b></span>
+          </div>
+          <div class="layer ok">
+            <span class="lv">L1 用户级</span>
+            <span class="desc">固定加载的用户相关信息，与 query 无强相关，更新覆盖多轮对话<b class="good">　低频 ✓</b></span>
+          </div>
+          <div class="layer bad">
+            <span class="lv">L2 query级</span>
+            <span class="desc">按 query 检索的 <b>skill / 知识 / 用户信息</b><b class="badc">　每个 query 原位重写 ✗</b></span>
+          </div>
+          <div class="layer hit">
+            <span class="lv">L3 loop级</span>
+            <span class="desc">UAT（user / assistant / tool）消息流，本身追加式<b class="badc">　却被 L2 连带全部失效</b></span>
+          </div>
+        </div>
+        <p style="margin-top:.8em;">排布原则：变化频率必须从前到后单调递增，<b>“原位重写”区绝不能排在“追加式”区之前</b>——L2 恰好违反。</p>
+      </div>
+    </div>
+    <div class="col" style="flex:1;">
+      <div class="card">
+        <h3><span class="badc">问题 ①</span>　失效范围大，且随对话轮数线性增长</h3>
+        <p>每个新 query 的 cache miss 量 = <b>|L2| + |L3 全部历史|</b>。对话越长浪费越大，而长对话恰恰是最需要缓存的场景。</p>
+      </div>
+      <div class="card">
+        <h3><span class="badc">问题 ②</span>　检索内容与 query 的相关性绑定丢失</h3>
+        <p>L2 是单例槽位，内容与它服务的 query <b>无显式对应</b>，且物理上与当前 query 隔着整个历史，注意力利用效率最差。</p>
+      </div>
+      <div class="card">
+        <h3><span class="badc">问题 ③</span>　历史证据被覆盖，时间线断裂</h3>
+        <p>L2 每轮覆盖式更新，<b>上一轮检索的 skill / 知识被冲掉</b>。第 N 轮依赖第 N-2 轮的检索结果时证据已丢失；去重也无从谈起。</p>
+      </div>
+      <div class="banner alert">病灶只有一个：<b>最易变的 L2 被放在了 UAT 历史之前</b></div>
+    </div>
+  </div>
+  <div class="footer"><span>现状与问题</span><span>2 / 6</span></div>
+</section>
+
+<!-- ============ P3 目标方案总览 ============ -->
+<section class="slide">
+  <h2><span class="num">03</span>目标方案：取消 L2 槽位，<span class="hl">query 级内容下沉进消息流</span></h2>
+  <div class="row grow">
+    <div class="col" style="flex:1.05;">
+      <div class="card grow">
+        <h3>目标排布（L0 → L1 → UAT 流，全程 append-only）</h3>
+        <div class="stack" style="margin-top:.5em;">
+          <div class="layer ok">
+            <span class="lv">L0 产品级</span>
+            <span class="desc">system 关键原则 + 工具全集 + <b>全量 skill 索引</b>（名称+一句话描述，静态）</span>
+          </div>
+          <div class="layer ok">
+            <span class="lv">L1 用户级</span>
+            <span class="desc">会话开始加载后冻结；中途更新<b>攒批执行</b>（低频事件，代价可接受）</span>
+          </div>
+          <div class="layer new">
+            <span class="lv">UAT 流</span>
+            <span class="desc">query 级内容<b>随各轮消息渐进进入</b>：检索增量/环境增量随 user message，skill 正文以 tool result 追加——<b>只追加，不修改</b></span>
+          </div>
+        </div>
+        <p style="margin-top:.8em;">原 L2 的三类内容去向：<b>知识/用户信息</b> → 随当轮 user message 注入；<b>skill</b> → 索引进 L0 + 正文按需 load；<b>环境上下文</b> → 增量随消息注入。</p>
+      </div>
+    </div>
+    <div class="col" style="flex:1;">
+      <div class="card">
+        <h3 class="good">效果：每轮前缀 = 上一轮的严格超集</h3>
+        <p>没有任何区域被原位重写，缓存<b>全程命中</b>，只为当轮新增内容付 prefill 成本。</p>
+      </div>
+      <div class="card">
+        <h3>相关性与历史同时修复</h3>
+        <ul>
+          <li>证据与 query <b>物理相邻、显式绑定</b>，无需推断对应关系</li>
+          <li>每轮 query 和它的证据一起<b>留在时间线里</b>，历史可查、可审计</li>
+          <li>旧条目历史可见 → <b>条目级 ID 去重</b>才得以成立</li>
+        </ul>
+      </div>
+      <div class="banner">核心原则：上下文从前到后，<b>变化频率单调递增</b>；重写区永远不排在追加区之前</div>
+    </div>
+  </div>
+  <div class="footer"><span>目标方案总览</span><span>3 / 6</span></div>
+</section>
+
+<!-- ============ P4 渐进式加载 ============ -->
+<section class="slide">
+  <h2><span class="num">04</span>渐进式加载：<span class="hl">两条通道</span>把 query 级内容送进消息流</h2>
+  <div class="row grow">
+    <div class="col" style="flex:1.15;">
+      <div class="card grow">
+        <h3>通道一 · 被动注入（系统检索，随当轮 user message）</h3>
+<pre><span class="c">&lt;turn_context&gt;</span>
+  <span class="b">&lt;env&gt;</span>首轮全量快照，后续只注入相对上轮的增量<span class="b">&lt;/env&gt;</span>
+  <span class="g">&lt;retrieved&gt;</span>仅未注入过的条目（ID 去重，固定排序）<span class="g">&lt;/retrieved&gt;</span>
+  <span class="y">&lt;skill_hint&gt;</span>检索 top-1：高置信给正文，低置信只给名字<span class="y">&lt;/skill_hint&gt;</span>
+<span class="c">&lt;/turn_context&gt;</span>
+<span class="b">&lt;query&gt;</span>用户原文，永远放在消息最后<span class="b">&lt;/query&gt;</span></pre>
+        <ul style="margin-top:.6em;">
+          <li>序列化<b>完全确定性</b>：标签顺序、排序规则固定，空块省略</li>
+          <li>会话级状态仅两个：<code>env_snapshot</code>（算增量）、<code>injected_ids</code>（去重）</li>
+          <li>一旦发出<b>永不回改</b>，重写统一攒到压缩时刻</li>
+        </ul>
+      </div>
+    </div>
+    <div class="col" style="flex:1;">
+      <div class="card grow">
+        <h3>通道二 · 主动加载（模型按需拉取 skill）</h3>
+<pre>assistant: <span class="y">load_skill("deploy")</span>
+tool:      <span class="g">[skill 正文，以 tool result 追加进消息流]</span></pre>
+        <ul style="margin-top:.6em;">
+          <li>L0 只放<b>静态 skill 索引</b>，正文由模型判断按需加载</li>
+          <li>从“系统猜 top-k”变成<b>模型自己决定要什么</b></li>
+          <li>已加载 skill 在会话内持续可见，<b>不重复检索</b></li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>通道选择</h3>
+        <table>
+          <tr><th></th><th>通道一</th><th>通道二</th></tr>
+          <tr><td><b>谁决定</b></td><td>系统（检索器）</td><td>模型</td></tr>
+          <tr><td><b>适合</b></td><td>环境增量、高置信命中</td><td>skill 正文、大体积知识</td></tr>
+          <tr><td><b>成本</b></td><td>无额外往返</td><td>+1 次工具调用</td></tr>
+        </table>
+      </div>
+    </div>
+  </div>
+  <div class="footer"><span>渐进式加载设计</span><span>4 / 6</span></div>
+</section>
+
+<!-- ============ P5 压缩策略 ============ -->
+<section class="slide">
+  <h2><span class="num">05</span>压缩策略：miss 无法避免，<span class="hl">只能摊销</span></h2>
+  <div class="row grow">
+    <div class="col" style="flex:1;">
+      <div class="card">
+        <h3 class="badc">反模式（每轮全量 miss）</h3>
+        <ul>
+          <li>每轮滚动更新一个位于前部的 summary 块</li>
+          <li>每轮删一点最旧消息（滑动窗口逐步前移）</li>
+        </ul>
+      </div>
+      <div class="card grow">
+        <h3 class="good">推荐：阈值触发 + 双水位 + 分代冻结</h3>
+        <ul>
+          <li><b>双水位</b>：达到 ~80% 容量才压，一次压到 ~40%，避免“压一点→又满→再压”的抖动</li>
+          <li><b>分代冻结</b>：摘要块写入后冻结不再改动，成为新稳定前缀的一部分；两次压缩之间<b>全部轮次命中</b></li>
+          <li><b>自然边界</b>：尽量在子任务完成时压缩，摘要质量最高</li>
+          <li>所有重写历史的操作<b>攒到同一次压缩</b>，一次 miss 付清所有账</li>
+        </ul>
+      </div>
+    </div>
+    <div class="col" style="flex:1.1;">
+      <div class="card grow">
+        <h3>从远到近分级保真（可恢复优先于有损摘要）</h3>
+        <table>
+          <tr><th>内容</th><th>压缩处理</th><th>恢复方式</th></tr>
+          <tr><td><b>env 旧增量</b></td><td>直接丢弃，摘要给当前快照</td><td>无需恢复</td></tr>
+          <tr><td><b>retrieved 正文</b></td><td>退化为 ID 指针</td><td class="mono">按 ID 重拉</td></tr>
+          <tr><td><b>已加载 skill</b></td><td>退化为“名称+已加载标记”</td><td class="mono">load_skill</td></tr>
+          <tr><td><b>大 tool result</b></td><td>落盘，留路径+摘要</td><td class="mono">重新读取</td></tr>
+          <tr><td><b>远端对话</b></td><td>结构化摘要（目标/结论/待办）</td><td>—（有损）</td></tr>
+          <tr><td><b>近端 K 轮</b></td><td><b class="good">原文保留</b></td><td>—</td></tr>
+        </table>
+      </div>
+      <div class="banner">压缩的真正代价是<b>信息丢失</b>而非那一次 prefill——设计重心放在摘要保真与可恢复指针上</div>
+    </div>
+  </div>
+  <div class="footer"><span>压缩策略</span><span>5 / 6</span></div>
+</section>
+
+<!-- ============ P6 收益与落地 ============ -->
+<section class="slide">
+  <h2><span class="num">06</span>收益对比与<span class="hl">落地路径</span></h2>
+  <div class="row" style="flex:1; min-height:0;">
+    <div class="col" style="flex:1.25;">
+      <div class="card grow">
+        <h3>迁移前后对比</h3>
+        <table>
+          <tr><th>维度</th><th>现状（L2 固定槽位）</th><th>目标（下沉进消息流）</th></tr>
+          <tr><td><b>KV cache</b></td><td class="badc">每 query：L2+全部历史 miss</td><td class="good">全程命中，只为增量付费</td></tr>
+          <tr><td><b>成本曲线</b></td><td class="badc">随对话轮数线性恶化</td><td class="good">与历史长度基本无关</td></tr>
+          <tr><td><b>query 相关性</b></td><td class="badc">无绑定、距离远</td><td class="good">物理相邻、显式绑定</td></tr>
+          <tr><td><b>历史证据</b></td><td class="badc">每轮覆盖，时间线断裂</td><td class="good">完整保留，可审计</td></tr>
+          <tr><td><b>去重能力</b></td><td class="badc">不可能（旧内容已丢）</td><td class="good">条目级 ID 去重</td></tr>
+          <tr><td><b>压缩配合</b></td><td class="badc">无</td><td class="good">指针化可恢复压缩</td></tr>
+        </table>
+      </div>
+      <div class="kpi">
+        <div class="card"><div class="big g">≈5–6 轮</div><div class="lbl">压缩后回本轮数<br>（50k 上下文、0.1× 缓存价示例）</div></div>
+        <div class="card"><div class="big g">-60%</div><div class="lbl">回本后每轮等效输入成本<br>（50k → 20k 示例）</div></div>
+      </div>
+    </div>
+    <div class="col" style="flex:1;">
+      <div class="card grow">
+        <h3>落地路径（按依赖排序）</h3>
+        <div class="stack" style="margin-top:.4em;">
+          <div class="layer new"><span class="lv">①</span><span class="desc"><b>先加度量</b>：接入 cached_tokens / prefix-cache 命中率指标——没有度量，任何优化都无法验证</span></div>
+          <div class="layer new"><span class="lv">②</span><span class="desc"><b>skill 迁移</b>：正文移出 L2，索引进 L0，增加 load_skill 工具（收益最大的一步）</span></div>
+          <div class="layer new"><span class="lv">③</span><span class="desc"><b>消息结构化注入</b>：知识/用户信息/环境增量随 user message，ID 去重（env 首版可全量）</span></div>
+          <div class="layer new"><span class="lv">④</span><span class="desc"><b>压缩改造</b>：双水位 + 分代冻结 + 可恢复指针化</span></div>
+        </div>
+      </div>
+      <div class="banner">①②完成即可消除最大病灶；③④在同一框架内渐进叠加</div>
+    </div>
+  </div>
+  <div class="footer"><span>收益与落地路径</span><span>6 / 6</span></div>
+</section>
+
+<div class="dots" id="dots"></div>
+<div class="nav">
+  <button id="prev" aria-label="上一页">‹</button>
+  <span class="pg" id="pg">1 / 6</span>
+  <button id="next" aria-label="下一页">›</button>
+</div>
+</div>
+
+<script>
+  const slides = [...document.querySelectorAll('.slide')];
+  const dots = document.getElementById('dots');
+  slides.forEach((_, i) => {
+    const d = document.createElement('i');
+    d.onclick = () => go(i);
+    dots.appendChild(d);
+  });
+  let cur = 0;
+  function go(i) {
+    cur = Math.max(0, Math.min(slides.length - 1, i));
+    slides.forEach((s, j) => s.classList.toggle('active', j === cur));
+    [...dots.children].forEach((d, j) => d.classList.toggle('on', j === cur));
+    document.getElementById('pg').textContent = (cur + 1) + ' / ' + slides.length;
+  }
+  document.getElementById('prev').onclick = () => go(cur - 1);
+  document.getElementById('next').onclick = () => go(cur + 1);
+  document.addEventListener('keydown', e => {
+    if (['ArrowRight', 'PageDown', ' '].includes(e.key)) go(cur + 1);
+    if (['ArrowLeft', 'PageUp'].includes(e.key)) go(cur - 1);
+    if (e.key === 'Home') go(0);
+    if (e.key === 'End') go(slides.length - 1);
+  });
+  go(0);
+</script>
+</body>
+</html>
