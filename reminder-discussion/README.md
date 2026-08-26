@@ -13,7 +13,8 @@
 | [01-业界方案盘点.md](./01-业界方案盘点.md) | Claude Code system-reminder、Manus recitation、Anthropic 官方模式的方案与使用方式 |
 | [02-作用机理与解决的问题.md](./02-作用机理与解决的问题.md) | reminder 为什么有效：注意力几何、context rot、状态同步、缓存经济 |
 | [03-对我们系统的启示.md](./03-对我们系统的启示.md) | 落地设计建议、与渐进式加载的配合、待讨论取舍 |
-| [reminder机制.slides.html](./reminder机制.slides.html) | 4 页幻灯片：业界洞察、注入位置、两个内部实践（tool result 隐私字段屏蔽、随 User 注入时间/前台应用） |
+| [reminder机制.slides.html](./reminder机制.slides.html) | 2 页幻灯片（浅色系）：P1 业界洞察 + 注入位置；P2 两个内部实践（tool result 隐私字段屏蔽、随 User 注入时间/前台应用） |
+| [reminder机制.pptx](./reminder机制.pptx) | 同内容的真实 PPT 文件（浅色系，16:9，2 页），由 [make_pptx.py](./make_pptx.py) 生成 |
 
 ## 一句话共识
 
