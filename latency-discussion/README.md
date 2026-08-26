@@ -15,12 +15,13 @@
 | [01-单loop成本.md](./01-单loop成本.md) | skill 加载、工具调用生成 token、安全校验与工具执行、推理性能 |
 | [02-loop次数优化.md](./02-loop次数优化.md) | 幻觉纠错、工具粒度、并行工具调用、错误消息工程 |
 | [03-快慢双系统.md](./03-快慢双系统.md) | skill+loop 慢系统向 function call 快系统的迁移设计 |
-| [Agent-loop时延分析与优化.slides.v2.html](./Agent-loop时延分析与优化.slides.v2.html) | **汇报材料（当前版本）**：5 页浅色系幻灯片（P1 现状端到端架构图、P2 时延方程与杠杆理论、P3~P5 六个问题点方案与优先级路线） |
-| [Agent-loop时延分析与优化.slides.html](./Agent-loop时延分析与优化.slides.html) | 汇报材料初版（4 页，已被 v2 取代，留档） |
+| [Agent-loop时延分析与优化.slides.v3.html](./Agent-loop时延分析与优化.slides.v3.html) | **汇报材料（当前版本，2 页）**：P1 现状端到端架构图（SkillLoad ×0~3，含预加载最优账）；P2 时延方程 + 按时延构成逐项方案 + 敏感性对比 + 落地顺序 |
+| [Agent-loop时延分析与优化.slides.v2.html](./Agent-loop时延分析与优化.slides.v2.html) | v2（5 页，已被 v3 取代，留档） |
+| [Agent-loop时延分析与优化.slides.html](./Agent-loop时延分析与优化.slides.html) | 初版（4 页，留档） |
 
-## 已确认口径（v2 采用）
+## 已确认口径（v3 采用）
 
-- SkillLoad：**免安全校验**，2s+/次，现状 1~3 次；
+- SkillLoad：**免安全校验**，2s+/次，现状 0~3 次（预加载命中时为 0）；
 - 任务执行 Loop：典型 **1~3 轮**，每轮 = 推理生成工具调用（首 1.3s + 增量）+ 工具执行（校验 0.5s + 执行 0.5~2s）；
 - 工具调用输出 token：**平均 35 token（≈1.1s）**，长参数最坏 300 token（→9s，长尾削峰对象）；
 - FinalAnswer：loop 结束标志，**只计首 token 1.3s**，增量伴随阅读不计入等待；
