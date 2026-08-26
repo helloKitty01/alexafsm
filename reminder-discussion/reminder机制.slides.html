@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Reminder 机制（notion 方案）· 业界洞察与实践</title>
+<style>
+  :root {
+    --bg: #0d1220;
+    --slide-bg: linear-gradient(135deg, #131a2e 0%, #0f1526 55%, #12203a 100%);
+    --card: rgba(255,255,255,.045);
+    --card-border: rgba(255,255,255,.09);
+    --text: #e8ecf6;
+    --muted: #9aa7c2;
+    --accent: #5b9dff;
+    --accent2: #4fd6a7;
+    --warn: #ffb454;
+    --purple: #b79aff;
+    --code-bg: rgba(0,0,0,.35);
+    --mono: "SF Mono", "JetBrains Mono", Consolas, "Courier New", monospace;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { background: var(--bg); }
+  body {
+    font-family: "PingFang SC", "Microsoft YaHei", "Noto Sans SC", -apple-system, sans-serif;
+    color: var(--text);
+    display: flex; flex-direction: column; align-items: center; gap: 28px;
+    padding: 28px 16px; min-height: 100vh;
+  }
+  .slide {
+    width: min(1280px, 96vw);
+    aspect-ratio: 16 / 9;
+    background: var(--slide-bg);
+    border: 1px solid var(--card-border);
+    border-radius: 18px;
+    box-shadow: 0 22px 60px rgba(0,0,0,.5);
+    padding: 2.4% 3.2%;
+    display: flex; flex-direction: column;
+    overflow: hidden; position: relative;
+    font-size: clamp(11px, 1.38vw, 18px);
+  }
+  .slide::before {
+    content: ""; position: absolute; inset: 0 0 auto 0; height: 4px;
+    background: linear-gradient(90deg, var(--accent), var(--accent2));
+    border-radius: 18px 18px 0 0;
+  }
+  .pageno {
+    position: absolute; right: 1.6em; bottom: 1em;
+    color: var(--muted); font-size: .82em; opacity: .7;
+  }
+
+  /* ---- 标题区 ---- */
+  .header { display: flex; align-items: center; justify-content: space-between; gap: 2em; margin-bottom: .9em; }
+  h1 { font-size: 1.75em; font-weight: 700; white-space: nowrap; }
+  h1 .hl { color: var(--accent); }
+  h1 small { display: block; font-size: .52em; font-weight: 400; color: var(--muted); margin-top: .2em; }
+  .headline {
+    display: flex; align-items: center; gap: 1.2em;
+    background: linear-gradient(90deg, rgba(91,157,255,.12), rgba(79,214,167,.10));
+    border: 1px solid rgba(91,157,255,.3);
+    border-radius: 10px; padding: .55em 1.1em; flex: 1; min-width: 0;
+  }
+  .headline p { color: var(--muted); font-size: .9em; line-height: 1.45; }
+  .headline p strong { color: var(--text); }
+  .headline p em { color: var(--accent2); font-style: normal; font-weight: 600; }
+
+  /* ---- 布局 ---- */
+  .grid { display: grid; gap: 1em; flex: 1; min-height: 0; }
+  .grid.two { grid-template-columns: 1fr 1fr; }
+  .grid.left-narrow { grid-template-columns: 1fr 1.5fr; }
+  .card {
+    background: var(--card);
+    border: 1px solid var(--card-border);
+    border-radius: 12px;
+    padding: .95em 1.1em;
+    min-height: 0;
+  }
+  .card.band { grid-column: 1 / -1; }
+
+  h3 { font-size: 1.0em; font-weight: 700; margin-bottom: .5em; display: flex; align-items: center; gap: .5em; }
+  h3 .dot { width: .55em; height: .55em; border-radius: 50%; background: var(--accent); flex: none; }
+  h3.green .dot { background: var(--accent2); }
+  h3.warn .dot { background: var(--warn); }
+  h3.purple .dot { background: var(--purple); }
+
+  .card ul { list-style: none; }
+  .card li { color: var(--muted); line-height: 1.5; padding-left: 1.05em; position: relative; margin-bottom: .32em; }
+  .card li::before { content: "•"; color: var(--accent); position: absolute; left: 0; }
+  .card li strong, .card p strong { color: var(--text); font-weight: 600; }
+  .card p { color: var(--muted); line-height: 1.5; }
+
+  code {
+    font-family: var(--mono); font-size: .9em;
+    background: var(--code-bg); color: #cfe3ff;
+    padding: .1em .38em; border-radius: 5px;
+  }
+
+  /* ---- 表格 ---- */
+  table { width: 100%; border-collapse: collapse; font-size: .92em; }
+  th, td { text-align: left; padding: .42em .6em; line-height: 1.4; }
+  th { color: var(--accent); font-weight: 600; border-bottom: 1px solid rgba(255,255,255,.14); white-space: nowrap; }
+  td { color: var(--muted); border-bottom: 1px dashed rgba(255,255,255,.07); vertical-align: top; }
+  td strong { color: var(--text); }
+  tr:last-child td { border-bottom: none; }
+
+  /* ---- 消息流示意 ---- */
+  .msgflow { display: flex; flex-direction: column; gap: .4em; font-size: .88em; }
+  .msg {
+    border: 1px solid var(--card-border); border-radius: 8px;
+    padding: .4em .75em; background: var(--code-bg);
+    color: var(--muted); font-family: var(--mono); line-height: 1.4;
+    display: flex; justify-content: space-between; align-items: center; gap: 1em;
+  }
+  .msg .who { color: var(--text); font-weight: 600; }
+  .msg .note { font-family: "PingFang SC","Microsoft YaHei",sans-serif; font-size: .85em; white-space: nowrap; }
+  .msg.sys { border-color: rgba(91,157,255,.5); }
+  .msg.sys .note { color: var(--accent); }
+  .msg.dim { opacity: .55; }
+  .msg.rem { border-color: rgba(79,214,167,.55); }
+  .msg.rem .who { color: var(--accent2); }
+  .msg.rem .note { color: var(--accent2); }
+  .msg .rtag { color: var(--accent2); }
+
+  /* ---- 代码示例块 ---- */
+  .example {
+    font-family: var(--mono); font-size: .85em; color: #cfe3ff;
+    background: var(--code-bg); border: 1px solid var(--card-border);
+    border-radius: 8px; padding: .65em .9em; margin-top: .45em;
+    line-height: 1.55; white-space: pre-wrap; word-break: break-all;
+  }
+  .example .rem { color: var(--accent2); }
+  .example .warn { color: var(--warn); }
+  .example .dim { color: var(--muted); }
+  .example .u { color: var(--accent); }
+
+  .tag {
+    display: inline-block; font-size: .78em; font-weight: 600;
+    border-radius: 99px; padding: .16em .7em; margin-bottom: .45em;
+    background: rgba(91,157,255,.15); color: var(--accent); border: 1px solid rgba(91,157,255,.35);
+  }
+  .tag.green { background: rgba(79,214,167,.13); color: var(--accent2); border-color: rgba(79,214,167,.35); }
+  .tag.warn  { background: rgba(255,180,84,.13); color: var(--warn);  border-color: rgba(255,180,84,.35); }
+  .tag.purple{ background: rgba(155,120,255,.14); color: var(--purple); border-color: rgba(155,120,255,.38); }
+
+  .takeaway {
+    margin-top: .7em; padding-top: .55em;
+    border-top: 1px dashed rgba(255,255,255,.12);
+    color: var(--text); font-size: .95em; line-height: 1.5;
+  }
+  .takeaway strong { color: var(--accent2); }
+
+  .cols { display: flex; gap: 1em; }
+  .cols > div { flex: 1; min-width: 0; }
+
+  @media print {
+    body { padding: 0; gap: 0; background: #fff; }
+    .slide { width: 100%; border-radius: 0; box-shadow: none; page-break-after: always; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ═══════════ P1 业界洞察总览 ═══════════ -->
+<section class="slide">
+  <div class="header">
+    <h1>Reminder <span class="hl">机制</span><small>内部代号：notion 方案 · 业界洞察与实践</small></h1>
+    <div class="headline">
+      <p><strong>定义：</strong>agent loop 运行期间，由系统向消息流注入的短小、结构化指令/状态块。<br>
+      <em>system prompt 是入职培训（primacy，静态），reminder 是定期备忘录（recency，事件触发）</em> —— agent 的二级指令通道。</p>
+    </div>
+  </div>
+
+  <div class="grid two">
+    <div class="card">
+      <h3><span class="dot"></span>业界三条路线（按"谁来提醒"划分）</h3>
+      <table>
+        <tr><th>路线</th><th>代表</th><th>机制</th></tr>
+        <tr><td><strong>系统注入</strong></td><td>Claude Code<br><code>&lt;system-reminder&gt;</code></td><td>40+ 种事件触发器生成提醒，附着到 user message / tool result，一条不进 system prompt</td></tr>
+        <tr><td><strong>自我复诵</strong></td><td>Manus recitation</td><td>模型反复重写 todo.md 到上下文尾部，把全局计划推入高注意力区</td></tr>
+        <tr><td><strong>API 原生</strong></td><td>Anthropic<br>memory / compaction</td><td>笔记持久化、服务端压缩做成 API 原语；memory + context editing 实测 agent 搜索 +39%</td></tr>
+      </table>
+    </div>
+
+    <div class="card">
+      <h3 class="green"><span class="dot"></span>解决的四个结构性问题</h3>
+      <table>
+        <tr><th>问题</th><th>表现</th><th>reminder 解法</th></tr>
+        <tr><td><strong>注意力几何</strong></td><td>lost-in-the-middle，中段指令被淹没</td><td>关键信息重注入 recency 高注意力区</td></tr>
+        <tr><td><strong>Context rot</strong></td><td>~80K token 后指令遵循度下降</td><td>事件触发式规则刷新，在相关时刻重申</td></tr>
+        <tr><td><strong>状态漂移</strong></td><td>基于过期环境状态决策</td><td>环境增量主动推送（文件变更、模式切换）</td></tr>
+        <tr><td><strong>缓存失效</strong></td><td>动态内容改写前缀，全量 miss</td><td>一律 append 消息流尾部，前缀纹丝不动</td></tr>
+      </table>
+      <div class="takeaway">◎ <strong>前置契约：</strong>在 system prompt 预声明标签语义 —— 系统的话、与所附着消息无关、无需回复。权威等级：<strong>reminder &gt; 用户 &gt; 工具数据</strong>（兼具抗注入价值）。</div>
+    </div>
+  </div>
+  <span class="pageno">1 / 4</span>
+</section>
+
+<!-- ═══════════ P2 注入位置与机理 ═══════════ -->
+<section class="slide">
+  <div class="header">
+    <h1>注入位置：<span class="hl">三种载体</span>，一条铁律</h1>
+    <div class="headline">
+      <p><strong>选择标准一句话：</strong>事件发生在哪个时机，就搭哪班车 —— query 到来的信息随 <em>user message</em>，loop 执行中的事件随 <em>tool result</em>，两者都不在场就<em>合成一条 user message</em>。</p>
+    </div>
+  </div>
+
+  <div class="grid left-narrow">
+    <div class="card">
+      <h3><span class="dot"></span>消息流中的位置</h3>
+      <div class="msgflow">
+        <div class="msg sys"><span class="who">system</span><span class="note">primacy · 静态 · 预声明标签契约</span></div>
+        <div class="msg dim"><span class="who">user#1 … assistant … tool …</span><span class="note">中间 · 注意力洼地</span></div>
+        <div class="msg rem"><span class="who">tool result <span class="rtag">+ &lt;reminder&gt;</span></span><span class="note">loop 中事件搭车</span></div>
+        <div class="msg rem"><span class="who">user#N <span class="rtag">+ &lt;reminder&gt;</span></span><span class="note">recency · 注意力最强</span></div>
+      </div>
+      <div class="takeaway">◎ <strong>铁律：</strong>只附着在 append 前沿（当前正要发出的新消息），绝不回头改历史消息 —— 否则其后 KV cache 全灭。</div>
+    </div>
+
+    <div class="card">
+      <h3 class="green"><span class="dot"></span>三种载体的分工</h3>
+      <table>
+        <tr><th>载体</th><th>适用时机</th><th>典型内容</th></tr>
+        <tr><td><strong>随 user message</strong></td><td>用户新一轮 query 到来</td><td>时间/环境等动态上下文、模式切换、环境增量、检索命中</td></tr>
+        <tr><td><strong>随 tool result</strong></td><td>agent loop 执行中发生事件<br><em style="color:var(--accent2);font-style:normal">模型每次决策前唯一的新输入</em></td><td>文件外部被修改、空文件标记、安全提醒、隐私字段标识、行为提醒搭车</td></tr>
+        <tr><td><strong>合成 user message</strong></td><td>无自然载体（会话恢复、压缩后、用户插话）</td><td>上下文块、压缩后目标重申、side question 包装</td></tr>
+      </table>
+      <p style="margin-top:.5em"><strong>不能注入的位置：</strong>assistant message（伪造模型发言，污染其对自身行为的认知）；凭空的 tool result（必须对应真实 tool_use id，只能"随"不能"造"）；system prompt（缓存）。</p>
+    </div>
+  </div>
+  <span class="pageno">2 / 4</span>
+</section>
+
+<!-- ═══════════ P3 实践一：tool result 隐私字段屏蔽 ═══════════ -->
+<section class="slide">
+  <div class="header">
+    <h1>实践一：随 <span class="hl">tool result</span> · 隐私字段屏蔽</h1>
+    <div class="headline">
+      <p><strong>问题：</strong>工具返回的中间结果里含隐私字段（标识符、号码、路径等），模型推理需要用到它们，但<em>不应呈现给用户</em>。改造每个工具去脱敏，代价高且会破坏推理链。</p>
+    </div>
+  </div>
+
+  <div class="grid two">
+    <div class="card">
+      <span class="tag green">做法 · 框架层注入，工具零改动</span>
+      <p>框架在返回 tool result 时，扫描/标注中间隐私字段，随结果附加一条 reminder：</p>
+      <div class="example"><span class="dim">tool result:</span>
+{ "contacts": [ { "name": "张三",
+    "phone": "13812341234", "uid": "u_8f3a92c1" } ] }
+
+<span class="rem">&lt;system-reminder&gt;
+以上结果中 phone / uid 为中间隐私字段，
+仅供你完成当前任务推理使用；
+不得在给用户的回复中展示、复述或改写呈现。
+&lt;/system-reminder&gt;</span></div>
+    </div>
+
+    <div class="card">
+      <h3 class="green"><span class="dot"></span>为什么用 reminder 而不是别的</h3>
+      <ul>
+        <li><strong>数据可用、不外泄</strong>：直接脱敏会切断推理链（后续工具调用可能还要用 uid）；reminder 让数据保留在上下文里，只约束<strong>呈现行为</strong></li>
+        <li><strong>工具零改动</strong>：约束由框架统一注入，同类工具自动全覆盖，与"变量解析机制"同一设计哲学</li>
+        <li><strong>就近生效</strong>：约束紧贴数据出现的位置（recency），比 system prompt 里一条泛化的"注意隐私"遵循度高得多</li>
+        <li><strong>权威等级清晰</strong>：这是"系统的话"，即使用户后续要求"把手机号发我"，模型有依据拒绝或走脱敏路径</li>
+      </ul>
+      <div class="takeaway">◎ <strong>设计要点：</strong>固定模板文案（不用 LLM 生成）；字段清单由框架按 schema 标注生成；同一 loop 内同类提醒去重合并。</div>
+    </div>
+  </div>
+  <span class="pageno">3 / 4</span>
+</section>
+
+<!-- ═══════════ P4 实践二：随 User 注入时间与前台应用 ═══════════ -->
+<section class="slide">
+  <div class="header">
+    <h1>实践二：随 <span class="hl">user message</span> · 时间与前台应用</h1>
+    <div class="headline">
+      <p><strong>问题：</strong>用户的指代依赖<em>此刻的设备状态</em>——"第4张照片"是哪张？取决于前台正开着什么；"昨天拍的"是哪天？取决于现在几点。这些信息每轮都在变，进 system prompt 等于每轮全量 cache miss。</p>
+    </div>
+  </div>
+
+  <div class="grid two">
+    <div class="card">
+      <span class="tag">做法 · 结构化前缀随当轮 user message 注入</span>
+      <div class="example"><span class="dim">user:</span> <span class="u">[用户输入时间：Tue 2026-08-25 15:43]</span> <span class="u">[前台应用：图库]</span>
+给我详细描述一下第4张照片</div>
+      <h3 style="margin-top:.7em"><span class="dot"></span>注入后模型获得的能力</h3>
+      <ul>
+        <li><strong>指代消歧</strong>："第4张照片" → 前台是图库 → 当前视图的第 4 张，无需反问、无需先调工具探测环境</li>
+        <li><strong>相对时间解析</strong>："昨天 / 上周" 有了锚点，时间精确到分钟也不破坏缓存（在消息流尾部，不在前缀）</li>
+        <li><strong>意图路由</strong>：同一句话在不同前台应用下路由到不同的 skill / 工具链</li>
+      </ul>
+    </div>
+
+    <div class="card">
+      <h3 class="green"><span class="dot"></span>设计要点</h3>
+      <ul>
+        <li><strong>只随当轮</strong>：每轮 user message 携带当轮快照，历史轮的注入块不回头刷新（append-only）</li>
+        <li><strong>确定性格式</strong>：<code>[键：值]</code> 固定模板、字段顺序固定 —— 同样的状态永远生成同样的 token 序列</li>
+        <li><strong>system prompt 预声明</strong>：说明方括号前缀由系统注入、代表输入瞬间的设备状态，历史轮的值已过期，以最新一轮为准</li>
+        <li><strong>体积纪律</strong>：只放高频消歧字段（时间、前台应用）；大体积环境信息走主动加载（通道二）</li>
+      </ul>
+      <div class="takeaway">◎ <strong>两个实践合起来：</strong>正好覆盖 reminder 的两大载体 —— tool result 侧约束<strong>输出行为</strong>（什么不能给用户看），user 侧供给<strong>输入语境</strong>（此刻用户在哪、现在几点）。前缀零改动，缓存全程命中。</div>
+    </div>
+  </div>
+  <span class="pageno">4 / 4</span>
+</section>
+
+</body>
+</html>
