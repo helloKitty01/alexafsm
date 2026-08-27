@@ -27,7 +27,8 @@
 | [KV-Cache收益闭环.v6.slides.html](./KV-Cache收益闭环.v6.slides.html) | 汇报幻灯片 v6(5 页浅色,含 60%/23K 旧基线,已被 v6.1 取代,留档) |
 | [KV-Cache收益闭环.v6.1.slides.html](./KV-Cache收益闭环.v6.1.slides.html) | 汇报幻灯片 v6.1(6 页浅色,业务占比与任务模型旧口径,已被 v6.3 取代,留档) |
 | [KV-Cache收益闭环.v6.3.slides.html](./KV-Cache收益闭环.v6.3.slides.html) | 汇报幻灯片 v6.3(任务页为表格形式且含 preload,已被 v6.4 取代,留档) |
-| [KV-Cache收益闭环.v6.4.slides.html](./KV-Cache收益闭环.v6.4.slides.html) | 汇报幻灯片 v6.4(6 页 · 浅色 · 当前版本,去 preload:任务一轮 = skill load+工具+回复 3 调用,复用 skill 时 2 调用):P2 任务页改为三 query 全景堆叠柱状图(8 次调用逐调用输入构成,绿=命中/红=白算/蓝=新增,现状目标并排,63K→23.5K -63%,加权-65%);P1 基线(现状14.6K/调用→目标5.9K,-60%);P3 问答-53%/P4 闲聊-75%/P5 轮数收益账/P6 汇总(混合-60%)同 v6.3 口径 |
+| [KV-Cache收益闭环.v6.4.slides.html](./KV-Cache收益闭环.v6.4.slides.html) | 汇报幻灯片 v6.4(任务页为纵向全景柱状图,收益不够显性,已被 v6.5 取代,留档) |
+| [KV-Cache收益闭环.v6.5.slides.html](./KV-Cache收益闭环.v6.5.slides.html) | 汇报幻灯片 v6.5(6 页 · 浅色 · 当前版本):P2 任务页改为横向 miss 拆解图——只画实际推理量,每轮现状/目标双条,现状条按六段拆解(重写/Tools/history 三段白算 + U注入/skill/工具结果 三段新增),目标条 = 删掉暖色段,右侧节省徽章;新增每 query 节省公式卡 ΔS≈8.5K+H(q)(首轮4.5K,loop≈0,上限23.5K,三类业务通用);其余页同 v6.4 口径(混合-60%) |
 | [上下文工程与KV-Cache优化.slides.html](./上下文工程与KV-Cache优化.slides.html) | 汇报用 HTML 幻灯片 v1（6 页，已被 v2 取代，留档） |
 | [上下文工程与KV-Cache优化.v2.slides.html](./上下文工程与KV-Cache优化.v2.slides.html) | 汇报用 HTML 幻灯片 v2（7 页，已被 v3 取代，留档） |
 | [上下文工程与KV-Cache优化.v3.slides.html](./上下文工程与KV-Cache优化.v3.slides.html) | 汇报用 HTML 幻灯片 v3（7 页，已被 v4 取代，留档） |
