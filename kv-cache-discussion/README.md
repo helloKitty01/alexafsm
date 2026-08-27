@@ -21,7 +21,8 @@
 | [KV-Cache收益闭环.slides.html](./KV-Cache收益闭环.slides.html) | 汇报用 2 页 HTML 幻灯片(基于 11,只用 prefill 计算量口径):P1 钱花在哪+逐请求账目条形图,P2 三级台阶+两个计数器统计闭环 |
 | [12-上下文长度实测需求.md](./12-上下文长度实测需求.md) | 交给内部模型的测量需求:模块定义与识别方法 + token 统计口径 + JSON 输出 schema,用于替换假设值 |
 | [KV-Cache收益闭环.v2.slides.html](./KV-Cache收益闭环.v2.slides.html) | 汇报幻灯片 v2(结构条误将 Tools 并入静态区置前,已被 v3 取代,留档) |
-| [KV-Cache收益闭环.v3.slides.html](./KV-Cache收益闭环.v3.slides.html) | 汇报幻灯片 v3(单页,已确认参数:静态SP 20K 不含工具/用户3K 视为静态/query相关5K/Tools 5K 且位于 query相关之后被连带/UAT 5K·轮/每轮2次请求):现状与目标结构条对照+断裂点、一轮query解剖、1~5轮逐轮账目(-53%→-80%,累计125K→35K 即 -72%),Tools 每轮白算 5K 单独标色,推演 12.5K/请求与现网实测 12K 互验 |
+| [KV-Cache收益闭环.v3.slides.html](./KV-Cache收益闭环.v3.slides.html) | 汇报幻灯片 v3(单页深色,已被 v4 取代,留档) |
+| [KV-Cache收益闭环.v4.slides.html](./KV-Cache收益闭环.v4.slides.html) | 汇报幻灯片 v4(单页 · 浅色系,当前版本):新增"原则带"(输入38K三分解条 60%命中/30%白算/10%新增 + 命中率看健康度、token量算钱的口径说明);基线更新为实测 38K/23K/60%(miss 15K,白算11.5K占77%);布局重排(loop解剖移至右栏账目图上方,左栏结构条+白算构成公式卡);逐轮账目 -53%→-80%,累计125K→35K,收益口径 -72%(推演保守)~-77%(实测) |
 | [上下文工程与KV-Cache优化.slides.html](./上下文工程与KV-Cache优化.slides.html) | 汇报用 HTML 幻灯片 v1（6 页，已被 v2 取代，留档） |
 | [上下文工程与KV-Cache优化.v2.slides.html](./上下文工程与KV-Cache优化.v2.slides.html) | 汇报用 HTML 幻灯片 v2（7 页，已被 v3 取代，留档） |
 | [上下文工程与KV-Cache优化.v3.slides.html](./上下文工程与KV-Cache优化.v3.slides.html) | 汇报用 HTML 幻灯片 v3（7 页，已被 v4 取代，留档） |
