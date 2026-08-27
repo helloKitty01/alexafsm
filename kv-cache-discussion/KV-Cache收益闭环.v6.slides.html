@@ -1,0 +1,537 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>KV Cache 收益闭环 · 汇报版 v6(浅色 · 实测基线 · 分业务展开)</title>
+<style>
+  :root {
+    --bg: #e9edf4;
+    --slide-bg: linear-gradient(135deg, #ffffff 0%, #f7f9fd 60%, #eef3fb 100%);
+    --card: #f7f9fc;
+    --card-border: #dfe5ee;
+    --text: #1f2a3d;
+    --muted: #5c6b84;
+    --accent: #2563eb;
+    --good: #059669;
+    --warn: #d97706;
+    --bad: #dc2626;
+    --mono: "SF Mono", "JetBrains Mono", Consolas, "Courier New", monospace;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { background: var(--bg); height: 100%; }
+  body {
+    font-family: "PingFang SC", "Microsoft YaHei", "Noto Sans SC", -apple-system, sans-serif;
+    color: var(--text);
+    display: flex; justify-content: center; align-items: center;
+    padding: 16px 12px; min-height: 100vh;
+  }
+  .deck { position: relative; width: min(96vw, calc((100vh - 32px) * 1.7778)); }
+  .slide {
+    width: 100%;
+    aspect-ratio: 16 / 9;
+    background: var(--slide-bg);
+    border: 1px solid var(--card-border);
+    border-radius: 18px;
+    box-shadow: 0 18px 50px rgba(31,42,61,.16);
+    padding: 2% 2.8%;
+    display: none; flex-direction: column;
+    overflow: hidden; position: relative;
+    font-size: clamp(9.5px, min(1.08vw, 1.92vh), 22px);
+  }
+  .slide.active { display: flex; }
+  .slide::before {
+    content: ""; position: absolute; inset: 0 0 auto 0; height: 5px;
+    background: linear-gradient(90deg, var(--accent), var(--good));
+    border-radius: 18px 18px 0 0;
+  }
+  h2 { font-size: 1.28em; font-weight: 700; margin-bottom: .38em; }
+  h2 .hl { color: var(--accent); }
+  h2 .num { color: var(--muted); font-weight: 600; margin-right: .4em; font-size: .78em; }
+  .card {
+    background: var(--card); border: 1px solid var(--card-border);
+    border-radius: 12px; padding: .68em .88em;
+    overflow: hidden;
+  }
+  .card h3 { font-size: .93em; margin-bottom: .34em; color: var(--text); }
+  .card p, .card li { color: var(--muted); font-size: .83em; line-height: 1.46; }
+  .card li { margin-left: 1.15em; margin-bottom: .24em; }
+  .card b { color: var(--text); font-weight: 700; }
+  .goodc { color: var(--good) !important; }
+  .warnc { color: var(--warn) !important; }
+  .badc { color: var(--bad) !important; }
+  .mono { font-family: var(--mono); }
+
+  .row { display: flex; gap: .78em; min-height: 0; }
+  .col { display: flex; flex-direction: column; gap: .58em; min-width: 0; }
+  .grow { flex: 1; min-height: 0; min-width: 0; }
+
+  .banner {
+    border-radius: 10px; padding: .44em .92em; font-size: .87em;
+    background: linear-gradient(90deg, rgba(37,99,235,.08), rgba(5,150,105,.07));
+    border: 1px solid rgba(37,99,235,.28); color: var(--text); line-height: 1.44;
+  }
+  .banner b { color: var(--accent); }
+
+  .kpi { display: flex; gap: .78em; }
+  .kpi .card { flex: 1; text-align: center; padding: .4em .32em; }
+  .kpi .big { font-size: 1.2em; font-weight: 700; color: var(--accent); font-family: var(--mono); }
+  .kpi .big.g { color: var(--good); }
+  .kpi .big.w { color: var(--warn); }
+  .kpi .big.r { color: var(--bad); }
+  .kpi .lbl { color: var(--muted); font-size: .7em; margin-top: .14em; line-height: 1.3; }
+  .kpi .lbl b { color: var(--text); }
+
+  table { border-collapse: collapse; width: 100%; font-size: .82em; }
+  th, td { text-align: left; padding: .34em .5em; border-bottom: 1px solid var(--card-border); }
+  th { color: var(--accent); font-weight: 700; white-space: nowrap; }
+  td { color: var(--muted); line-height: 1.35; }
+  td b { color: var(--text); }
+
+  /* 轮数分布 */
+  .dist { display: flex; flex-direction: column; gap: .3em; }
+  .drow { display: flex; align-items: center; gap: .5em; }
+  .drow .dl { flex: none; width: 3.6em; font-family: var(--mono); font-size: .74em; color: var(--text); font-weight: 700; text-align: right; }
+  .drow .track { flex: 1; height: .95em; border-radius: 4px; background: #eceff5; position: relative; }
+  .drow .bar { position: absolute; inset: 0 auto 0 0; border-radius: 4px; background: linear-gradient(90deg, rgba(37,99,235,.65), rgba(37,99,235,.35)); }
+  .drow .dv { flex: none; width: 3em; font-family: var(--mono); font-size: .72em; color: var(--muted); }
+
+  /* 结构条 */
+  .ctxbar { display: flex; height: 2.5em; border-radius: 8px; overflow: hidden; border: 1px solid var(--card-border); }
+  .seg { display: flex; flex-direction: column; justify-content: center; align-items: center; gap: .05em; min-width: 0; padding: 0 .2em; }
+  .seg .nm { font-size: .67em; font-weight: 700; white-space: nowrap; }
+  .seg .sz { font-family: var(--mono); font-size: .61em; opacity: .9; white-space: nowrap; }
+  .seg.static { background: rgba(5,150,105,.13); border-right: 1px solid var(--card-border); color: #065f46; }
+  .seg.query  { background: rgba(220,38,38,.16); border-right: 1px solid var(--card-border); color: #991b1b; }
+  .seg.tools  { background: rgba(217,119,6,.16); border-right: 1px solid var(--card-border); color: #92400e; }
+  .seg.uat    { background: rgba(37,99,235,.10); color: #1e40af; }
+  .boltline { position: relative; height: 1.2em; margin-top: .08em; }
+  .bolt { position: absolute; top: 0; font-size: .67em; color: var(--bad); white-space: nowrap; font-weight: 700; }
+
+  /* 胶囊流 */
+  .caps { display: flex; align-items: center; gap: .26em; flex-wrap: wrap; min-width: 0; row-gap: .35em; }
+  .chip {
+    border-radius: 999px; padding: .2em .5em; font-size: .68em; white-space: nowrap;
+    border: 1px solid var(--card-border); background: #fff; color: var(--text); font-family: var(--mono);
+  }
+  .chip.u { border-color: rgba(37,99,235,.5); color: var(--accent); }
+  .chip.a { border-color: #c3ccda; }
+  .chip.t { border-color: rgba(5,150,105,.5); color: var(--good); }
+  .chip.req { border-color: rgba(217,119,6,.55); color: var(--warn); background: rgba(217,119,6,.07); font-weight: 700; }
+  .chip.sim { border-style: dashed; }
+  .arr { color: var(--muted); font-size: .74em; flex: none; }
+
+  /* 逐轮账目 */
+  .qledger { display: flex; flex-direction: column; gap: .44em; }
+  .qgroup { display: flex; align-items: center; gap: .5em; }
+  .qgroup .qlb { flex: none; width: 3.6em; font-size: .74em; color: var(--text); font-weight: 700; text-align: right; line-height: 1.25; }
+  .qgroup .qlb .sub2 { display: block; font-size: .78em; color: var(--muted); font-weight: 400; }
+  .qgroup .bars { flex: 1; display: flex; flex-direction: column; gap: .13em; min-width: 0; }
+  .brow { display: flex; align-items: center; gap: .36em; }
+  .brow .track { flex: 1; height: .8em; border-radius: 4px; background: #eceff5; position: relative; min-width: 0; }
+  .brow .bar { position: absolute; inset: 0 auto 0 0; border-radius: 4px; }
+  .brow .bar.bad { background: linear-gradient(90deg, rgba(220,38,38,.75), rgba(220,38,38,.45)); }
+  .brow .bar.ok  { background: linear-gradient(90deg, rgba(5,150,105,.8), rgba(5,150,105,.5)); }
+  .brow .v { flex: none; width: 2.9em; font-family: var(--mono); font-size: .66em; color: var(--muted); white-space: nowrap; }
+  .qgroup .save { flex: none; width: 4.2em; text-align: center; }
+  .qgroup .save .pct { font-family: var(--mono); font-weight: 700; font-size: .84em; color: var(--good); }
+  .qgroup .save .sk { font-size: .58em; color: var(--muted); line-height: 1.25; }
+
+  .legend { display: flex; gap: .9em; font-size: .66em; color: var(--muted); margin-top: .22em; flex-wrap: wrap; }
+  .legend i { display: inline-block; width: .82em; height: .5em; border-radius: 3px; margin-right: .24em; }
+  .legend .lg-bad i { background: rgba(220,38,38,.6); }
+  .legend .lg-ok i { background: rgba(5,150,105,.65); }
+
+  .footer {
+    margin-top: auto; padding-top: .35em; display: flex;
+    justify-content: space-between; color: var(--muted); font-size: .66em; gap: 1em;
+  }
+
+  .nav {
+    position: absolute; bottom: 3.2%; right: 3%;
+    display: flex; gap: .5em; align-items: center; z-index: 10;
+    font-size: clamp(9.5px, min(1.08vw, 1.92vh), 22px);
+  }
+  .nav button {
+    background: #fff; border: 1px solid var(--card-border); color: var(--text);
+    border-radius: 8px; width: 2.1em; height: 2.1em; cursor: pointer; font-size: 1em;
+  }
+  .nav button:hover { border-color: var(--accent); color: var(--accent); }
+  .nav .pg { color: var(--muted); font-family: var(--mono); font-size: .88em; padding: 0 .35em; }
+  .dots { position: absolute; bottom: 3.9%; left: 3%; display: flex; gap: .42em; z-index: 10; }
+  .dots i { width: .52em; height: .52em; border-radius: 50%; background: #c9d2e0; cursor: pointer; }
+  .dots i.on { background: var(--accent); }
+</style>
+</head>
+<body>
+<div class="deck">
+
+<!-- ============ P1 基线对齐 ============ -->
+<section class="slide active">
+  <h2><span class="num">01</span>基线对齐:<span class="hl">实测参数与流量画像</span>——数字全部自洽,账可以放心算</h2>
+  <div class="kpi" style="margin-bottom:.55em;">
+    <div class="card"><div class="big">38.5K</div><div class="lbl">平均每次调用<b>输入</b></div></div>
+    <div class="card"><div class="big">23K / 60%</div><div class="lbl">平均<b>命中</b>量 / 命中率</div></div>
+    <div class="card"><div class="big r">15.5K</div><div class="lbl">平均<b>实际推理量</b>(miss)<br>= 输入 − 命中,真实烧 GPU</div></div>
+    <div class="card"><div class="big w">51%</div><div class="lbl">会话仅 1 轮(平均 ~2.4 轮)<br><b>收益结构因此分化,见 P5</b></div></div>
+  </div>
+  <div class="row grow">
+    <div class="col" style="flex:1.15;">
+      <div class="card">
+        <h3>上下文模块长度(实测)与物理顺序</h3>
+        <div class="ctxbar">
+          <div class="seg static" style="flex:25.5;"><span class="nm">固定前缀</span><span class="sz">25.5K = SP 25929 + user.md 313</span></div>
+          <div class="seg query" style="flex:4.5;"><span class="nm">query级⚡</span><span class="sz">4.5K</span></div>
+          <div class="seg tools" style="flex:4.5;"><span class="nm">Tools</span><span class="sz">4413</span></div>
+          <div class="seg uat" style="flex:10;"><span class="nm">history</span><span class="sz">样本 7.2~13.5K,打满10轮≈15K</span></div>
+        </div>
+        <div class="boltline"><div class="bolt" style="left:36%;">⚡ query级 = available skills ~3K + memory.md 1K + device_info 0.5K,每 query 重写 → 其后全部重算</div></div>
+      </div>
+      <div class="card grow">
+        <h3>会话轮数分布(收益权重的关键输入)</h3>
+        <div class="dist" style="margin-top:.3em;">
+          <div class="drow"><span class="dl">1 轮</span><div class="track"><div class="bar" style="width:100%;"></div></div><span class="dv">51%</span></div>
+          <div class="drow"><span class="dl">2 轮</span><div class="track"><div class="bar" style="width:39%;"></div></div><span class="dv">20%</span></div>
+          <div class="drow"><span class="dl">3 轮</span><div class="track"><div class="bar" style="width:18%;"></div></div><span class="dv">9%</span></div>
+          <div class="drow"><span class="dl">4 轮</span><div class="track"><div class="bar" style="width:11%;"></div></div><span class="dv">5.5%</span></div>
+          <div class="drow"><span class="dl">5 轮</span><div class="track"><div class="bar" style="width:7%;"></div></div><span class="dv">3.5%</span></div>
+          <div class="drow"><span class="dl">6 轮+</span><div class="track"><div class="bar" style="width:22%;"></div></div><span class="dv">11%</span></div>
+        </div>
+        <p style="margin-top:.4em;">一半会话单轮(无 query 切换点,排布收益有限);但 <b>6 轮以上的 11% 会话贡献现状 prefill 的 ~44%</b>,多轮会话合计贡献 ~85%——省钱主战场在长会话。</p>
+      </div>
+    </div>
+    <div class="col" style="flex:1;">
+      <div class="card">
+        <h3>自洽性验证①:输入对得上</h3>
+        <p class="mono" style="font-size:.85em; color:var(--text);">38.5K ≈ 头部 34.5K + 平均 history ~4K ✓</p>
+        <p style="margin-top:.25em;">大量单轮会话拉低 history 均值,与长会话样本 7~13.5K 不矛盾。</p>
+      </div>
+      <div class="card">
+        <h3>自洽性验证②:命中对得上,断点找到了</h3>
+        <p class="mono" style="font-size:.85em; color:var(--text);">23K ≈ 固定前缀 25.5K × ~90% ✓</p>
+        <p style="margin-top:.25em;">平均命中恰好贴着固定前缀:<b class="badc">缓存断点稳定在 query 级起点</b>(其后 ~19K 全部重算);缺口 ~10% = 部分调用整头 miss(会话首请求/驻留逐出)。</p>
+      </div>
+      <div class="card grow">
+        <h3>三类业务的一轮形态(P2–P4 分别展开)</h3>
+        <table>
+          <tr><th>类型</th><th>调用数/轮</th><th>当轮新增</th></tr>
+          <tr><td><b>闲聊</b></td><td>1(直接融合回复)</td><td>~1K(U)</td></tr>
+          <tr><td><b>问答</b></td><td>1(前置模拟 webSearch A/T)</td><td>~11K(U 1 + 检索 10)</td></tr>
+          <tr><td><b>任务</b></td><td>2~3(preload skill + 工具 + 回复)</td><td>~7K(U 1 + skill 3 + loop 3)</td></tr>
+        </table>
+      </div>
+    </div>
+  </div>
+  <div class="banner" style="margin-top:.55em;">读法:输入、命中、轮数三组实测互相咬合,<b>"断点在 query 级起点"不再是假设而是数据结论</b>——每次调用平均白算 ~12K(query级 4.5 + Tools 4.5 + history),这就是后面几页要拆的账。</div>
+  <div class="footer"><span>KV Cache 收益闭环 · v6 · P1 基线</span><span>实测:固定前缀25929/user.md 313/skills 2877-3565/memory 1K/device_info 259-310/tools 4413/history 7184-13453;轮数分布与业务类型按独立近似</span></div>
+</section>
+
+<!-- ============ P2 闲聊 ============ -->
+<section class="slide">
+  <h2><span class="num">02</span>闲聊型:<span class="hl">新增最小,白算占比最高</span>——多轮场景节省 85%+</h2>
+  <div class="card" style="margin-bottom:.55em;">
+    <h3>一轮形态:1 次调用,直接融合回复;当轮新增仅 ~1K,history 增长慢(~1.5K/轮)</h3>
+    <div class="caps" style="margin-top:.25em;">
+      <span class="chip u">U 用户消息 ~1K</span><span class="arr">→</span>
+      <span class="chip req">调用①</span><span class="arr">→</span>
+      <span class="chip a">A 融合回复</span>
+      <span style="font-size:.72em; color:var(--muted); margin-left:.8em;">现状每次调用却要重算:query级 4.5 + Tools 4.5 + history ——<b class="badc">白算占比 90%+,三类业务中最冤</b></span>
+    </div>
+  </div>
+  <div class="row grow">
+    <div class="card" style="flex:1.25; display:flex; flex-direction:column;">
+      <h3>逐轮账目(现状 → 目标)</h3>
+      <div class="qledger grow" style="justify-content:center; margin-top:.2em;">
+        <div class="qgroup">
+          <span class="qlb">轮1<span class="sub2">会话首轮</span></span>
+          <div class="bars">
+            <div class="brow"><div class="track"><div class="bar bad" style="width:63%;"></div></div><span class="v">10K</span></div>
+            <div class="brow"><div class="track"><div class="bar ok" style="width:34%;"></div></div><span class="v">5.5K</span></div>
+          </div>
+          <div class="save"><div class="pct">-45%</div><div class="sk">省 Tools 连带<br>query级首次必算</div></div>
+        </div>
+        <div class="qgroup">
+          <span class="qlb">轮2</span>
+          <div class="bars">
+            <div class="brow"><div class="track"><div class="bar bad" style="width:72%;"></div></div><span class="v">11.5K</span></div>
+            <div class="brow"><div class="track"><div class="bar ok" style="width:13%;"></div></div><span class="v">2K</span></div>
+          </div>
+          <div class="save"><div class="pct">-83%</div></div>
+        </div>
+        <div class="qgroup">
+          <span class="qlb">轮3</span>
+          <div class="bars">
+            <div class="brow"><div class="track"><div class="bar bad" style="width:81%;"></div></div><span class="v">13K</span></div>
+            <div class="brow"><div class="track"><div class="bar ok" style="width:13%;"></div></div><span class="v">2K</span></div>
+          </div>
+          <div class="save"><div class="pct">-85%</div></div>
+        </div>
+        <div class="qgroup">
+          <span class="qlb">轮5</span>
+          <div class="bars">
+            <div class="brow"><div class="track"><div class="bar bad" style="width:100%;"></div></div><span class="v">16K</span></div>
+            <div class="brow"><div class="track"><div class="bar ok" style="width:13%;"></div></div><span class="v">2K</span></div>
+          </div>
+          <div class="save"><div class="pct">-88%</div></div>
+        </div>
+        <div class="qgroup" style="border-top:1px dashed #cbd4e1; padding-top:.35em;">
+          <span class="qlb">加权<span class="sub2">按轮数分布</span></span>
+          <div class="bars">
+            <div class="brow"><div class="track"><div class="bar bad" style="width:100%;"></div></div><span class="v" style="color:var(--bad);">30.6K</span></div>
+            <div class="brow"><div class="track"><div class="bar ok" style="width:27%;"></div></div><span class="v" style="color:var(--good);">8.2K</span></div>
+          </div>
+          <div class="save"><div class="pct">-73%</div><div class="sk">每会话均值</div></div>
+        </div>
+      </div>
+      <div class="legend"><span class="lg-bad"><i></i>现状实际推理量/轮</span><span class="lg-ok"><i></i>目标(只算当轮新增)</span></div>
+    </div>
+    <div class="col" style="flex:1;">
+      <div class="card grow">
+        <h3>为什么闲聊省得最狠</h3>
+        <p>闲聊每轮真正的新内容只有 ~1K 用户消息 + 回复,但现状要为它重算 10~16K 上下文——<b class="badc">花 13K 算力回答一句闲聊</b>。目标态历史全命中,只算 2K(U + device 增量),<b class="goodc">多轮闲聊 -83%~-88%</b>。</p>
+      </div>
+      <div class="card grow">
+        <h3>时延视角(对体验最敏感的场景)</h3>
+        <p>闲聊用户期待"秒回"。首 token 等待 ∝ 现算量:轮 3 从现算 13K 降到 2K,<b class="goodc">TTFT 的 prefill 部分降 ~85%</b>——闲聊是时延收益的第一受益者。</p>
+      </div>
+      <div class="card">
+        <h3>注意</h3>
+        <p>轮 1(-45%)收益有限:query 级内容首次进入必须算(下沉不消灭首次,只消灭重复)。单轮闲聊会话的主要收益来自 Tools 不再被连带(4.5K)。</p>
+      </div>
+    </div>
+  </div>
+  <div class="footer"><span>KV Cache 收益闭环 · v6 · P2 闲聊</span><span>建模:1 调用/轮,U 1K,history 增量 1.5K/轮;加权 = 按 P1 轮数分布(6轮+按 8 轮)</span></div>
+</section>
+
+<!-- ============ P3 问答 ============ -->
+<section class="slide">
+  <h2><span class="num">03</span>问答型:<span class="hl">10K 检索内容是新增底线</span>——节省封顶 ~63%,再降要靠指针化</h2>
+  <div class="card" style="margin-bottom:.55em;">
+    <h3>一轮形态:1 次调用;检索系统前置注入模拟 webSearch(A tool call + T 结果 ~10K),模型融合回复</h3>
+    <div class="caps" style="margin-top:.25em;">
+      <span class="chip u">U 用户问题 ~1K</span><span class="arr">→</span>
+      <span class="chip a sim">模拟A webSearch call</span><span class="arr">→</span>
+      <span class="chip t sim">模拟T 检索结果 ~10K</span><span class="arr">→</span>
+      <span class="chip req">调用①</span><span class="arr">→</span>
+      <span class="chip a">A 融合回复</span>
+      <span style="font-size:.72em; color:var(--muted); margin-left:.6em;">检索结果首次进上下文<b>必须算</b>,属新增底线</span>
+    </div>
+  </div>
+  <div class="row grow">
+    <div class="card" style="flex:1.25; display:flex; flex-direction:column;">
+      <h3>逐轮账目(现状 → 目标;history 每轮 +11.5K,很快触顶 15K 裁剪)</h3>
+      <div class="qledger grow" style="justify-content:center; margin-top:.2em;">
+        <div class="qgroup">
+          <span class="qlb">轮1<span class="sub2">会话首轮</span></span>
+          <div class="bars">
+            <div class="brow"><div class="track"><div class="bar bad" style="width:57%;"></div></div><span class="v">20K</span></div>
+            <div class="brow"><div class="track"><div class="bar ok" style="width:44%;"></div></div><span class="v">15.5K</span></div>
+          </div>
+          <div class="save"><div class="pct">-23%</div><div class="sk">10K 检索必算</div></div>
+        </div>
+        <div class="qgroup">
+          <span class="qlb">轮2</span>
+          <div class="bars">
+            <div class="brow"><div class="track"><div class="bar bad" style="width:90%;"></div></div><span class="v">31.5K</span></div>
+            <div class="brow"><div class="track"><div class="bar ok" style="width:37%;"></div></div><span class="v">13K</span></div>
+          </div>
+          <div class="save"><div class="pct">-59%</div></div>
+        </div>
+        <div class="qgroup">
+          <span class="qlb">轮3+</span>
+          <div class="bars">
+            <div class="brow"><div class="track"><div class="bar bad" style="width:100%;"></div></div><span class="v">35K</span></div>
+            <div class="brow"><div class="track"><div class="bar ok" style="width:37%;"></div></div><span class="v">13K</span></div>
+          </div>
+          <div class="save"><div class="pct">-63%</div><div class="sk">history 触顶后稳态</div></div>
+        </div>
+        <div class="qgroup" style="border-top:1px dashed #cbd4e1; padding-top:.35em;">
+          <span class="qlb">加权<span class="sub2">按轮数分布</span></span>
+          <div class="bars">
+            <div class="brow"><div class="track"><div class="bar bad" style="width:100%;"></div></div><span class="v" style="color:var(--bad);">69.2K</span></div>
+            <div class="brow"><div class="track"><div class="bar ok" style="width:50%;"></div></div><span class="v" style="color:var(--good);">34.4K</span></div>
+          </div>
+          <div class="save"><div class="pct">-50%</div><div class="sk">每会话均值</div></div>
+        </div>
+      </div>
+      <div class="legend"><span class="lg-bad"><i></i>现状实际推理量/轮</span><span class="lg-ok"><i></i>目标(只算当轮新增)</span></div>
+    </div>
+    <div class="col" style="flex:1;">
+      <div class="card grow">
+        <h3>问答的收益结构:两段式</h3>
+        <p>排布改造只能消灭"重复计算"那部分(query级 + Tools + history 重算);<b>10K 检索内容是每轮的新增底线,占目标态 13K 的 77%</b>。所以问答封顶 -63%,是三类中降幅最小、但绝对量不小(轮 3 省 22K/轮)。</p>
+      </div>
+      <div class="card grow">
+        <h3>再往下降:两条结构性手段(抬结构上限)</h3>
+        <p>① <b>检索结果落盘 + 指针化</b>:全文落盘,上下文只注入摘要/高相关段(10K→3~5K);<br>② <b>裁剪时 webSearch 结果退化为指针</b>(可 re-fetch),避免 10K 大块反复裁剪重写前缀——问答型正是 history 触顶(15K)的主要制造者。</p>
+      </div>
+      <div class="card">
+        <h3>时延视角</h3>
+        <p>轮 3 现算 35K → 13K,<b class="goodc">TTFT prefill 部分 -63%</b>;若叠加检索指针化(13K→6K),可到 -83%。</p>
+      </div>
+    </div>
+  </div>
+  <div class="footer"><span>KV Cache 收益闭环 · v6 · P3 问答</span><span>建模:1 调用/轮,新增 = U 1K + webSearch 模拟 A/T 10K;history 增量 11.5K/轮,cap 15K</span></div>
+</section>
+
+<!-- ============ P4 任务 ============ -->
+<section class="slide">
+  <h2><span class="num">04</span>任务型:<span class="hl">调用最多、受 loop 断缓存伤害最大</span>——稳态节省 ~70%,止血项在这</h2>
+  <div class="card" style="margin-bottom:.55em;">
+    <h3>一轮形态:2 次调用(preload 版)或 3 次(模型自行 load skill);每次 loop +3K</h3>
+    <div class="caps" style="margin-top:.25em;">
+      <span class="chip u">U ~1K</span><span class="arr">+</span>
+      <span class="chip a sim">模拟A skill load</span><span class="arr">→</span>
+      <span class="chip t sim">模拟T skill 正文 ~3K</span><span class="arr">→</span>
+      <span class="chip req">调用①</span><span class="arr">→</span>
+      <span class="chip a">A 工具调用</span><span class="arr">→</span>
+      <span class="chip t">T 结果</span><span class="arr">→</span>
+      <span class="chip req">调用②</span><span class="arr">→</span>
+      <span class="chip a">A 融合回复</span>
+    </div>
+  </div>
+  <div class="row grow">
+    <div class="card" style="flex:1.25; display:flex; flex-direction:column;">
+      <h3>逐轮账目(现状 → 目标;每轮 = 调用①+调用②,history +7K/轮,cap 15K)</h3>
+      <div class="qledger grow" style="justify-content:center; margin-top:.2em;">
+        <div class="qgroup">
+          <span class="qlb">轮1<span class="sub2">会话首轮</span></span>
+          <div class="bars">
+            <div class="brow"><div class="track"><div class="bar bad" style="width:52%;"></div></div><span class="v">16K</span></div>
+            <div class="brow"><div class="track"><div class="bar ok" style="width:37%;"></div></div><span class="v">11.5K</span></div>
+          </div>
+          <div class="save"><div class="pct">-28%</div><div class="sk">skill 3K 首次必算</div></div>
+        </div>
+        <div class="qgroup">
+          <span class="qlb">轮2</span>
+          <div class="bars">
+            <div class="brow"><div class="track"><div class="bar bad" style="width:74%;"></div></div><span class="v">23K</span></div>
+            <div class="brow"><div class="track"><div class="bar ok" style="width:29%;"></div></div><span class="v">9K</span></div>
+          </div>
+          <div class="save"><div class="pct">-61%</div></div>
+        </div>
+        <div class="qgroup">
+          <span class="qlb">轮3</span>
+          <div class="bars">
+            <div class="brow"><div class="track"><div class="bar bad" style="width:97%;"></div></div><span class="v">30K</span></div>
+            <div class="brow"><div class="track"><div class="bar ok" style="width:29%;"></div></div><span class="v">9K</span></div>
+          </div>
+          <div class="save"><div class="pct">-70%</div></div>
+        </div>
+        <div class="qgroup">
+          <span class="qlb">轮5</span>
+          <div class="bars">
+            <div class="brow"><div class="track"><div class="bar bad" style="width:100%;"></div></div><span class="v">31K</span></div>
+            <div class="brow"><div class="track"><div class="bar ok" style="width:29%;"></div></div><span class="v">9K</span></div>
+          </div>
+          <div class="save"><div class="pct">-71%</div></div>
+        </div>
+        <div class="qgroup" style="border-top:1px dashed #cbd4e1; padding-top:.35em;">
+          <span class="qlb">加权<span class="sub2">按轮数分布</span></span>
+          <div class="bars">
+            <div class="brow"><div class="track"><div class="bar bad" style="width:100%;"></div></div><span class="v" style="color:var(--bad);">56.9K</span></div>
+            <div class="brow"><div class="track"><div class="bar ok" style="width:43%;"></div></div><span class="v" style="color:var(--good);">24.7K</span></div>
+          </div>
+          <div class="save"><div class="pct">-57%</div><div class="sk">每会话均值</div></div>
+        </div>
+      </div>
+      <div class="legend"><span class="lg-bad"><i></i>现状实际推理量/轮(2 次调用合计)</span><span class="lg-ok"><i></i>目标</span></div>
+    </div>
+    <div class="col" style="flex:1;">
+      <div class="card grow">
+        <h3><span class="warnc">止血项</span>:device_info 若每次调用刷新,任务型受害最大</h3>
+        <p>任务型是唯一有 loop 内调用(调用②③)的业务。若前台应用信息在 loop 期间实时刷新,<b class="badc">调用② 也从 query 级断</b>:轮 3 一轮成本从 30K 恶化到 ~53K。修复只需"<b>每 query 采样一次、loop 内冻结</b>"——几行代码,任务型立省 ~40%。上表按 loop 健康建模,实测 60% 命中率暗示现实更接近恶化态,<b>止血收益在上表之外另算</b>。</p>
+      </div>
+      <div class="card grow">
+        <h3>preload(skill search)的缓存视角评价</h3>
+        <p>preload 用模拟 A/T 把 skill 正文注入消息流——<b class="goodc">形态本身是缓存友好的</b>(追加式,少一次调用往返);改造后它天然融入"query 级内容随消息流进入"的目标架构,无需推翻。3 调用版(模型自行 load)多付一次调用但 skill 按需精准,两者并存即可。</p>
+      </div>
+      <div class="card">
+        <h3>时延视角</h3>
+        <p>任务型总时延 = 多次调用 TTFT 之和,对 prefill 最敏感:轮 3 调用① 现算 27K→6K,<b class="goodc">-78%</b>;整轮任务端到端提速最明显。</p>
+      </div>
+    </div>
+  </div>
+  <div class="footer"><span>KV Cache 收益闭环 · v6 · P4 任务</span><span>建模:preload 版 2 调用/轮,调① 新增 4K(U+skill)、调② 3K;history 增量 7K/轮,cap 15K;3 调用版现状更差、节省更多</span></div>
+</section>
+
+<!-- ============ P5 汇总 ============ -->
+<section class="slide">
+  <h2><span class="num">05</span>整体收益与统计闭环:<span class="hl">按真实流量加权 ~−57%</span>,长会话与止血项是放大器</h2>
+  <div class="kpi" style="margin-bottom:.55em;">
+    <div class="card"><div class="big g">-73%</div><div class="lbl"><b>闲聊</b>每会话(30.6K→8.2K)</div></div>
+    <div class="card"><div class="big g">-50%</div><div class="lbl"><b>问答</b>每会话(69.2K→34.4K)</div></div>
+    <div class="card"><div class="big g">-57%</div><div class="lbl"><b>任务</b>每会话(56.9K→24.7K)</div></div>
+    <div class="card"><div class="big g">≈ -57%</div><div class="lbl"><b>混合整体</b>(占比 40/40/20 假设)<br>51.3K→22K/会话,待占比回填</div></div>
+  </div>
+  <div class="row grow">
+    <div class="col" style="flex:1.1;">
+      <div class="card grow">
+        <h3>收益为什么从稳态 -75% 回落到 -57%:轮数分布的稀释与集中</h3>
+        <ul>
+          <li><b>51% 单轮会话稀释平均数</b>:无 query 切换点,只省 Tools 连带 4.5K(-23%~-45%);query 级内容首次进入必算,下沉消灭的是"重复"不是"首次";</li>
+          <li><b>算力集中在长会话</b>:6 轮+ 的 11% 会话贡献现状 prefill ~44%,多轮会话合计 ~85%——它们的节省是 -60%~-88%,<b>钱省在最该省的地方</b>;</li>
+          <li><b>两个放大器不在 -57% 内</b>:① device_info 止血(若 loop 确在断,现状比建模更差,实际节省更大);② 检索/skill 大块内容指针化(抬结构上限,问答可 -63%→-83%)。</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>时延收益(TTFT ≈ 现算量 ÷ prefill 吞吐)</h3>
+        <p>稳态轮次首调用:<b class="goodc">闲聊 -85%、任务 -78%、问答 -63%</b>;绝对秒数待 prefill 吞吐参数回填换算。轮数越深、原来越慢的请求改善越大。</p>
+      </div>
+    </div>
+    <div class="col" style="flex:1;">
+      <div class="card grow">
+        <h3>统计闭环:怎么证明这些数(不靠估算)</h3>
+        <table>
+          <tr><th>动作</th><th>说明</th></tr>
+          <tr><td><b>① 引擎实报</b></td><td>逐调用透传 cached_tokens → 实际推理量 = 输入 − 命中</td></tr>
+          <tr><td><b>② 应用记账</b></td><td>当轮新增消息 tokenize 计数 → 必要推理量;白算量 = ①−②,验收 = 归零</td></tr>
+          <tr><td><b>③ 四维打标</b></td><td>业务类型(闲聊/问答/任务)× 调用类型(query 首调/loop 调用)× 轮次 × 会话,直接验证 P2–P4 每格数字</td></tr>
+          <tr><td><b>④ 灰度 A/B</b></td><td>同期同流量对比每调用实际推理量与 TTFT,收益即报表</td></tr>
+        </table>
+      </div>
+      <div class="card">
+        <h3>待回填参数(不影响结论方向,影响精度)</h3>
+        <p>① 三类业务真实流量占比(现按 40/40/20 假设);② prefill 吞吐(时延换算绝对值);③ device_info 刷新时机确认(决定止血收益大小);④ 6 轮+ 会话的轮数均值(现按 8 轮)。</p>
+      </div>
+    </div>
+  </div>
+  <div class="banner" style="margin-top:.55em;">结论:排布改造(query 级下沉 + Tools 解除连带 + 裁剪改造)按真实轮数分布加权,<b>整体 prefill 算力与首 token 时延约降 57%</b>;叠加 device_info 止血与检索指针化,长会话场景可达 -70%~-88%。<b>每一格数字都可由"引擎实报 + 应用记账 + 四维打标"直接验证。</b></div>
+  <div class="footer"><span>KV Cache 收益闭环 · v6 · P5 汇总</span><span>加权口径:P1 轮数分布(6轮+按8轮)× 业务占比假设 40/40/20;止血项与指针化收益另计,均为增益方向</span></div>
+</section>
+
+</div>
+
+<div class="dots" id="dots"></div>
+<div class="nav">
+  <button id="prev">‹</button>
+  <span class="pg" id="pg">1 / 5</span>
+  <button id="next">›</button>
+</div>
+
+<script>
+  const slides = [...document.querySelectorAll('.slide')];
+  const dotsBox = document.getElementById('dots');
+  let cur = 0;
+  slides.forEach((_, i) => {
+    const d = document.createElement('i');
+    if (i === 0) d.classList.add('on');
+    d.onclick = () => go(i);
+    dotsBox.appendChild(d);
+  });
+  const dots = [...dotsBox.children];
+  function go(i) {
+    cur = (i + slides.length) % slides.length;
+    slides.forEach((s, j) => s.classList.toggle('active', j === cur));
+    dots.forEach((d, j) => d.classList.toggle('on', j === cur));
+    document.getElementById('pg').textContent = (cur + 1) + ' / ' + slides.length;
+  }
+  document.getElementById('prev').onclick = () => go(cur - 1);
+  document.getElementById('next').onclick = () => go(cur + 1);
+  document.addEventListener('keydown', e => {
+    if (e.key === 'ArrowRight' || e.key === ' ' || e.key === 'PageDown') go(cur + 1);
+    if (e.key === 'ArrowLeft' || e.key === 'PageUp') go(cur - 1);
+  });
+</script>
+</body>
+</html>
