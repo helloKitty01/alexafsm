@@ -16,6 +16,7 @@
 | [07-分代冻结详解.md](./07-分代冻结详解.md) | 分代冻结机制展开：合并式 vs 堆叠式、时间线算账、字节级冻结的工程陷阱 |
 | [08-量化收益评估.md](./08-量化收益评估.md) | 基于现网基线（输入 37K / 命中 25K / 66%）的收益估算与敏感性分析 |
 | [09-业界Agent-harness缓存实践洞察.md](./09-业界Agent-harness缓存实践洞察.md) | Manus / Claude Code / Anthropic 平台 / Mooncake 的缓存优化实践深度调研与借鉴清单 |
+| [10-细化统计方案与分场景收益.md](./10-细化统计方案与分场景收益.md) | 长期度量体系:请求输入四分解、命中率/结构上限/达成率三层指标、单轮对话/单轮loop/多轮对话分场景收益口径、埋点与三步落地 |
 | [上下文工程与KV-Cache优化.slides.html](./上下文工程与KV-Cache优化.slides.html) | 汇报用 HTML 幻灯片 v1（6 页，已被 v2 取代，留档） |
 | [上下文工程与KV-Cache优化.v2.slides.html](./上下文工程与KV-Cache优化.v2.slides.html) | 汇报用 HTML 幻灯片 v2（7 页，已被 v3 取代，留档） |
 | [上下文工程与KV-Cache优化.v3.slides.html](./上下文工程与KV-Cache优化.v3.slides.html) | 汇报用 HTML 幻灯片 v3（7 页，已被 v4 取代，留档） |
