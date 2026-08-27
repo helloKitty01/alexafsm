@@ -24,7 +24,8 @@
 | [KV-Cache收益闭环.v3.slides.html](./KV-Cache收益闭环.v3.slides.html) | 汇报幻灯片 v3(单页深色,已被 v4 取代,留档) |
 | [KV-Cache收益闭环.v4.slides.html](./KV-Cache收益闭环.v4.slides.html) | 汇报幻灯片 v4(单页浅色,预估参数,已被 v5 取代,留档) |
 | [KV-Cache收益闭环.v5.slides.html](./KV-Cache收益闭环.v5.slides.html) | 汇报幻灯片 v5(单页浅色实测参数,稳态口径,已被 v6 取代,留档) |
-| [KV-Cache收益闭环.v6.slides.html](./KV-Cache收益闭环.v6.slides.html) | 汇报幻灯片 v6(5 页 · 浅色 · 当前版本):P1 基线对齐(实测参数+轮数分布 51/20/9/5.5/3.5/11+三条自洽验证);P2 闲聊(多轮-83~88%,加权-73%);P3 问答(10K检索为新增底线,封顶-63%,加权-50%);P4 任务(loop断缓存受害最大+device_info止血项,加权-57%);P5 汇总(轮数加权整体≈-57%,6轮+的11%会话占44%算力,统计闭环四步+待回填参数) |
+| [KV-Cache收益闭环.v6.slides.html](./KV-Cache收益闭环.v6.slides.html) | 汇报幻灯片 v6(5 页浅色,含 60%/23K 旧基线,已被 v6.1 取代,留档) |
+| [KV-Cache收益闭环.v6.1.slides.html](./KV-Cache收益闭环.v6.1.slides.html) | 汇报幻灯片 v6.1(6 页 · 浅色 · 当前版本,弃用 60%/23K 粗测、命中侧全推演):P1 基线对齐(实测参数+轮数分布+业务占比任务40/问答40/闲聊20+口径说明);P2 任务(history沉淀3K/轮,加权-52%+止血项);P3 问答(封顶-63%,加权-50%+指针化);P4 闲聊(加权-73%,时延第一受益者);P5 轮数收益账(分桶表:节省率-27%→-64%,51%单轮会话贡献8%节省、11%长会话贡献51%);P6 汇总(混合-53%,每调用15.8K→7.4K,统计闭环四步) |
 | [上下文工程与KV-Cache优化.slides.html](./上下文工程与KV-Cache优化.slides.html) | 汇报用 HTML 幻灯片 v1（6 页，已被 v2 取代，留档） |
 | [上下文工程与KV-Cache优化.v2.slides.html](./上下文工程与KV-Cache优化.v2.slides.html) | 汇报用 HTML 幻灯片 v2（7 页，已被 v3 取代，留档） |
 | [上下文工程与KV-Cache优化.v3.slides.html](./上下文工程与KV-Cache优化.v3.slides.html) | 汇报用 HTML 幻灯片 v3（7 页，已被 v4 取代，留档） |
