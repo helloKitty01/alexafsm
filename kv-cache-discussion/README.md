@@ -18,6 +18,7 @@
 | [09-业界Agent-harness缓存实践洞察.md](./09-业界Agent-harness缓存实践洞察.md) | Manus / Claude Code / Anthropic 平台 / Mooncake 的缓存优化实践深度调研与借鉴清单 |
 | [10-细化统计方案与分场景收益.md](./10-细化统计方案与分场景收益.md) | 长期度量体系:请求输入四分解、命中率/结构上限/达成率三层指标、单轮对话/单轮loop/多轮对话分场景收益口径、埋点与三步落地 |
 | [11-收益闭环与统计口径-汇报版.md](./11-收益闭环与统计口径-汇报版.md) | 给领导闭环的版本(无驻留假设):各层长度盘点、多轮对话逐请求账目(现状162K vs 目标45K)、与现网基线互验(-75%/-56%)、两个计数器+验收等式的统计闭环、30秒话术 |
+| [KV-Cache收益闭环.slides.html](./KV-Cache收益闭环.slides.html) | 汇报用 2 页 HTML 幻灯片(基于 11,只用 prefill 计算量口径):P1 钱花在哪+逐请求账目条形图,P2 三级台阶+两个计数器统计闭环 |
 | [上下文工程与KV-Cache优化.slides.html](./上下文工程与KV-Cache优化.slides.html) | 汇报用 HTML 幻灯片 v1（6 页，已被 v2 取代，留档） |
 | [上下文工程与KV-Cache优化.v2.slides.html](./上下文工程与KV-Cache优化.v2.slides.html) | 汇报用 HTML 幻灯片 v2（7 页，已被 v3 取代，留档） |
 | [上下文工程与KV-Cache优化.v3.slides.html](./上下文工程与KV-Cache优化.v3.slides.html) | 汇报用 HTML 幻灯片 v3（7 页，已被 v4 取代，留档） |
