@@ -22,7 +22,8 @@
 | [12-上下文长度实测需求.md](./12-上下文长度实测需求.md) | 交给内部模型的测量需求:模块定义与识别方法 + token 统计口径 + JSON 输出 schema,用于替换假设值 |
 | [KV-Cache收益闭环.v2.slides.html](./KV-Cache收益闭环.v2.slides.html) | 汇报幻灯片 v2(结构条误将 Tools 并入静态区置前,已被 v3 取代,留档) |
 | [KV-Cache收益闭环.v3.slides.html](./KV-Cache收益闭环.v3.slides.html) | 汇报幻灯片 v3(单页深色,已被 v4 取代,留档) |
-| [KV-Cache收益闭环.v4.slides.html](./KV-Cache收益闭环.v4.slides.html) | 汇报幻灯片 v4(单页 · 浅色系,当前版本):新增"原则带"(输入38K三分解条 60%命中/30%白算/10%新增 + 命中率看健康度、token量算钱的口径说明);基线更新为实测 38K/23K/60%(miss 15K,白算11.5K占77%);布局重排(loop解剖移至右栏账目图上方,左栏结构条+白算构成公式卡);逐轮账目 -53%→-80%,累计125K→35K,收益口径 -72%(推演保守)~-77%(实测) |
+| [KV-Cache收益闭环.v4.slides.html](./KV-Cache收益闭环.v4.slides.html) | 汇报幻灯片 v4(单页浅色,预估参数,已被 v5 取代,留档) |
+| [KV-Cache收益闭环.v5.slides.html](./KV-Cache收益闭环.v5.slides.html) | 汇报幻灯片 v5(单页 · 浅色 · 实测参数,当前版本):结构条改用实测长度(固定前缀25.5K/query级4.5K=skills3+memory1+device_info0.5/Tools4.5K/history≤15K);账目按三类业务拆分(闲聊-95%/问答-63%/任务-73%,合计-75%);新增时延带(TTFT≈miss÷吞吐,分业务相对改善);新增两个止血项卡(device_info 每调用刷新嫌疑、T高频裁剪);KPI 新增"命中23K<固定前缀25.5K,一成调用整头miss"发现 |
 | [上下文工程与KV-Cache优化.slides.html](./上下文工程与KV-Cache优化.slides.html) | 汇报用 HTML 幻灯片 v1（6 页，已被 v2 取代，留档） |
 | [上下文工程与KV-Cache优化.v2.slides.html](./上下文工程与KV-Cache优化.v2.slides.html) | 汇报用 HTML 幻灯片 v2（7 页，已被 v3 取代，留档） |
 | [上下文工程与KV-Cache优化.v3.slides.html](./上下文工程与KV-Cache优化.v3.slides.html) | 汇报用 HTML 幻灯片 v3（7 页，已被 v4 取代，留档） |
