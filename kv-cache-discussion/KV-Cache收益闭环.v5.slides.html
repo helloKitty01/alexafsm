@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>KV Cache 收益闭环 · 汇报版 v5(单页 · 浅色 · 实测参数)</title>
+<style>
+  :root {
+    --bg: #e9edf4;
+    --slide-bg: linear-gradient(135deg, #ffffff 0%, #f7f9fd 60%, #eef3fb 100%);
+    --card: #f7f9fc;
+    --card-border: #dfe5ee;
+    --text: #1f2a3d;
+    --muted: #5c6b84;
+    --accent: #2563eb;
+    --good: #059669;
+    --warn: #d97706;
+    --bad: #dc2626;
+    --mono: "SF Mono", "JetBrains Mono", Consolas, "Courier New", monospace;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { background: var(--bg); height: 100%; }
+  body {
+    font-family: "PingFang SC", "Microsoft YaHei", "Noto Sans SC", -apple-system, sans-serif;
+    color: var(--text);
+    display: flex; justify-content: center; align-items: center;
+    padding: 16px 12px; min-height: 100vh;
+  }
+  .deck { position: relative; width: min(96vw, calc((100vh - 32px) * 1.7778)); }
+  .slide {
+    width: 100%;
+    aspect-ratio: 16 / 9;
+    background: var(--slide-bg);
+    border: 1px solid var(--card-border);
+    border-radius: 18px;
+    box-shadow: 0 18px 50px rgba(31,42,61,.16);
+    padding: 2% 2.8%;
+    display: flex; flex-direction: column;
+    overflow: hidden; position: relative;
+    font-size: clamp(9.5px, min(1.08vw, 1.92vh), 22px);
+  }
+  .slide::before {
+    content: ""; position: absolute; inset: 0 0 auto 0; height: 5px;
+    background: linear-gradient(90deg, var(--accent), var(--good));
+    border-radius: 18px 18px 0 0;
+  }
+  h2 { font-size: 1.26em; font-weight: 700; margin-bottom: .35em; }
+  h2 .hl { color: var(--accent); }
+  .card {
+    background: var(--card); border: 1px solid var(--card-border);
+    border-radius: 12px; padding: .65em .85em;
+    overflow: hidden;
+  }
+  .card h3 { font-size: .92em; margin-bottom: .32em; color: var(--text); }
+  .card p { color: var(--muted); font-size: .82em; line-height: 1.45; }
+  .card b { color: var(--text); font-weight: 700; }
+  .goodc { color: var(--good) !important; }
+  .warnc { color: var(--warn) !important; }
+  .badc { color: var(--bad) !important; }
+  .mono { font-family: var(--mono); }
+
+  .row { display: flex; gap: .75em; min-height: 0; }
+  .col { display: flex; flex-direction: column; gap: .55em; min-width: 0; }
+  .grow { flex: 1; min-height: 0; min-width: 0; }
+
+  .banner {
+    border-radius: 10px; padding: .42em .9em; font-size: .86em;
+    background: linear-gradient(90deg, rgba(37,99,235,.08), rgba(5,150,105,.07));
+    border: 1px solid rgba(37,99,235,.28); color: var(--text); line-height: 1.44;
+  }
+  .banner b { color: var(--accent); }
+
+  .kpi { display: flex; gap: .75em; }
+  .kpi .card { flex: 1; text-align: center; padding: .38em .32em; }
+  .kpi .big { font-size: 1.2em; font-weight: 700; color: var(--accent); font-family: var(--mono); }
+  .kpi .big.g { color: var(--good); }
+  .kpi .big.w { color: var(--warn); }
+  .kpi .big.r { color: var(--bad); }
+  .kpi .lbl { color: var(--muted); font-size: .7em; margin-top: .14em; line-height: 1.3; }
+  .kpi .lbl b { color: var(--text); }
+
+  /* 原则带分解条 */
+  .pbar { display: flex; height: 2.2em; border-radius: 8px; overflow: hidden; border: 1px solid var(--card-border); }
+  .pseg { display: flex; flex-direction: column; justify-content: center; align-items: center; gap: .04em; min-width: 0; padding: 0 .25em; }
+  .pseg .nm { font-size: .7em; font-weight: 700; white-space: nowrap; }
+  .pseg .sz { font-family: var(--mono); font-size: .62em; white-space: nowrap; opacity: .95; }
+  .pseg.hit { background: rgba(5,150,105,.14); color: #065f46; border-right: 1px solid var(--card-border); }
+  .pseg.waste { background: rgba(220,38,38,.13); color: #991b1b; border-right: 1px solid var(--card-border); }
+  .pseg.new { background: rgba(37,99,235,.12); color: #1e40af; }
+
+  /* 结构条 */
+  .ctxbar { display: flex; height: 2.6em; border-radius: 8px; overflow: hidden; border: 1px solid var(--card-border); }
+  .seg { display: flex; flex-direction: column; justify-content: center; align-items: center; gap: .05em; min-width: 0; padding: 0 .2em; }
+  .seg .nm { font-size: .68em; font-weight: 700; white-space: nowrap; }
+  .seg .sz { font-family: var(--mono); font-size: .62em; opacity: .9; white-space: nowrap; }
+  .seg.static { background: rgba(5,150,105,.13); border-right: 1px solid var(--card-border); color: #065f46; }
+  .seg.query  { background: rgba(220,38,38,.16); border-right: 1px solid var(--card-border); color: #991b1b; }
+  .seg.tools  { background: rgba(217,119,6,.16); border-right: 1px solid var(--card-border); color: #92400e; }
+  .seg.uat    { background: rgba(37,99,235,.10); color: #1e40af; }
+  .ctxbar.mini { height: 1.9em; }
+  .ctxbar.mini .seg .nm { font-size: .64em; }
+  .boltline { position: relative; height: 1.2em; margin-top: .08em; }
+  .bolt { position: absolute; top: 0; font-size: .68em; color: var(--bad); white-space: nowrap; font-weight: 700; }
+
+  /* 业务类型账目 */
+  .qledger { display: flex; flex-direction: column; gap: .5em; }
+  .qgroup { display: flex; align-items: center; gap: .5em; }
+  .qgroup .qlb { flex: none; width: 3.1em; font-size: .76em; color: var(--text); font-weight: 700; text-align: right; line-height: 1.25; }
+  .qgroup .qlb .sub2 { display: block; font-size: .78em; color: var(--muted); font-weight: 400; }
+  .qgroup .bars { flex: 1; display: flex; flex-direction: column; gap: .13em; min-width: 0; }
+  .brow { display: flex; align-items: center; gap: .36em; }
+  .brow .track { flex: 1; height: .82em; border-radius: 4px; background: #eceff5; position: relative; min-width: 0; }
+  .brow .bar { position: absolute; inset: 0 auto 0 0; border-radius: 4px; }
+  .brow .bar.bad { background: linear-gradient(90deg, rgba(220,38,38,.75), rgba(220,38,38,.45)); }
+  .brow .bar.tl  { background: rgba(217,119,6,.65); border-radius: 0; }
+  .brow .bar.ok  { background: linear-gradient(90deg, rgba(5,150,105,.8), rgba(5,150,105,.5)); }
+  .brow .bar.nw  { background: rgba(37,99,235,.5); border-radius: 0; }
+  .brow .v { flex: none; width: 2.5em; font-family: var(--mono); font-size: .66em; color: var(--muted); white-space: nowrap; }
+  .qgroup .save { flex: none; width: 4.4em; text-align: center; }
+  .qgroup .save .pct { font-family: var(--mono); font-weight: 700; font-size: .84em; color: var(--good); }
+  .qgroup .save .sk { font-size: .58em; color: var(--muted); line-height: 1.25; }
+
+  .legend { display: flex; gap: .9em; font-size: .66em; color: var(--muted); margin-top: .22em; flex-wrap: wrap; }
+  .legend i { display: inline-block; width: .82em; height: .5em; border-radius: 3px; margin-right: .24em; }
+  .legend .lg-bad i { background: rgba(220,38,38,.6); }
+  .legend .lg-tl i { background: rgba(217,119,6,.65); }
+  .legend .lg-ok i { background: rgba(5,150,105,.65); }
+
+  /* 时延带 */
+  .lat { display: flex; gap: .75em; align-items: stretch; }
+  .lat .card { flex: 1; text-align: center; padding: .35em .3em; }
+  .lat .big { font-size: 1.05em; font-weight: 700; font-family: var(--mono); color: var(--good); }
+  .lat .lbl { color: var(--muted); font-size: .66em; margin-top: .1em; line-height: 1.28; }
+  .lat .lbl b { color: var(--text); }
+
+  .footer {
+    margin-top: auto; padding-top: .35em; display: flex;
+    justify-content: space-between; color: var(--muted); font-size: .66em; gap: 1em;
+  }
+</style>
+</head>
+<body>
+<div class="deck">
+
+<section class="slide">
+  <h2>KV Cache 收益闭环(实测参数):<span class="hl">每次调用实际推理 15K → ~3-5K,prefill 与首 token 时延同步降 ~75%</span></h2>
+
+  <!-- KPI -->
+  <div class="kpi" style="margin-bottom:.5em;">
+    <div class="card"><div class="big r">15K</div><div class="lbl"><b>现网实测</b>每次调用实际推理量<br>输入 38K,命中 23K,命中率 60%</div></div>
+    <div class="card"><div class="big w">23K &lt; 25.5K</div><div class="lbl">平均命中<b>连固定前缀都不满</b><br>≈一成调用整头 miss(驻留/首请求)</div></div>
+    <div class="card"><div class="big g">~3-5K</div><div class="lbl"><b>目标</b>每次调用实际推理量<br>只算当轮新增(按业务类型不同)</div></div>
+    <div class="card"><div class="big g">-75%</div><div class="lbl">prefill 计算量 ≈ <b>TTFT 同步下降</b><br>(三类业务混合,详见下方时延带)</div></div>
+  </div>
+
+  <!-- 原则带 -->
+  <div class="card" style="margin-bottom:.5em;">
+    <div class="row" style="align-items:center;">
+      <div style="flex:1.2; min-width:0;">
+        <h3>原则:输入三部分——<span class="badc">红色要消灭</span>,<span style="color:#1e40af;">蓝色躲不掉</span>;盯 token 量而非命中率</h3>
+        <div class="pbar">
+          <div class="pseg hit" style="flex:60;"><span class="nm">命中(免费复用)</span><span class="sz">23K · 60%</span></div>
+          <div class="pseg waste" style="flex:30;"><span class="nm">白算:算过被重算</span><span class="sz">~11.5K · 30%</span></div>
+          <div class="pseg new" style="flex:10;"><span class="nm">实际新增</span><span class="sz">~3.5K</span></div>
+        </div>
+      </div>
+      <div style="flex:1; min-width:0;">
+        <p style="line-height:1.42;">命中率是比值,随业务形态漂移、折算不成钱;<b class="badc">miss 的每个 token 都真实消耗 GPU 做 prefill</b>,miss 量 × 调用量 = 算力账单,miss 量 ÷ prefill 吞吐 ≈ 首 token 等待。<b>白算量归零是验收线,新增量是成本底线。</b></p>
+      </div>
+    </div>
+  </div>
+
+  <!-- 主体 -->
+  <div class="row grow">
+    <!-- 左:结构与病灶 -->
+    <div class="col" style="flex:1;">
+      <div class="card">
+        <h3><span class="badc">现状</span>上下文结构(实测长度):query 级重写,身后全部重算</h3>
+        <div class="ctxbar">
+          <div class="seg static" style="flex:25.5;"><span class="nm">固定前缀</span><span class="sz">25.5K(SP 25 + user.md 0.5)命中</span></div>
+          <div class="seg query" style="flex:4.5;"><span class="nm">query级⚡</span><span class="sz">4.5K</span></div>
+          <div class="seg tools" style="flex:4.5;"><span class="nm">Tools</span><span class="sz">4.5K 连带</span></div>
+          <div class="seg uat" style="flex:10;"><span class="nm">history</span><span class="sz">~10K(打满10轮≈15K)</span></div>
+        </div>
+        <div class="boltline"><div class="bolt" style="left:38%;">⚡ query级 4.5K = skills 3 + memory 1 + device_info 0.5,每 query 重写 → 其后 ~19K 全部重算</div></div>
+      </div>
+      <div class="card">
+        <h3><span class="goodc">目标</span>:query 级下沉消息流,固定命中区扩为 30K</h3>
+        <div class="ctxbar mini">
+          <div class="seg static" style="flex:25.5;"><span class="nm">固定前缀 25.5K</span></div>
+          <div class="seg tools" style="flex:4.5;"><span class="nm">Tools 4.5K</span></div>
+          <div class="seg uat" style="flex:14;"><span class="nm">history 纯追加(skills/memory/device 随 U 注入)</span></div>
+        </div>
+        <p style="margin-top:.3em;">前缀无重写点:<b class="goodc">每次调用只算当轮新增</b>;webSearch/skill 正文以模拟 A/T 追加,进历史后即成为可命中前缀。</p>
+      </div>
+      <div class="card grow">
+        <h3><span class="warnc">两个止血项</span>(便宜、见效快,建议先行)</h3>
+        <p>① <b>device_info(前台应用信息,0.5K)若每次调用实时刷新</b>,loop 内每次调用都从 query 级断——0.5K 拖垮身后 ~19K。修复:每 query 采样一次、loop 内冻结(或随 U 下沉)。实测"命中恒≈23K"与此高度吻合,待分类型统计确认。<br>② <b>history 打满 10 轮 ~15K 说明 T 高频裁剪</b>(webSearch 10K/skill 正文用完即裁),每次裁剪 = 前缀重写再断一次。改造:按 token 双水位、攒批裁剪。</p>
+      </div>
+    </div>
+
+    <!-- 右:三类业务账目 -->
+    <div class="col" style="flex:1.15;">
+      <div class="card grow" style="display:flex; flex-direction:column;">
+        <h3>三类业务单轮账目(稳态 history≈10K;现状基座 = 4.5 query级 + 4.5 Tools + 10 history = 19K 白算)</h3>
+        <div class="qledger grow" style="justify-content:center; margin-top:.2em;">
+          <div class="qgroup">
+            <span class="qlb">闲聊<span class="sub2">1 次调用</span></span>
+            <div class="bars">
+              <div class="brow"><div class="track"><div class="bar bad" style="width:67%;"></div><div class="bar tl" style="left:15%; width:15%;"></div></div><span class="v">20K</span></div>
+              <div class="brow"><div class="track"><div class="bar ok" style="width:3.5%;"></div></div><span class="v">1K</span></div>
+            </div>
+            <div class="save"><div class="pct">-95%</div><div class="sk">U→直接融合回复<br>新增仅 ~1K</div></div>
+          </div>
+          <div class="qgroup">
+            <span class="qlb">问答<span class="sub2">1 次调用</span></span>
+            <div class="bars">
+              <div class="brow"><div class="track"><div class="bar bad" style="width:100%;"></div><div class="bar tl" style="left:15%; width:15%;"></div></div><span class="v">30K</span></div>
+              <div class="brow"><div class="track"><div class="bar ok" style="width:37%;"></div></div><span class="v">11K</span></div>
+            </div>
+            <div class="save"><div class="pct">-63%</div><div class="sk">webSearch 模拟A/T<br>10K 首次必算</div></div>
+          </div>
+          <div class="qgroup">
+            <span class="qlb">任务<span class="sub2">2 次调用</span></span>
+            <div class="bars">
+              <div class="brow"><div class="track"><div class="bar bad" style="width:87%;"></div><div class="bar tl" style="left:15%; width:15%;"></div></div><span class="v">26K</span></div>
+              <div class="brow"><div class="track"><div class="bar ok" style="width:23%;"></div></div><span class="v">7K</span></div>
+            </div>
+            <div class="save"><div class="pct">-73%</div><div class="sk">preload skill 3K<br>+ 工具 loop 3K</div></div>
+          </div>
+          <div class="qgroup" style="border-top:1px dashed #cbd4e1; padding-top:.35em;">
+            <span class="qlb">合计<span class="sub2">4 次调用</span></span>
+            <div class="bars">
+              <div class="brow"><div class="track"><div class="bar bad" style="width:100%;"></div></div><span class="v" style="color:var(--bad);">76K</span></div>
+              <div class="brow"><div class="track"><div class="bar ok" style="width:25%;"></div></div><span class="v" style="color:var(--good);">19K</span></div>
+            </div>
+            <div class="save"><div class="pct">-75%</div><div class="sk">三类各一轮</div></div>
+          </div>
+        </div>
+        <div class="legend">
+          <span class="lg-bad"><i></i>现状实际推理量/轮</span>
+          <span class="lg-tl"><i></i>其中 Tools 白算 4.5K</span>
+          <span class="lg-ok"><i></i>目标(只算当轮新增)</span>
+        </div>
+        <p style="font-size:.7em; color:var(--muted); margin-top:.25em;">任务型按 preload 版(2 次调用)建模,3 次调用版(模型自行 load skill)现状更差、节省更多;问答型的 11K 里 10K 是检索内容本身,属新增底线,若结果落盘指针化可进一步压缩。</p>
+      </div>
+      <!-- 时延带 -->
+      <div class="lat">
+        <div class="card"><div class="big">-95%</div><div class="lbl"><b>闲聊</b>首 token 等待<br>现算 20K→1K</div></div>
+        <div class="card"><div class="big">-63%</div><div class="lbl"><b>问答</b>首 token 等待<br>现算 30K→11K</div></div>
+        <div class="card"><div class="big">-83%</div><div class="lbl"><b>任务</b>首调用 TTFT<br>现算 23K→4K</div></div>
+        <div class="card"><div class="big" style="color:var(--accent);">TTFT≈miss÷吞吐</div><div class="lbl">绝对秒数待 prefill 吞吐<br>参数回填后换算</div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="banner" style="margin-top:.5em;">结论:query 级下沉 + device_info 冻结 + 裁剪改造后,<b>每次调用实际推理量 15K → ~3-5K,prefill 算力与首 token 时延同步降约 75%</b>(闲聊 -95% / 任务 -73% / 问答 -63%)。统计闭环:<b>引擎逐请求实报命中、应用侧记账新增,白算量归零为验收,按业务类型 + 调用类型(query 首调/loop 调用)打标拆分,灰度 A/B 直接验证</b>。</div>
+  <div class="footer"><span>KV Cache 收益闭环 · v5(单页 · 浅色 · 实测参数)</span><span>实测:固定前缀 25929 / tools 4413 / skills 2877-3565 / user.md 313 / device_info 259-310 / history 7184-13453;假设:稳态 history 10K、任务型 2 次调用、每 loop +3K、webSearch 10K;流量占比与 prefill 吞吐待回填</span></div>
+</section>
+
+</div>
+</body>
+</html>

@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>KV Cache 收益闭环 · 汇报版 v2</title>
+<style>
+  :root {
+    --bg: #0d1220;
+    --slide-bg: linear-gradient(135deg, #131a2e 0%, #0f1526 55%, #12203a 100%);
+    --card: rgba(255,255,255,.045);
+    --card-border: rgba(255,255,255,.09);
+    --text: #e8ecf6;
+    --muted: #9aa7c2;
+    --accent: #5b9dff;
+    --accent2: #4fd6a7;
+    --warn: #ffb454;
+    --bad: #ff6b6b;
+    --code-bg: rgba(0,0,0,.35);
+    --mono: "SF Mono", "JetBrains Mono", Consolas, "Courier New", monospace;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { background: var(--bg); height: 100%; }
+  body {
+    font-family: "PingFang SC", "Microsoft YaHei", "Noto Sans SC", -apple-system, sans-serif;
+    color: var(--text);
+    display: flex; justify-content: center; align-items: center;
+    padding: 16px 12px; min-height: 100vh;
+  }
+  .deck { position: relative; width: min(96vw, calc((100vh - 32px) * 1.7778)); }
+  .slide {
+    width: 100%;
+    aspect-ratio: 16 / 9;
+    background: var(--slide-bg);
+    border: 1px solid var(--card-border);
+    border-radius: 18px;
+    box-shadow: 0 22px 60px rgba(0,0,0,.5);
+    padding: 2.4% 3.2%;
+    display: none; flex-direction: column;
+    overflow: hidden; position: relative;
+    font-size: clamp(9.5px, min(1.08vw, 1.92vh), 22px);
+  }
+  .slide.active { display: flex; }
+  .slide::before {
+    content: ""; position: absolute; inset: 0 0 auto 0; height: 4px;
+    background: linear-gradient(90deg, var(--accent), var(--accent2));
+    border-radius: 18px 18px 0 0;
+  }
+  h2 { font-size: 1.42em; font-weight: 700; margin-bottom: .45em; }
+  h2 .hl { color: var(--accent); }
+  h2 .num { color: var(--muted); font-weight: 600; margin-right: .4em; font-size: .8em; }
+  .card {
+    background: var(--card); border: 1px solid var(--card-border);
+    border-radius: 12px; padding: .85em 1.05em;
+    overflow: hidden;
+  }
+  .card h3 { font-size: 1em; margin-bottom: .45em; color: #fff; }
+  .card p, .card li { color: var(--muted); font-size: .9em; line-height: 1.5; }
+  .card li { margin-left: 1.2em; margin-bottom: .28em; }
+  .card b { color: var(--text); font-weight: 600; }
+  .good { color: var(--accent2) !important; }
+  .warnc { color: var(--warn) !important; }
+  .badc { color: var(--bad) !important; }
+  .mono { font-family: var(--mono); }
+
+  .row { display: flex; gap: .9em; min-height: 0; }
+  .col { display: flex; flex-direction: column; gap: .7em; min-width: 0; }
+  .grow { flex: 1; min-height: 0; min-width: 0; }
+
+  .banner {
+    border-radius: 10px; padding: .5em 1.05em; font-size: .93em;
+    background: linear-gradient(90deg, rgba(91,157,255,.12), rgba(79,214,167,.10));
+    border: 1px solid rgba(91,157,255,.3); color: var(--text); line-height: 1.5;
+  }
+  .banner b { color: var(--accent); }
+
+  .kpi { display: flex; gap: .9em; }
+  .kpi .card { flex: 1; text-align: center; padding: .5em .4em; }
+  .kpi .big { font-size: 1.32em; font-weight: 700; color: var(--accent); font-family: var(--mono); }
+  .kpi .big.g { color: var(--accent2); }
+  .kpi .big.w { color: var(--warn); }
+  .kpi .big.r { color: var(--bad); }
+  .kpi .lbl { color: var(--muted); font-size: .78em; margin-top: .2em; line-height: 1.3; }
+
+  /* ---- 上下文结构条 ---- */
+  .ctxbar { display: flex; height: 3em; border-radius: 9px; overflow: hidden; border: 1px solid var(--card-border); }
+  .seg { display: flex; flex-direction: column; justify-content: center; align-items: center; gap: .1em; min-width: 0; padding: 0 .3em; }
+  .seg .nm { font-size: .78em; font-weight: 700; white-space: nowrap; }
+  .seg .sz { font-family: var(--mono); font-size: .72em; opacity: .85; white-space: nowrap; }
+  .seg.static { background: rgba(79,214,167,.16); border-right: 1px solid var(--card-border); color: #bef2de; }
+  .seg.user   { background: rgba(79,214,167,.10); border-right: 1px solid var(--card-border); color: #bef2de; }
+  .seg.query  { background: rgba(255,107,107,.2); border-right: 1px solid var(--card-border); color: #ffc9c9; }
+  .seg.uat    { background: rgba(91,157,255,.13); color: #cfe0ff; }
+  .seg.uat + .seg.uat { border-left: 1px dashed rgba(91,157,255,.35); }
+  .ctxnote { display: flex; margin-top: .3em; font-size: .72em; color: var(--muted); }
+  .boltline { position: relative; height: 1.5em; margin-top: .15em; }
+  .bolt {
+    position: absolute; top: 0; font-size: .74em; color: var(--bad); white-space: nowrap; font-weight: 600;
+  }
+
+  /* ---- loop 解剖胶囊 ---- */
+  .caps { display: flex; align-items: center; gap: .32em; flex-wrap: nowrap; min-width: 0; }
+  .chip {
+    border-radius: 999px; padding: .28em .6em; font-size: .76em; white-space: nowrap;
+    border: 1px solid var(--card-border); background: var(--card); color: var(--text); font-family: var(--mono);
+  }
+  .chip.u { border-color: rgba(91,157,255,.55); color: var(--accent); }
+  .chip.a { border-color: rgba(255,255,255,.3); }
+  .chip.t { border-color: rgba(79,214,167,.55); color: var(--accent2); }
+  .chip.req { border-color: rgba(255,180,84,.6); color: var(--warn); background: rgba(255,180,84,.07); font-weight: 700; }
+  .arr { color: var(--muted); font-size: .82em; flex: none; }
+  .capnote { font-size: .74em; color: var(--muted); line-height: 1.45; margin-top: .4em; }
+  .capnote b { color: var(--text); }
+
+  /* ---- 逐轮账目双条 ---- */
+  .qledger { display: flex; flex-direction: column; gap: .52em; }
+  .qgroup { display: flex; align-items: center; gap: .6em; }
+  .qgroup .qlb { flex: none; width: 3.4em; font-family: var(--mono); font-size: .8em; color: var(--text); font-weight: 700; text-align: right; }
+  .qgroup .bars { flex: 1; display: flex; flex-direction: column; gap: .18em; min-width: 0; }
+  .brow { display: flex; align-items: center; gap: .45em; }
+  .brow .track { flex: 1; height: .95em; border-radius: 4px; background: rgba(255,255,255,.045); position: relative; min-width: 0; }
+  .brow .bar { position: absolute; inset: 0 auto 0 0; border-radius: 4px; }
+  .brow .bar.bad { background: linear-gradient(90deg, rgba(255,107,107,.75), rgba(255,107,107,.4)); }
+  .brow .bar.ok  { background: linear-gradient(90deg, rgba(79,214,167,.8), rgba(79,214,167,.45)); }
+  .brow .v { flex: none; width: 3em; font-family: var(--mono); font-size: .72em; color: var(--muted); white-space: nowrap; }
+  .qgroup .save { flex: none; width: 5.4em; text-align: center; }
+  .qgroup .save .pct { font-family: var(--mono); font-weight: 700; font-size: .92em; color: var(--accent2); }
+  .qgroup .save .sk { font-size: .66em; color: var(--muted); }
+
+  table { border-collapse: collapse; width: 100%; font-size: .86em; }
+  th, td { text-align: left; padding: .38em .55em; border-bottom: 1px solid var(--card-border); }
+  th { color: var(--accent); font-weight: 600; white-space: nowrap; }
+  td { color: var(--muted); line-height: 1.4; }
+  td b { color: var(--text); }
+
+  .footer {
+    margin-top: auto; padding-top: .5em; display: flex;
+    justify-content: space-between; color: var(--muted); font-size: .76em; gap: 1em;
+  }
+
+  .nav {
+    position: absolute; bottom: 3.5%; right: 3.2%;
+    display: flex; gap: .5em; align-items: center; z-index: 10;
+    font-size: clamp(9.5px, min(1.08vw, 1.92vh), 22px);
+  }
+  .nav button {
+    background: var(--card); border: 1px solid var(--card-border); color: var(--text);
+    border-radius: 8px; width: 2.2em; height: 2.2em; cursor: pointer; font-size: 1em;
+  }
+  .nav button:hover { border-color: var(--accent); color: var(--accent); }
+  .nav .pg { color: var(--muted); font-family: var(--mono); font-size: .9em; padding: 0 .4em; }
+  .dots { position: absolute; bottom: 4.2%; left: 3.2%; display: flex; gap: .45em; z-index: 10; }
+  .dots i { width: .55em; height: .55em; border-radius: 50%; background: rgba(255,255,255,.18); cursor: pointer; }
+  .dots i.on { background: var(--accent); }
+</style>
+</head>
+<body>
+<div class="deck">
+
+<!-- ============ P1 上下文长什么样,缓存从哪断 ============ -->
+<section class="slide active">
+  <h2><span class="num">01</span>一次请求的上下文长什么样,<span class="hl">缓存从哪里断掉</span></h2>
+
+  <div class="card" style="margin-bottom:.7em;">
+    <h3>上下文结构与长度(按前缀顺序,示意第 3 轮 query 时,总量 ~46K)</h3>
+    <div class="ctxbar">
+      <div class="seg static" style="flex:20;"><span class="nm">静态不变</span><span class="sz">20K:系统提示+工具全集</span></div>
+      <div class="seg user" style="flex:3;"><span class="nm">用户相关</span><span class="sz">3K</span></div>
+      <div class="seg query" style="flex:8;"><span class="nm">query相关 ⚡</span><span class="sz">8K:检索skill+知识</span></div>
+      <div class="seg uat" style="flex:5;"><span class="nm">轮1</span><span class="sz">5K</span></div>
+      <div class="seg uat" style="flex:5;"><span class="nm">轮2</span><span class="sz">5K</span></div>
+      <div class="seg uat" style="flex:5;"><span class="nm">轮3…</span><span class="sz">5K/轮</span></div>
+    </div>
+    <div class="boltline">
+      <div class="bolt" style="left:41%;">⚡ 每个新 query 到来,这 8K 被整体重写 → 缓存从此断裂,其后 UAT 历史全部重新计算</div>
+    </div>
+    <div class="ctxnote">
+      <span style="flex:23; color:var(--accent2);">◀ 稳定命中(静态全网共享 + 用户级会话内不变)</span>
+      <span style="flex:8; color:var(--bad);">重写点</span>
+      <span style="flex:15; color:var(--accent);">追加式历史,本可命中,却被前面 8K 连累 ▶</span>
+    </div>
+  </div>
+
+  <div class="row grow">
+    <div class="card" style="flex:1.25; display:flex; flex-direction:column;">
+      <h3>一轮 query 内部解剖:默认 2 次模型请求(skill load / 工具调用 / 融合回复,三选二)</h3>
+      <div class="caps" style="margin-top:.4em;">
+        <span class="chip u">U 用户query ~1.5K</span><span class="arr">→</span>
+        <span class="chip req">请求①</span><span class="arr">→</span>
+        <span class="chip a">A 动作1(如 skill load)</span><span class="arr">→</span>
+        <span class="chip t">T 结果 ~2.5K</span>
+      </div>
+      <div class="caps" style="margin-top:.35em;">
+        <span class="arr" style="margin-left:1.2em;">↳</span>
+        <span class="chip req">请求②</span><span class="arr">→</span>
+        <span class="chip a">A 动作2(工具调用 / 融合回复)</span>
+      </div>
+      <div class="capnote">
+        一轮 query 沉淀进历史的 UAT 增量 <b>≈ 5K</b>(U 1.5K + 动作/结果 3.5K)。<br>
+        <b class="good">请求② 是追加式:前缀=请求①的严格超集,天然命中,只算 ~3.5K 新增</b>;<br>
+        <b class="badc">请求①(query 切换点)是 miss 重灾区:8K 重写 + 全部历史被连累重算</b>。
+      </div>
+    </div>
+    <div class="col" style="flex:1;">
+      <div class="card grow">
+        <h3><span class="badc">现状:</span>第 q 轮 query 首请求要重算多少</h3>
+        <p class="mono" style="font-size:.88em; color:var(--text);">8K(重写) + 5K×(q−1)(历史) + 1.5K(新U)</p>
+        <p style="margin-top:.35em;">第 1 轮 12.5K → 第 3 轮 19.5K → <b class="badc">第 5 轮 29.5K</b>,随轮数线性增长——<b>轮数越深,浪费越大</b>。</p>
+      </div>
+      <div class="card grow">
+        <h3><span class="good">目标:</span>query 相关内容下沉进消息流</h3>
+        <p>8K 槽位取消:skill 索引进静态区、正文按需 load(已在 T 中)、检索增量随 U 注入(去重后 ~2K)。前缀变为纯追加,<b class="good">历史全命中,每轮首请求只算 ~3.5K 新增</b>,与轮数无关。</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="banner" style="margin-top:.7em;">一句话:模型每次回答都要把整段上下文重新"读"(prefill)一遍;缓存让读过的部分免于重算,但 <b>query 相关 8K 每轮重写,把它身后的全部历史一起拖下水</b>——这就是推理算力浪费的来源。</div>
+  <div class="footer"><span>KV Cache 收益闭环 · v2</span><span>参数为内部预估:静态 20K / 用户 3K / query 相关 8K / UAT 5K·轮 / 每轮 2 次请求;待实测(文档12)回填修正</span></div>
+</section>
+
+<!-- ============ P2 1~5 轮收益账目 ============ -->
+<section class="slide">
+  <h2><span class="num">02</span>典型 1~5 轮 query 会话的收益账:<span class="hl">轮数越深省得越多</span>,第 5 轮省 79%</h2>
+
+  <div class="kpi" style="margin-bottom:.65em;">
+    <div class="card"><div class="big r">11.8K</div><div class="lbl">现状每请求实际推理量<br>(模型推演值)</div></div>
+    <div class="card"><div class="big w">≈ 12K</div><div class="lbl">现网实测每请求 miss<br><b>模型与实测吻合,参数可信</b></div></div>
+    <div class="card"><div class="big g">3.8K</div><div class="lbl">目标每请求实际推理量<br>只算当轮新增</div></div>
+    <div class="card"><div class="big g">-68%</div><div class="lbl">prefill 计算量<br>(会话 118K → 38K)</div></div>
+  </div>
+
+  <div class="row grow">
+    <div class="card" style="flex:1.35; display:flex; flex-direction:column;">
+      <h3>逐轮实际推理量:<span class="badc">现状(红)</span> vs <span class="good">目标(绿)</span>(每轮 = 首请求 + 1 次 loop 迭代)</h3>
+      <div class="qledger grow" style="justify-content:center; margin-top:.3em;">
+        <div class="qgroup">
+          <span class="qlb">轮1</span>
+          <div class="bars">
+            <div class="brow"><div class="track"><div class="bar bad" style="width:48%;"></div></div><span class="v">16K</span></div>
+            <div class="brow"><div class="track"><div class="bar ok" style="width:30%;"></div></div><span class="v">10K</span></div>
+          </div>
+          <div class="save"><div class="pct">-37%</div><div class="sk">省 6K</div></div>
+        </div>
+        <div class="qgroup">
+          <span class="qlb">轮2</span>
+          <div class="bars">
+            <div class="brow"><div class="track"><div class="bar bad" style="width:55%;"></div></div><span class="v">18K</span></div>
+            <div class="brow"><div class="track"><div class="bar ok" style="width:21%;"></div></div><span class="v">7K</span></div>
+          </div>
+          <div class="save"><div class="pct">-61%</div><div class="sk">省 11K</div></div>
+        </div>
+        <div class="qgroup">
+          <span class="qlb">轮3</span>
+          <div class="bars">
+            <div class="brow"><div class="track"><div class="bar bad" style="width:70%;"></div></div><span class="v">23K</span></div>
+            <div class="brow"><div class="track"><div class="bar ok" style="width:21%;"></div></div><span class="v">7K</span></div>
+          </div>
+          <div class="save"><div class="pct">-70%</div><div class="sk">省 16K</div></div>
+        </div>
+        <div class="qgroup">
+          <span class="qlb">轮4</span>
+          <div class="bars">
+            <div class="brow"><div class="track"><div class="bar bad" style="width:85%;"></div></div><span class="v">28K</span></div>
+            <div class="brow"><div class="track"><div class="bar ok" style="width:21%;"></div></div><span class="v">7K</span></div>
+          </div>
+          <div class="save"><div class="pct">-75%</div><div class="sk">省 21K</div></div>
+        </div>
+        <div class="qgroup">
+          <span class="qlb">轮5</span>
+          <div class="bars">
+            <div class="brow"><div class="track"><div class="bar bad" style="width:100%;"></div></div><span class="v">33K</span></div>
+            <div class="brow"><div class="track"><div class="bar ok" style="width:21%;"></div></div><span class="v">7K</span></div>
+          </div>
+          <div class="save"><div class="pct">-79%</div><div class="sk">省 26K</div></div>
+        </div>
+        <div class="qgroup" style="border-top:1px dashed rgba(255,255,255,.18); padding-top:.45em;">
+          <span class="qlb">累计</span>
+          <div class="bars">
+            <div class="brow"><div class="track"><div class="bar bad" style="width:100%;"></div></div><span class="v badc" style="color:var(--bad);">118K</span></div>
+            <div class="brow"><div class="track"><div class="bar ok" style="width:32%;"></div></div><span class="v good" style="color:var(--accent2);">38K</span></div>
+          </div>
+          <div class="save"><div class="pct">-68%</div><div class="sk">省 80K</div></div>
+        </div>
+      </div>
+    </div>
+    <div class="col" style="flex:1;">
+      <div class="card">
+        <h3>为什么轮数越深省得越多</h3>
+        <p>现状每轮首请求重算 <b class="badc">8K + 5K×(q−1)</b>,历史越长拖累越重;目标每轮只算 <b class="good">~3.5K 新增,与轮数无关</b>。两条线的差距随轮数张开——<b>长会话、重度用户,恰恰省得最多</b>。</p>
+      </div>
+      <div class="card grow">
+        <h3>怎么统计验证(不靠估算)</h3>
+        <table>
+          <tr><th>数据</th><th>来源</th></tr>
+          <tr><td><b>实际推理量</b> = 输入 − 命中</td><td>推理引擎逐请求实报 cached_tokens</td></tr>
+          <tr><td><b>必要推理量</b> = 当轮新增</td><td>应用侧对新增消息记账</td></tr>
+          <tr><td><b>白算量</b> = 实际 − 必要</td><td>改造达标 = 趋近 0,上看板防回退</td></tr>
+          <tr><td><b>收益确认</b></td><td>改造灰度 A/B,同期对比每请求实际推理量</td></tr>
+        </table>
+      </div>
+      <div class="card">
+        <h3>对照:无缓存世界</h3>
+        <p>同一会话若完全无缓存需 prefill <b>~440K</b>;现状 118K(缓存已省 73%),改造后 38K(<b class="good">再省 68%</b>)。</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="banner" style="margin-top:.65em;">结论:按当前预估参数,改造后<b>每请求实际推理量 11.8K → 3.8K(prefill 计算量 −68%)</b>,且轮数越深省得越多(第 5 轮 −79%);模型推演的 11.8K 与现网实测 12K 吻合,账目可信、灰度 A/B 可验证。</div>
+  <div class="footer"><span>KV Cache 收益闭环 · v2</span><span>逐轮=首请求+1次迭代;轮1含会话首次的用户相关3K;静态20K按全网共享命中;实测数据回填后更新</span></div>
+</section>
+
+</div>
+
+<div class="dots" id="dots"></div>
+<div class="nav">
+  <button id="prev">‹</button>
+  <span class="pg" id="pg">1 / 2</span>
+  <button id="next">›</button>
+</div>
+
+<script>
+  const slides = [...document.querySelectorAll('.slide')];
+  const dotsBox = document.getElementById('dots');
+  let cur = 0;
+  slides.forEach((_, i) => {
+    const d = document.createElement('i');
+    if (i === 0) d.classList.add('on');
+    d.onclick = () => go(i);
+    dotsBox.appendChild(d);
+  });
+  const dots = [...dotsBox.children];
+  function go(i) {
+    cur = (i + slides.length) % slides.length;
+    slides.forEach((s, j) => s.classList.toggle('active', j === cur));
+    dots.forEach((d, j) => d.classList.toggle('on', j === cur));
+    document.getElementById('pg').textContent = (cur + 1) + ' / ' + slides.length;
+  }
+  document.getElementById('prev').onclick = () => go(cur - 1);
+  document.getElementById('next').onclick = () => go(cur + 1);
+  document.addEventListener('keydown', e => {
+    if (e.key === 'ArrowRight' || e.key === ' ' || e.key === 'PageDown') go(cur + 1);
+    if (e.key === 'ArrowLeft' || e.key === 'PageUp') go(cur - 1);
+  });
+</script>
+</body>
+</html>

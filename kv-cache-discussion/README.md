@@ -16,6 +16,21 @@
 | [07-分代冻结详解.md](./07-分代冻结详解.md) | 分代冻结机制展开：合并式 vs 堆叠式、时间线算账、字节级冻结的工程陷阱 |
 | [08-量化收益评估.md](./08-量化收益评估.md) | 基于现网基线（输入 37K / 命中 25K / 66%）的收益估算与敏感性分析 |
 | [09-业界Agent-harness缓存实践洞察.md](./09-业界Agent-harness缓存实践洞察.md) | Manus / Claude Code / Anthropic 平台 / Mooncake 的缓存优化实践深度调研与借鉴清单 |
+| [10-细化统计方案与分场景收益.md](./10-细化统计方案与分场景收益.md) | 长期度量体系:请求输入四分解、命中率/结构上限/达成率三层指标、单轮对话/单轮loop/多轮对话分场景收益口径、埋点与三步落地 |
+| [11-收益闭环与统计口径-汇报版.md](./11-收益闭环与统计口径-汇报版.md) | 给领导闭环的版本(无驻留假设):各层长度盘点、多轮对话逐请求账目(现状162K vs 目标45K)、与现网基线互验(-75%/-56%)、两个计数器+验收等式的统计闭环、30秒话术 |
+| [KV-Cache收益闭环.slides.html](./KV-Cache收益闭环.slides.html) | 汇报用 2 页 HTML 幻灯片(基于 11,只用 prefill 计算量口径):P1 钱花在哪+逐请求账目条形图,P2 三级台阶+两个计数器统计闭环 |
+| [12-上下文长度实测需求.md](./12-上下文长度实测需求.md) | 交给内部模型的测量需求:模块定义与识别方法 + token 统计口径 + JSON 输出 schema,用于替换假设值 |
+| [KV-Cache收益闭环.v2.slides.html](./KV-Cache收益闭环.v2.slides.html) | 汇报幻灯片 v2(结构条误将 Tools 并入静态区置前,已被 v3 取代,留档) |
+| [KV-Cache收益闭环.v3.slides.html](./KV-Cache收益闭环.v3.slides.html) | 汇报幻灯片 v3(单页深色,已被 v4 取代,留档) |
+| [KV-Cache收益闭环.v4.slides.html](./KV-Cache收益闭环.v4.slides.html) | 汇报幻灯片 v4(单页浅色,预估参数,已被 v5 取代,留档) |
+| [KV-Cache收益闭环.v5.slides.html](./KV-Cache收益闭环.v5.slides.html) | 汇报幻灯片 v5(单页浅色实测参数,稳态口径,已被 v6 取代,留档) |
+| [KV-Cache收益闭环.v6.slides.html](./KV-Cache收益闭环.v6.slides.html) | 汇报幻灯片 v6(5 页浅色,含 60%/23K 旧基线,已被 v6.1 取代,留档) |
+| [KV-Cache收益闭环.v6.1.slides.html](./KV-Cache收益闭环.v6.1.slides.html) | 汇报幻灯片 v6.1(6 页浅色,业务占比与任务模型旧口径,已被 v6.3 取代,留档) |
+| [KV-Cache收益闭环.v6.3.slides.html](./KV-Cache收益闭环.v6.3.slides.html) | 汇报幻灯片 v6.3(任务页为表格形式且含 preload,已被 v6.4 取代,留档) |
+| [KV-Cache收益闭环.v6.4.slides.html](./KV-Cache收益闭环.v6.4.slides.html) | 汇报幻灯片 v6.4(任务页为纵向全景柱状图,收益不够显性,已被 v6.5 取代,留档) |
+| [KV-Cache收益闭环.v6.5.slides.html](./KV-Cache收益闭环.v6.5.slides.html) | 汇报幻灯片 v6.5(任务页六色横向拆解,颜色过多且未显示命中段与 loop 结构,已被 v6.6 取代,留档) |
+| [KV-Cache收益闭环.v6.6.slides.html](./KV-Cache收益闭环.v6.6.slides.html) | 汇报幻灯片 v6.6(任务页三色图但 loop 行合并、带右栏,已被 v6.7 取代,留档) |
+| [KV-Cache收益闭环.v6.7.slides.html](./KV-Cache收益闭环.v6.7.slides.html) | 汇报幻灯片 v6.7(6 页 · 浅色 · 当前版本,用户query忽略/任务一轮=工具调用+融合回复2次调用/skill随U注入):P2/P3/P4 三页统一为全屏横向 miss 拆解图,每次调用都画现状/目标双条(loop 两根等长=无收益),段标注具体化(动态检索重复注入4K/工具定义4.5K/对话历史UAT/skill正文3K/工具结果3K/webSearch结果10K)+图下段释义;任务加权-68%/问答-55%/闲聊-82%,混合整体-62%(每会话51.7K→19.4K),长会话-74%贡献50%节省 |
 | [上下文工程与KV-Cache优化.slides.html](./上下文工程与KV-Cache优化.slides.html) | 汇报用 HTML 幻灯片 v1（6 页，已被 v2 取代，留档） |
 | [上下文工程与KV-Cache优化.v2.slides.html](./上下文工程与KV-Cache优化.v2.slides.html) | 汇报用 HTML 幻灯片 v2（7 页，已被 v3 取代，留档） |
 | [上下文工程与KV-Cache优化.v3.slides.html](./上下文工程与KV-Cache优化.v3.slides.html) | 汇报用 HTML 幻灯片 v3（7 页，已被 v4 取代，留档） |
