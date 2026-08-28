@@ -32,7 +32,8 @@
 | [KV-Cache收益闭环.v6.6.slides.html](./KV-Cache收益闭环.v6.6.slides.html) | 汇报幻灯片 v6.6(任务页三色图但 loop 行合并、带右栏,已被 v6.7 取代,留档) |
 | [KV-Cache收益闭环.v6.7.slides.html](./KV-Cache收益闭环.v6.7.slides.html) | 汇报幻灯片 v6.7(含"去重"自设口径且目标条只画 miss,已被 v6.8 取代,留档) |
 | [KV-Cache收益闭环.v6.8.slides.html](./KV-Cache收益闭环.v6.8.slides.html) | 汇报幻灯片 v6.8(目标条段序未按真实排布、绿字格式不统一,已被 v6.9 取代,留档) |
-| [KV-Cache收益闭环.v6.9.slides.html](./KV-Cache收益闭环.v6.9.slides.html) | 汇报幻灯片 v6.9(6 页 · 浅色 · 当前版本):P1 重做为全模块基线页(SP/Tools/UAT 三大块七模块表:长度/实测值/变化频率/现状命运/目标处理,UAT历史=跨query沉淀的toolResult+finalAnswer);目标态动态上下文精简为 2K 并按真实排布画在 UAT 尾部(目标条=连续绿前缀+纯蓝追加,即目标架构本身);段名带块前缀(SP·/Tools·/UAT·);绿色段统一"✓命中 XK⋯"格式;公式 ΔS≈7K+H(q);任务-67%/问答-56%/闲聊-81%,混合-62%(每会话 51.6K→19.6K,每调用 16.8K→6.4K),单轮 -45%、长会话 -69% 贡献 46% |
+| [KV-Cache收益闭环.v6.9.slides.html](./KV-Cache收益闭环.v6.9.slides.html) | 汇报幻灯片 v6.9(P1 为纯表格、徽章以比例为主,已被 v7.0 取代,留档) |
+| [KV-Cache收益闭环.v7.0.slides.html](./KV-Cache收益闭环.v7.0.slides.html) | 汇报幻灯片 v7.0(6 页 · 浅色 · 当前版本):P1 重做为"排布迁移对照"(现状/目标双结构条+迁移箭头+五行迁移表,长度/位置/命运均为现状→目标箭头式,点题"真正搬家的只有动态上下文一行");P2 徽章改绝对节省为主数(省7K/15.5K/19K,-41/-76/-79%),Q3 改复用 skill(史更长省更多,率单调上升),场景合计 61.5K→20K(省41.5K,-67%,与轮数加权一致);segnote 加"复用/载入对照"(绝对省相同15.5K,率-76% vs -61%,绝对值是钱);窄段标"UAT·2K"+图例全名;P3/P4 徽章同步绝对值为主;混合整体 -62% 不变 |
 | [上下文工程与KV-Cache优化.slides.html](./上下文工程与KV-Cache优化.slides.html) | 汇报用 HTML 幻灯片 v1（6 页，已被 v2 取代，留档） |
 | [上下文工程与KV-Cache优化.v2.slides.html](./上下文工程与KV-Cache优化.v2.slides.html) | 汇报用 HTML 幻灯片 v2（7 页，已被 v3 取代，留档） |
 | [上下文工程与KV-Cache优化.v3.slides.html](./上下文工程与KV-Cache优化.v3.slides.html) | 汇报用 HTML 幻灯片 v3（7 页，已被 v4 取代，留档） |
