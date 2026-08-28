@@ -34,7 +34,8 @@
 | [KV-Cache收益闭环.v6.8.slides.html](./KV-Cache收益闭环.v6.8.slides.html) | 汇报幻灯片 v6.8(目标条段序未按真实排布、绿字格式不统一,已被 v6.9 取代,留档) |
 | [KV-Cache收益闭环.v6.9.slides.html](./KV-Cache收益闭环.v6.9.slides.html) | 汇报幻灯片 v6.9(P1 为纯表格、徽章以比例为主,已被 v7.0 取代,留档) |
 | [KV-Cache收益闭环.v7.0.slides.html](./KV-Cache收益闭环.v7.0.slides.html) | 汇报幻灯片 v7.0(徽章绝对值为主、比例弱化,已被 v7.1 取代,留档) |
-| [KV-Cache收益闭环.v7.1.slides.html](./KV-Cache收益闭环.v7.1.slides.html) | 汇报幻灯片 v7.1(6 页 · 浅色 · 当前版本):在 v7.0 基础上徽章改为"双主数"——绝对节省与比例两行同等字重(如 省15.5K / -76%),公式推导(=7+史8.5)从徽章撤除、仅保留在段释义与 P6;第三行小注仅在有增量信息处保留(首轮"其余首次必算"、问答"10K检索必算"、合计"与轮数加权一致"等);其余同 v7.0(P1 迁移对照、Q3 复用、UAT·2K 标注、混合 -62%) |
+| [KV-Cache收益闭环.v7.1.slides.html](./KV-Cache收益闭环.v7.1.slides.html) | 汇报幻灯片 v7.1(双主数徽章、含15K触顶口径,已被 v7.2 取代,留档) |
+| [KV-Cache收益闭环.v7.2.slides.html](./KV-Cache收益闭环.v7.2.slides.html) | 汇报幻灯片 v7.2(7 页 · 浅色 · 当前版本):①去掉 15K/60K 触顶限制(理想化假设,P1 注明与实测 15K 差异源于现网裁剪);②命名全篇统一 Q(P3/P4 行名、P6 分桶 1Q~6Q+);③新增 P5"按 Q 序号加权收益"页(Q1~Q5 逐位账目 + Qn 公式 ΔS(n)≈7K+6.1K×(n−1),目标态恒 ~7.5K/轮);④P2 备注无 skill 首轮(省同 7K,-58%,占比待回填);问答 Q3 40K→12K(-70%)、加权 -68%,任务加权 -69%,闲聊 -81%,混合整体 -69%(每会话 64.2K→19.6K),6Q+ 会话占 51% 算力贡献 58% 节省 |
 | [上下文工程与KV-Cache优化.slides.html](./上下文工程与KV-Cache优化.slides.html) | 汇报用 HTML 幻灯片 v1（6 页，已被 v2 取代，留档） |
 | [上下文工程与KV-Cache优化.v2.slides.html](./上下文工程与KV-Cache优化.v2.slides.html) | 汇报用 HTML 幻灯片 v2（7 页，已被 v3 取代，留档） |
 | [上下文工程与KV-Cache优化.v3.slides.html](./上下文工程与KV-Cache优化.v3.slides.html) | 汇报用 HTML 幻灯片 v3（7 页，已被 v4 取代，留档） |
