@@ -31,7 +31,8 @@
 | [KV-Cache收益闭环.v6.5.slides.html](./KV-Cache收益闭环.v6.5.slides.html) | 汇报幻灯片 v6.5(任务页六色横向拆解,颜色过多且未显示命中段与 loop 结构,已被 v6.6 取代,留档) |
 | [KV-Cache收益闭环.v6.6.slides.html](./KV-Cache收益闭环.v6.6.slides.html) | 汇报幻灯片 v6.6(任务页三色图但 loop 行合并、带右栏,已被 v6.7 取代,留档) |
 | [KV-Cache收益闭环.v6.7.slides.html](./KV-Cache收益闭环.v6.7.slides.html) | 汇报幻灯片 v6.7(含"去重"自设口径且目标条只画 miss,已被 v6.8 取代,留档) |
-| [KV-Cache收益闭环.v6.8.slides.html](./KV-Cache收益闭环.v6.8.slides.html) | 汇报幻灯片 v6.8(6 页 · 浅色 · 当前版本):①白算段原长度转绿——现状/目标条同位对照,工具定义与对话历史 UAT 红转绿、长度不变;②口径修正:动态上下文每轮固定 4.5K(skills3+memory1+device0.5)全量重写,目标方案 SP 预置高频 skill description、available 只放引用(3K→1K,注入 2.5K/轮);③参数更新 skill 正文 5K/工具结果 3K/融合回复 0.5K/webSearch 10K;公式 ΔS≈6.5K+H(q);任务-65%/问答-54%/闲聊-77%,混合-60%(每会话 51.6K→20.8K),单轮会话也有 -41% |
+| [KV-Cache收益闭环.v6.8.slides.html](./KV-Cache收益闭环.v6.8.slides.html) | 汇报幻灯片 v6.8(目标条段序未按真实排布、绿字格式不统一,已被 v6.9 取代,留档) |
+| [KV-Cache收益闭环.v6.9.slides.html](./KV-Cache收益闭环.v6.9.slides.html) | 汇报幻灯片 v6.9(6 页 · 浅色 · 当前版本):P1 重做为全模块基线页(SP/Tools/UAT 三大块七模块表:长度/实测值/变化频率/现状命运/目标处理,UAT历史=跨query沉淀的toolResult+finalAnswer);目标态动态上下文精简为 2K 并按真实排布画在 UAT 尾部(目标条=连续绿前缀+纯蓝追加,即目标架构本身);段名带块前缀(SP·/Tools·/UAT·);绿色段统一"✓命中 XK⋯"格式;公式 ΔS≈7K+H(q);任务-67%/问答-56%/闲聊-81%,混合-62%(每会话 51.6K→19.6K,每调用 16.8K→6.4K),单轮 -45%、长会话 -69% 贡献 46% |
 | [上下文工程与KV-Cache优化.slides.html](./上下文工程与KV-Cache优化.slides.html) | 汇报用 HTML 幻灯片 v1（6 页，已被 v2 取代，留档） |
 | [上下文工程与KV-Cache优化.v2.slides.html](./上下文工程与KV-Cache优化.v2.slides.html) | 汇报用 HTML 幻灯片 v2（7 页，已被 v3 取代，留档） |
 | [上下文工程与KV-Cache优化.v3.slides.html](./上下文工程与KV-Cache优化.v3.slides.html) | 汇报用 HTML 幻灯片 v3（7 页，已被 v4 取代，留档） |

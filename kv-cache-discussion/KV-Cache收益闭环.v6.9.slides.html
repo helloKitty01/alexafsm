@@ -1,0 +1,717 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>KV Cache 收益闭环 · v6.9(浅色 · 全模块基线 · 分业务详析)</title>
+<style>
+  :root {
+    --bg: #e9edf4;
+    --slide-bg: linear-gradient(135deg, #ffffff 0%, #f7f9fd 60%, #eef3fb 100%);
+    --card: #f7f9fc;
+    --card-border: #dfe5ee;
+    --text: #1f2a3d;
+    --muted: #5c6b84;
+    --accent: #2563eb;
+    --good: #059669;
+    --warn: #d97706;
+    --bad: #dc2626;
+    --mono: "SF Mono", "JetBrains Mono", Consolas, "Courier New", monospace;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { background: var(--bg); height: 100%; }
+  body {
+    font-family: "PingFang SC", "Microsoft YaHei", "Noto Sans SC", -apple-system, sans-serif;
+    color: var(--text);
+    display: flex; justify-content: center; align-items: center;
+    padding: 16px 12px; min-height: 100vh;
+  }
+  .deck { position: relative; width: min(96vw, calc((100vh - 32px) * 1.7778)); }
+  .slide {
+    width: 100%;
+    aspect-ratio: 16 / 9;
+    background: var(--slide-bg);
+    border: 1px solid var(--card-border);
+    border-radius: 18px;
+    box-shadow: 0 18px 50px rgba(31,42,61,.16);
+    padding: 2% 2.8%;
+    display: none; flex-direction: column;
+    overflow: hidden; position: relative;
+    font-size: clamp(9.5px, min(1.08vw, 1.92vh), 22px);
+  }
+  .slide.active { display: flex; }
+  .slide::before {
+    content: ""; position: absolute; inset: 0 0 auto 0; height: 5px;
+    background: linear-gradient(90deg, var(--accent), var(--good));
+    border-radius: 18px 18px 0 0;
+  }
+  h2 { font-size: 1.28em; font-weight: 700; margin-bottom: .38em; }
+  h2 .hl { color: var(--accent); }
+  h2 .num { color: var(--muted); font-weight: 600; margin-right: .4em; font-size: .78em; }
+  .card {
+    background: var(--card); border: 1px solid var(--card-border);
+    border-radius: 12px; padding: .68em .88em;
+    overflow: hidden;
+  }
+  .card h3 { font-size: .93em; margin-bottom: .34em; color: var(--text); }
+  .card p, .card li { color: var(--muted); font-size: .83em; line-height: 1.46; }
+  .card li { margin-left: 1.15em; margin-bottom: .24em; }
+  .card b { color: var(--text); font-weight: 700; }
+  .goodc { color: var(--good) !important; }
+  .warnc { color: var(--warn) !important; }
+  .badc { color: var(--bad) !important; }
+  .mono { font-family: var(--mono); }
+
+  .row { display: flex; gap: .78em; min-height: 0; }
+  .col { display: flex; flex-direction: column; gap: .58em; min-width: 0; }
+  .grow { flex: 1; min-height: 0; min-width: 0; }
+
+  .banner {
+    border-radius: 10px; padding: .44em .92em; font-size: .87em;
+    background: linear-gradient(90deg, rgba(37,99,235,.08), rgba(5,150,105,.07));
+    border: 1px solid rgba(37,99,235,.28); color: var(--text); line-height: 1.44;
+  }
+  .banner b { color: var(--accent); }
+
+  .kpi { display: flex; gap: .78em; }
+  .kpi .card { flex: 1; text-align: center; padding: .4em .32em; }
+  .kpi .big { font-size: 1.2em; font-weight: 700; color: var(--accent); font-family: var(--mono); }
+  .kpi .big.g { color: var(--good); }
+  .kpi .big.w { color: var(--warn); }
+  .kpi .big.r { color: var(--bad); }
+  .kpi .lbl { color: var(--muted); font-size: .7em; margin-top: .14em; line-height: 1.3; }
+  .kpi .lbl b { color: var(--text); }
+
+  table { border-collapse: collapse; width: 100%; font-size: .78em; }
+  th, td { text-align: left; padding: .3em .45em; border-bottom: 1px solid var(--card-border); }
+  th { color: var(--accent); font-weight: 700; white-space: nowrap; }
+  td { color: var(--muted); line-height: 1.35; }
+  td b { color: var(--text); }
+  td.blk { font-weight: 700; color: var(--text); white-space: nowrap; }
+
+  /* 轮数分布 */
+  .dist { display: flex; flex-direction: column; gap: .26em; }
+  .drow { display: flex; align-items: center; gap: .5em; }
+  .drow .dl { flex: none; width: 3.4em; font-family: var(--mono); font-size: .72em; color: var(--text); font-weight: 700; text-align: right; }
+  .drow .track { flex: 1; height: .85em; border-radius: 4px; background: #eceff5; position: relative; }
+  .drow .bar { position: absolute; inset: 0 auto 0 0; border-radius: 4px; background: linear-gradient(90deg, rgba(37,99,235,.65), rgba(37,99,235,.35)); }
+  .drow .dv { flex: none; width: 2.8em; font-family: var(--mono); font-size: .7em; color: var(--muted); }
+
+  /* 结构条 + 区标尺 */
+  .ruler { display: flex; height: 1.15em; margin-bottom: .18em; gap: 2px; }
+  .ruler .rseg { display: flex; align-items: center; justify-content: center; font-size: .62em; font-weight: 700; color: var(--muted); border-bottom: 2px solid #b9c4d6; }
+  .ctxbar { display: flex; height: 2.5em; border-radius: 8px; overflow: hidden; border: 1px solid var(--card-border); }
+  .seg { display: flex; flex-direction: column; justify-content: center; align-items: center; gap: .05em; min-width: 0; padding: 0 .2em; }
+  .seg .nm { font-size: .66em; font-weight: 700; white-space: nowrap; }
+  .seg .sz { font-family: var(--mono); font-size: .6em; opacity: .9; white-space: nowrap; }
+  .seg.static { background: rgba(5,150,105,.13); border-right: 1px solid var(--card-border); color: #065f46; }
+  .seg.query  { background: rgba(220,38,38,.16); border-right: 1px solid var(--card-border); color: #991b1b; }
+  .seg.tools  { background: rgba(217,119,6,.16); border-right: 1px solid var(--card-border); color: #92400e; }
+  .seg.uat    { background: rgba(37,99,235,.10); color: #1e40af; }
+  .boltline { position: relative; height: 1.2em; margin-top: .08em; }
+  .bolt { position: absolute; top: 0; font-size: .66em; color: var(--bad); white-space: nowrap; font-weight: 700; }
+
+  /* 胶囊流 */
+  .caps { display: flex; align-items: center; gap: .26em; flex-wrap: wrap; min-width: 0; row-gap: .35em; }
+  .chip {
+    border-radius: 999px; padding: .2em .5em; font-size: .68em; white-space: nowrap;
+    border: 1px solid var(--card-border); background: #fff; color: var(--text); font-family: var(--mono);
+  }
+  .chip.u { border-color: rgba(37,99,235,.5); color: var(--accent); }
+  .chip.a { border-color: #c3ccda; }
+  .chip.t { border-color: rgba(5,150,105,.5); color: var(--good); }
+  .chip.req { border-color: rgba(217,119,6,.55); color: var(--warn); background: rgba(217,119,6,.07); font-weight: 700; }
+  .chip.sim { border-style: dashed; }
+  .arr { color: var(--muted); font-size: .74em; flex: none; }
+
+  /* 横向 miss 拆解图 */
+  .mchart { flex: 1; display: flex; flex-direction: column; justify-content: space-evenly; gap: .55em; min-height: 0; margin-top: .35em; }
+  .mgrp { display: flex; align-items: center; gap: .65em; }
+  .mgrp .glb { flex: none; width: 6.6em; text-align: right; line-height: 1.3; }
+  .mgrp .glb .t1 { font-size: .78em; font-weight: 700; color: var(--text); display: block; }
+  .mgrp .glb .t2 { font-size: .6em; color: var(--muted); display: block; }
+  .mgrp .bars2 { flex: 1; display: flex; flex-direction: column; gap: .22em; min-width: 0; }
+  .hb { display: flex; align-items: center; gap: .45em; }
+  .hb .who { flex: none; width: 4.2em; font-size: .62em; color: var(--muted); text-align: right; white-space: nowrap; }
+  .hb .htrack { flex: 1; height: 1.4em; border-radius: 5px; background: #eceff5; display: flex; overflow: hidden; }
+  .hb .hv { flex: none; width: 4.2em; font-family: var(--mono); font-size: .68em; white-space: nowrap; }
+  .hseg { height: 100%; display: flex; align-items: center; justify-content: center; overflow: hidden; flex: none; }
+  .hseg + .hseg { border-left: 1px solid rgba(255,255,255,.85); }
+  .hseg span { font-size: .62em; white-space: nowrap; color: #fff; font-weight: 700; text-shadow: 0 1px 2px rgba(0,0,0,.3); }
+  .hseg.gh { background: rgba(5,150,105,.68); }
+  .hseg.gh.fix { border-right: 2px dashed #fff; }
+  .hseg.wr { background: rgba(220,38,38,.85); }
+  .hseg.nw { background: rgba(37,99,235,.8); }
+  .hb.loopr .htrack { opacity: .85; }
+  .mgrp .mbadge { flex: none; width: 5em; text-align: center; }
+  .mgrp .mbadge .pv { font-family: var(--mono); font-weight: 800; font-size: 1.1em; color: var(--good); }
+  .mgrp .mbadge .pl { font-size: .58em; color: var(--muted); line-height: 1.3; }
+  .mlegend { display: flex; gap: .9em; font-size: .66em; color: var(--muted); flex-wrap: wrap; margin-top: .35em; }
+  .mlegend i { display: inline-block; width: .82em; height: .55em; border-radius: 3px; margin-right: .24em; }
+  .mlegend .l-gh i { background: rgba(5,150,105,.68); }
+  .mlegend .l-wr i { background: rgba(220,38,38,.85); }
+  .mlegend .l-nw i { background: rgba(37,99,235,.8); }
+  .segnote { font-size: .66em; color: var(--muted); line-height: 1.5; margin-top: .3em; }
+  .segnote b { color: var(--text); }
+
+  .footer {
+    margin-top: auto; padding-top: .35em; display: flex;
+    justify-content: space-between; color: var(--muted); font-size: .66em; gap: 1em;
+  }
+
+  .nav {
+    position: absolute; bottom: 3.2%; right: 3%;
+    display: flex; gap: .5em; align-items: center; z-index: 10;
+    font-size: clamp(9.5px, min(1.08vw, 1.92vh), 22px);
+  }
+  .nav button {
+    background: #fff; border: 1px solid var(--card-border); color: var(--text);
+    border-radius: 8px; width: 2.1em; height: 2.1em; cursor: pointer; font-size: 1em;
+  }
+  .nav button:hover { border-color: var(--accent); color: var(--accent); }
+  .nav .pg { color: var(--muted); font-family: var(--mono); font-size: .88em; padding: 0 .35em; }
+  .dots { position: absolute; bottom: 3.9%; left: 3%; display: flex; gap: .42em; z-index: 10; }
+  .dots i { width: .52em; height: .52em; border-radius: 50%; background: #c9d2e0; cursor: pointer; }
+  .dots i.on { background: var(--accent); }
+</style>
+</head>
+<body>
+<div class="deck">
+
+<!-- ============ P1 全模块基线 ============ -->
+<section class="slide active">
+  <h2><span class="num">01</span>上下文全景基线:<span class="hl">SP / Tools / UAT 三大块、七个模块</span>,每个模块的长度·频率·缓存命运·目标处理</h2>
+  <div class="kpi" style="margin-bottom:.5em;">
+    <div class="card"><div class="big">38.5K</div><div class="lbl">平均每次调用<b>输入</b>(实测)<br>模型推演 ≈39K ✓</div></div>
+    <div class="card"><div class="big r">16.8K</div><div class="lbl"><b>现状</b>每调用实际推理量(推演)<br>命中率 ~57%,与粗测 60% 互证</div></div>
+    <div class="card"><div class="big g">6.4K</div><div class="lbl"><b>目标</b>每调用实际推理量<br>只算当轮新增(动态上下文 2K 起)</div></div>
+    <div class="card"><div class="big g">-62%</div><div class="lbl"><b>整体 prefill 节省</b>(轮数×业务加权)<br>分业务账见 P2–P4,轮数账见 P5</div></div>
+  </div>
+  <div class="row grow">
+    <div class="card" style="flex:1.45; display:flex; flex-direction:column;">
+      <h3>全模块基线表(所有后续测算的输入,实测值可直接核对)</h3>
+      <table style="margin-top:.25em;">
+        <tr><th>大块</th><th>模块</th><th>基线</th><th>实测值</th><th>变化频率</th><th>现状缓存命运</th><th>目标态处理</th></tr>
+        <tr><td class="blk" rowspan="3">SP</td><td><b>system prompt</b></td><td>25K</td><td class="mono">25929</td><td>静态·全网相同</td><td class="goodc">命中</td><td>不变;<b>+预置 10 个高频 skill desc ~2K</b></td></tr>
+        <tr><td><b>user.md</b></td><td>0.5K</td><td class="mono">313</td><td>用户级·会话内静态</td><td class="goodc">命中</td><td>不变</td></tr>
+        <tr><td><b>动态上下文</b>(skills 3K + memory 1K + device 0.5K)</td><td><b class="badc">4.5K</b></td><td class="mono">2877-3565 / — / 259-310</td><td><b class="badc">每轮 query 全量重写</b></td><td class="badc">白算,且连带其后一切</td><td><b>精简为 2K,下沉 UAT 随 U 进入</b></td></tr>
+        <tr><td class="blk">Tools</td><td><b>工具定义</b>(schema 全集)</td><td>4.5K</td><td class="mono">4413</td><td>静态</td><td class="badc">被连带白算</td><td class="goodc">转命中(前缀纯静态)</td></tr>
+        <tr><td class="blk" rowspan="3">UAT</td><td><b>对话历史</b>(跨 query 沉淀的 toolResult + finalAnswer)</td><td>≤15K</td><td class="mono">样本 7184-13453</td><td>追加,触顶裁剪</td><td class="badc">被连带白算</td><td class="goodc">转命中(append-only)</td></tr>
+        <tr><td><b>当轮新内容</b>:skill 正文 / 工具结果 / webSearch 结果</td><td>5K / 3K / 10K</td><td>—</td><td>每轮新产生</td><td>新增·必算</td><td>新增·必算(指针化可再压)</td></tr>
+        <tr><td><b>融合回复</b>(finalAnswer)</td><td>0.5K</td><td>—</td><td>decode 产物</td><td>不占 prefill,进沉淀</td><td>同左</td></tr>
+      </table>
+      <p style="margin-top:.35em;">头部合计 34.5K(SP 30K + Tools 4.5K)+ history 平均 ~4K ≈ 实测输入 38.5K ✓;<b>现状每轮首调白算 = 动态上下文 4.5K 重写 + 连带的 Tools 4.5K + 全部对话历史</b>。</p>
+    </div>
+    <div class="col" style="flex:1;">
+      <div class="card">
+        <h3>物理排布与断裂点(现状)</h3>
+        <div class="ruler">
+          <div class="rseg" style="flex:30;">SP 30K</div>
+          <div class="rseg" style="flex:4.5;">Tools</div>
+          <div class="rseg" style="flex:15;">UAT ≤15K</div>
+        </div>
+        <div class="ctxbar">
+          <div class="seg static" style="flex:25.5;"><span class="nm">固定 25.5K</span><span class="sz">sp+user.md</span></div>
+          <div class="seg query" style="flex:4.5;"><span class="nm">动态⚡4.5K</span></div>
+          <div class="seg tools" style="flex:4.5;"><span class="nm">工具定义</span></div>
+          <div class="seg uat" style="flex:15;"><span class="nm">对话历史(toolResult+回复)</span></div>
+        </div>
+        <div class="boltline"><div class="bolt" style="left:34%;">⚡ 每轮重写 → 其后 Tools + UAT 全部重算</div></div>
+      </div>
+      <div class="card grow">
+        <h3>流量画像</h3>
+        <div class="dist" style="margin-top:.25em;">
+          <div class="drow"><span class="dl">1 轮</span><div class="track"><div class="bar" style="width:100%;"></div></div><span class="dv">51%</span></div>
+          <div class="drow"><span class="dl">2 轮</span><div class="track"><div class="bar" style="width:39%;"></div></div><span class="dv">20%</span></div>
+          <div class="drow"><span class="dl">3 轮</span><div class="track"><div class="bar" style="width:18%;"></div></div><span class="dv">9%</span></div>
+          <div class="drow"><span class="dl">4 轮</span><div class="track"><div class="bar" style="width:11%;"></div></div><span class="dv">5.5%</span></div>
+          <div class="drow"><span class="dl">5 轮</span><div class="track"><div class="bar" style="width:7%;"></div></div><span class="dv">3.5%</span></div>
+          <div class="drow"><span class="dl">6 轮+</span><div class="track"><div class="bar" style="width:22%;"></div></div><span class="dv">11%</span></div>
+        </div>
+        <p style="margin-top:.35em;">平均 ~2.4 轮;业务占比 <b>问答 47% / 闲聊 28% / 任务 25%</b>(归一化)。任务 2 调用/轮,问答与闲聊 1 调用/轮;沉淀:任务首轮 8.5K、后续 3.5K,问答 ~10.5K,闲聊 ~1K。</p>
+      </div>
+    </div>
+  </div>
+  <div class="banner" style="margin-top:.5em;">读法:上表是全部测算的<b>唯一参数源</b>——每个模块多长(实测)、多久变一次、现状是什么命运、目标态怎么处理;P2–P4 的每根条形都由这张表拼出,埋点上线后逐格替换为实测。</div>
+  <div class="footer"><span>KV Cache 收益闭环 · v6.9 · P1 全模块基线</span><span>轮数分布 51/20/9/5.5/3.5/11(6+按8轮);命中侧推演待实测校准;skills 引用若压到 0.5K 每轮再省 0.5K</span></div>
+</section>
+
+<!-- ============ P2 任务 ============ -->
+<section class="slide">
+  <h2><span class="num">02</span>任务型(占 25%)三 query 账目:<span class="hl">白算原长度转绿、同位对照</span>——现状 66.5K → 目标 25K</h2>
+  <div class="card" style="margin-bottom:.5em; padding:.45em .85em;">
+    <div class="caps">
+      <span style="font-size:.74em; color:var(--text); font-weight:700; margin-right:.2em;">一轮 = 2 次调用:</span>
+      <span class="chip u">U + 动态上下文(含 skill 正文 5K)</span><span class="arr">→</span>
+      <span class="chip req">调①</span><span class="arr">→</span>
+      <span class="chip a">A 工具调用</span><span class="arr">→</span>
+      <span class="chip t">T 工具结果 3K</span><span class="arr">→</span>
+      <span class="chip req">调②</span><span class="arr">→</span>
+      <span class="chip a">A 融合回复 0.5K</span>
+      <span style="font-size:.66em; color:var(--muted); margin-left:.5em;"><b>skill 已在史时模型自行判断、不重复注入</b>(Q2 复用 S1)</span>
+    </div>
+  </div>
+  <div class="card grow" style="display:flex; flex-direction:column;">
+    <div class="row" style="align-items:center;">
+      <h3 style="margin-bottom:0;">逐调用拆解:目标条按真实排布(绿色前缀连续,动态上下文移入 UAT 尾部追加)</h3>
+      <div class="mlegend" style="margin-top:0; margin-left:auto;">
+        <span class="l-gh"><i></i>命中(免费复用)</span>
+        <span class="l-wr"><i></i>白算(改造后转绿/精简)</span>
+        <span class="l-nw"><i></i>新增(必须算)</span>
+      </div>
+    </div>
+    <div class="mchart">
+      <div class="mgrp">
+        <span class="glb"><span class="t1">Q1 · 载入 S1</span><span class="t2">首轮 · 输入~40K</span></span>
+        <div class="bars2">
+          <div class="hb"><span class="who">调① 现状</span><div class="htrack">
+            <div class="hseg gh fix" style="width:13%;"><span>✓命中 25.5K⋯</span></div>
+            <div class="hseg wr" style="width:15.1%;"><span>SP·动态上下文 4.5K</span></div>
+            <div class="hseg wr" style="width:15.1%;"><span>Tools·工具定义 4.5K</span></div>
+            <div class="hseg nw" style="width:16.7%;"><span>UAT·skill 正文 5K</span></div>
+          </div><span class="hv badc">miss 14K</span></div>
+          <div class="hb"><span class="who">调① 目标</span><div class="htrack">
+            <div class="hseg gh fix" style="width:13%;"><span>✓命中 27.5K⋯</span></div>
+            <div class="hseg gh" style="width:15.1%;"><span>Tools 4.5K 转命中</span></div>
+            <div class="hseg nw" style="width:6.7%;"><span>2K</span></div>
+            <div class="hseg nw" style="width:16.7%;"><span>UAT·skill 正文 5K</span></div>
+          </div><span class="hv goodc">7K</span></div>
+          <div class="hb loopr"><span class="who">调② 现状</span><div class="htrack">
+            <div class="hseg gh fix" style="width:13%;"><span>✓命中 ~40K⋯</span></div>
+            <div class="hseg nw" style="width:10%;"><span>UAT·工具结果 3K</span></div>
+          </div><span class="hv">3K</span></div>
+          <div class="hb loopr"><span class="who">调② 目标</span><div class="htrack">
+            <div class="hseg gh fix" style="width:13%;"><span>✓命中 ~40K⋯</span></div>
+            <div class="hseg nw" style="width:10%;"><span>UAT·工具结果 3K</span></div>
+          </div><span class="hv">3K(相同)</span></div>
+        </div>
+        <span class="mbadge"><span class="pv">-41%</span><span class="pl">轮合计<br>17→10K</span></span>
+      </div>
+      <div class="mgrp">
+        <span class="glb"><span class="t1">Q2 · 复用 S1</span><span class="t2">不重复注入 · 输入~47K</span></span>
+        <div class="bars2">
+          <div class="hb"><span class="who">调① 现状</span><div class="htrack">
+            <div class="hseg gh fix" style="width:13%;"><span>✓命中 25.5K⋯</span></div>
+            <div class="hseg wr" style="width:15.1%;"><span>SP·动态上下文 4.5K</span></div>
+            <div class="hseg wr" style="width:15.1%;"><span>Tools·工具定义 4.5K</span></div>
+            <div class="hseg wr" style="width:28.4%;"><span>UAT·对话历史 8.5K</span></div>
+          </div><span class="hv badc">miss 17.5K</span></div>
+          <div class="hb"><span class="who">调① 目标</span><div class="htrack">
+            <div class="hseg gh fix" style="width:13%;"><span>✓命中 27.5K⋯</span></div>
+            <div class="hseg gh" style="width:15.1%;"><span>Tools 4.5K 转命中</span></div>
+            <div class="hseg gh" style="width:28.4%;"><span>UAT·对话历史 8.5K 转命中</span></div>
+            <div class="hseg nw" style="width:6.7%;"><span>2K</span></div>
+          </div><span class="hv goodc">2K</span></div>
+          <div class="hb loopr"><span class="who">调② 现状</span><div class="htrack">
+            <div class="hseg gh fix" style="width:13%;"><span>✓命中 ~47K⋯</span></div>
+            <div class="hseg nw" style="width:10%;"><span>UAT·工具结果 3K</span></div>
+          </div><span class="hv">3K</span></div>
+          <div class="hb loopr"><span class="who">调② 目标</span><div class="htrack">
+            <div class="hseg gh fix" style="width:13%;"><span>✓命中 ~47K⋯</span></div>
+            <div class="hseg nw" style="width:10%;"><span>UAT·工具结果 3K</span></div>
+          </div><span class="hv">3K(相同)</span></div>
+        </div>
+        <span class="mbadge"><span class="pv">-76%</span><span class="pl">轮合计 20.5→5K<br>省 = 7+史8.5</span></span>
+      </div>
+      <div class="mgrp">
+        <span class="glb"><span class="t1">Q3 · 载入新 S2</span><span class="t2">输入~53K</span></span>
+        <div class="bars2">
+          <div class="hb"><span class="who">调① 现状</span><div class="htrack">
+            <div class="hseg gh fix" style="width:13%;"><span>✓命中 25.5K⋯</span></div>
+            <div class="hseg wr" style="width:15.1%;"><span>SP·动态上下文 4.5K</span></div>
+            <div class="hseg wr" style="width:15.1%;"><span>Tools·工具定义 4.5K</span></div>
+            <div class="hseg wr" style="width:40.2%;"><span>UAT·对话历史 12K</span></div>
+            <div class="hseg nw" style="width:16.7%;"><span>UAT·skill 正文 5K</span></div>
+          </div><span class="hv badc">miss 26K</span></div>
+          <div class="hb"><span class="who">调① 目标</span><div class="htrack">
+            <div class="hseg gh fix" style="width:13%;"><span>✓命中 27.5K⋯</span></div>
+            <div class="hseg gh" style="width:15.1%;"><span>Tools 4.5K 转命中</span></div>
+            <div class="hseg gh" style="width:40.2%;"><span>UAT·对话历史 12K 转命中</span></div>
+            <div class="hseg nw" style="width:6.7%;"><span>2K</span></div>
+            <div class="hseg nw" style="width:16.7%;"><span>UAT·skill 正文 5K</span></div>
+          </div><span class="hv goodc">7K</span></div>
+          <div class="hb loopr"><span class="who">调② 现状</span><div class="htrack">
+            <div class="hseg gh fix" style="width:13%;"><span>✓命中 ~53K⋯</span></div>
+            <div class="hseg nw" style="width:10%;"><span>UAT·工具结果 3K</span></div>
+          </div><span class="hv">3K</span></div>
+          <div class="hb loopr"><span class="who">调② 目标</span><div class="htrack">
+            <div class="hseg gh fix" style="width:13%;"><span>✓命中 ~53K⋯</span></div>
+            <div class="hseg nw" style="width:10%;"><span>UAT·工具结果 3K</span></div>
+          </div><span class="hv">3K(相同)</span></div>
+        </div>
+        <span class="mbadge"><span class="pv">-66%</span><span class="pl">轮合计 29→10K<br>省 = 7+史12</span></span>
+      </div>
+      <div class="mgrp" style="border-top:1px dashed #cbd4e1; padding-top:.4em;">
+        <span class="glb"><span class="t1">会话合计</span><span class="t2">6 次调用</span></span>
+        <div class="bars2">
+          <div class="hb"><span class="who">现状</span><div class="htrack">
+            <div class="hseg gh fix" style="width:13%;"><span>✓命中⋯</span></div>
+            <div class="hseg wr" style="width:54.3%;"><span>白算 41.5K(动态上下文精简 7.5 + 工具定义 13.5 + 对话历史 20.5)</span></div>
+            <div class="hseg nw" style="width:32.7%;"><span>必须算 25K</span></div>
+          </div><span class="hv badc">miss 66.5K</span></div>
+          <div class="hb"><span class="who">目标</span><div class="htrack">
+            <div class="hseg gh fix" style="width:13%;"><span>✓命中⋯</span></div>
+            <div class="hseg gh" style="width:44.5%;"><span>转命中 34K(工具定义 13.5 + 对话历史 20.5)</span></div>
+            <div class="hseg nw" style="width:32.7%;"><span>必须算 25K(动态 6 + skill 10 + 工具结果 9)</span></div>
+          </div><span class="hv goodc">25K</span></div>
+        </div>
+        <span class="mbadge"><span class="pv">-62%</span><span class="pl">省 41.5K<br>轮数加权 -67%</span></span>
+      </div>
+    </div>
+    <p class="segnote"><b>段释义</b>:SP·动态上下文 = available skills 3K + memory 1K + device_info 0.5K,现状每轮全量重写(红);目标态精简为 2K(SP 预置高频 skill desc、available 只放引用)并<b>下沉到 UAT 尾部随 U 追加</b>(蓝,窄段);Tools·工具定义稳定却被连带(目标转命中);UAT·对话历史 = 跨 query 沉淀的 toolResult + finalAnswer,未变却重算(目标转命中);skill 正文 5K / 工具结果 3K = 本轮新内容;融合回复 0.5K 只进沉淀。<b>每 query 节省 ≈ 7K + 对话历史(动态精简 2.5 + 工具定义 4.5 + UAT);loop 两根等长 = 无收益也无需收益。轮数加权:52.2→17.3K/会话,-67%。</b></p>
+  </div>
+  <div class="footer"><span>KV Cache 收益闭环 · v6.9 · P2 任务(25%)</span><span>绿色固定段压缩显示(数值为实际命中量);转命中段与白算段按原长度同位对照;Q 行 26K 满刻度、合计行 66.5K;沉淀:首轮 8.5K、后续 3.5K,上限 15K</span></div>
+</section>
+
+<!-- ============ P3 问答 ============ -->
+<section class="slide">
+  <h2><span class="num">03</span>问答型(占 47%,流量最大):<span class="hl">webSearch 结果 10K 是新增底线</span>——封顶 -65%,加权 -56%</h2>
+  <div class="card" style="margin-bottom:.5em; padding:.45em .85em;">
+    <div class="caps">
+      <span style="font-size:.74em; color:var(--text); font-weight:700; margin-right:.2em;">一轮 = 1 次调用:</span>
+      <span class="chip u">U + 动态上下文</span><span class="arr">+</span>
+      <span class="chip a sim">模拟A webSearch call</span><span class="arr">→</span>
+      <span class="chip t sim">模拟T 检索结果 10K</span><span class="arr">→</span>
+      <span class="chip req">调①</span><span class="arr">→</span>
+      <span class="chip a">A 融合回复 0.5K</span>
+      <span style="font-size:.66em; color:var(--muted); margin-left:.5em;">检索结果留史(沉淀 ~10.5K/轮,很快触顶 15K)</span>
+    </div>
+  </div>
+  <div class="card grow" style="display:flex; flex-direction:column;">
+    <div class="row" style="align-items:center;">
+      <h3 style="margin-bottom:0;">逐轮拆解(每轮 1 次调用,现状/目标同位对照)</h3>
+      <div class="mlegend" style="margin-top:0; margin-left:auto;">
+        <span class="l-gh"><i></i>命中(免费复用)</span>
+        <span class="l-wr"><i></i>白算(改造后转绿/精简)</span>
+        <span class="l-nw"><i></i>新增(必须算)</span>
+      </div>
+    </div>
+    <div class="mchart">
+      <div class="mgrp">
+        <span class="glb"><span class="t1">轮 1</span><span class="t2">首轮 · 输入~45K</span></span>
+        <div class="bars2">
+          <div class="hb"><span class="who">现状</span><div class="htrack">
+            <div class="hseg gh fix" style="width:13%;"><span>✓命中 25.5K⋯</span></div>
+            <div class="hseg wr" style="width:11.5%;"><span>SP·动态上下文 4.5K</span></div>
+            <div class="hseg wr" style="width:11.5%;"><span>Tools·工具定义 4.5K</span></div>
+            <div class="hseg nw" style="width:25.6%;"><span>UAT·webSearch 结果 10K</span></div>
+          </div><span class="hv badc">miss 19K</span></div>
+          <div class="hb"><span class="who">目标</span><div class="htrack">
+            <div class="hseg gh fix" style="width:13%;"><span>✓命中 27.5K⋯</span></div>
+            <div class="hseg gh" style="width:11.5%;"><span>Tools 4.5K 转命中</span></div>
+            <div class="hseg nw" style="width:5.1%;"><span>2K</span></div>
+            <div class="hseg nw" style="width:25.6%;"><span>UAT·webSearch 结果 10K</span></div>
+          </div><span class="hv goodc">12K</span></div>
+        </div>
+        <span class="mbadge"><span class="pv">-37%</span><span class="pl">10K 检索必算</span></span>
+      </div>
+      <div class="mgrp">
+        <span class="glb"><span class="t1">轮 2</span><span class="t2">输入~56K</span></span>
+        <div class="bars2">
+          <div class="hb"><span class="who">现状</span><div class="htrack">
+            <div class="hseg gh fix" style="width:13%;"><span>✓命中 25.5K⋯</span></div>
+            <div class="hseg wr" style="width:11.5%;"><span>SP·动态上下文 4.5K</span></div>
+            <div class="hseg wr" style="width:11.5%;"><span>Tools·工具定义 4.5K</span></div>
+            <div class="hseg wr" style="width:26.9%;"><span>UAT·对话历史 10.5K</span></div>
+            <div class="hseg nw" style="width:25.6%;"><span>UAT·webSearch 结果 10K</span></div>
+          </div><span class="hv badc">miss 29.5K</span></div>
+          <div class="hb"><span class="who">目标</span><div class="htrack">
+            <div class="hseg gh fix" style="width:13%;"><span>✓命中 27.5K⋯</span></div>
+            <div class="hseg gh" style="width:11.5%;"><span>Tools 4.5K 转命中</span></div>
+            <div class="hseg gh" style="width:26.9%;"><span>UAT·对话历史 10.5K 转命中</span></div>
+            <div class="hseg nw" style="width:5.1%;"><span>2K</span></div>
+            <div class="hseg nw" style="width:25.6%;"><span>UAT·webSearch 结果 10K</span></div>
+          </div><span class="hv goodc">12K</span></div>
+        </div>
+        <span class="mbadge"><span class="pv">-59%</span><span class="pl">省 17.5K<br>= 7+史10.5</span></span>
+      </div>
+      <div class="mgrp">
+        <span class="glb"><span class="t1">轮 3+</span><span class="t2">history 触顶 · 输入~60K</span></span>
+        <div class="bars2">
+          <div class="hb"><span class="who">现状</span><div class="htrack">
+            <div class="hseg gh fix" style="width:13%;"><span>✓命中 25.5K⋯</span></div>
+            <div class="hseg wr" style="width:11.5%;"><span>SP·动态上下文 4.5K</span></div>
+            <div class="hseg wr" style="width:11.5%;"><span>Tools·工具定义 4.5K</span></div>
+            <div class="hseg wr" style="width:38.4%;"><span>UAT·对话历史 15K(触顶)</span></div>
+            <div class="hseg nw" style="width:25.6%;"><span>UAT·webSearch 结果 10K</span></div>
+          </div><span class="hv badc">miss 34K</span></div>
+          <div class="hb"><span class="who">目标</span><div class="htrack">
+            <div class="hseg gh fix" style="width:13%;"><span>✓命中 27.5K⋯</span></div>
+            <div class="hseg gh" style="width:11.5%;"><span>Tools 4.5K 转命中</span></div>
+            <div class="hseg gh" style="width:38.4%;"><span>UAT·对话历史 15K 转命中</span></div>
+            <div class="hseg nw" style="width:5.1%;"><span>2K</span></div>
+            <div class="hseg nw" style="width:25.6%;"><span>UAT·webSearch 结果 10K</span></div>
+          </div><span class="hv goodc">12K</span></div>
+        </div>
+        <span class="mbadge"><span class="pv">-65%</span><span class="pl">稳态<br>省 22K/轮</span></span>
+      </div>
+      <div class="mgrp" style="border-top:1px dashed #cbd4e1; padding-top:.4em;">
+        <span class="glb"><span class="t1">轮数加权</span><span class="t2">每会话均值</span></span>
+        <div class="bars2">
+          <div class="hb"><span class="who">现状</span><div class="htrack">
+            <div class="hseg gh fix" style="width:13%;"><span>✓命中⋯</span></div>
+            <div class="hseg wr" style="width:48.3%;"><span>白算 36.8K</span></div>
+            <div class="hseg nw" style="width:38.7%;"><span>必须算 29.5K</span></div>
+          </div><span class="hv badc">66.3K</span></div>
+          <div class="hb"><span class="who">目标</span><div class="htrack">
+            <div class="hseg gh fix" style="width:13%;"><span>✓命中⋯</span></div>
+            <div class="hseg gh" style="width:40.7%;"><span>转命中 ~31K(工具定义 + 对话历史)</span></div>
+            <div class="hseg nw" style="width:38.7%;"><span>必须算 29.5K</span></div>
+          </div><span class="hv goodc">29.5K</span></div>
+        </div>
+        <span class="mbadge"><span class="pv">-56%</span><span class="pl">按 P1 轮数<br>分布加权</span></span>
+      </div>
+    </div>
+    <p class="segnote"><b>段释义</b>同 P2(UAT·对话历史 = 跨 query 沉淀的 webSearch 结果 + finalAnswer)。问答收益两段式:排布改造消灭白算(封顶 -65%);<b>webSearch 结果 10K 是每轮新增底线,占目标态 12K 的 83%</b>——再降靠结构性手段:① 检索结果落盘+指针化,只注入高相关段(10K→3~5K,稳态可再降至 ~-80%);② 裁剪时检索结果退化为可 re-fetch 指针(问答是 history 触顶的主要制造者)。问答占流量 47%,<b>绝对节省量三类之最(稳态每轮省 22K)</b>。</p>
+  </div>
+  <div class="footer"><span>KV Cache 收益闭环 · v6.9 · P3 问答(47%)</span><span>比例尺:轮行 34K 满刻度,加权行 66.3K;沉淀 ~10.5K/轮(webSearch 10 + 回复 0.5),上限 15K</span></div>
+</section>
+
+<!-- ============ P4 闲聊 ============ -->
+<section class="slide">
+  <h2><span class="num">04</span>闲聊型(占 28%):<span class="hl">新内容仅动态上下文 2K,现状纯白算</span>——多轮 -80% 以上,加权 -81%</h2>
+  <div class="card" style="margin-bottom:.5em; padding:.45em .85em;">
+    <div class="caps">
+      <span style="font-size:.74em; color:var(--text); font-weight:700; margin-right:.2em;">一轮 = 1 次调用:</span>
+      <span class="chip u">U + 动态上下文</span><span class="arr">→</span>
+      <span class="chip req">调①</span><span class="arr">→</span>
+      <span class="chip a">A 融合回复 0.5K</span>
+      <span style="font-size:.66em; color:var(--muted); margin-left:.5em;">当轮无工具/检索,沉淀 ~1K/轮——<b class="badc">现状却每轮重算 9~13K</b></span>
+    </div>
+  </div>
+  <div class="card grow" style="display:flex; flex-direction:column;">
+    <div class="row" style="align-items:center;">
+      <h3 style="margin-bottom:0;">逐轮拆解(每轮 1 次调用,现状/目标同位对照)</h3>
+      <div class="mlegend" style="margin-top:0; margin-left:auto;">
+        <span class="l-gh"><i></i>命中(免费复用)</span>
+        <span class="l-wr"><i></i>白算(改造后转绿/精简)</span>
+        <span class="l-nw"><i></i>新增(必须算)</span>
+      </div>
+    </div>
+    <div class="mchart">
+      <div class="mgrp">
+        <span class="glb"><span class="t1">轮 1</span><span class="t2">首轮 · 输入~35K</span></span>
+        <div class="bars2">
+          <div class="hb"><span class="who">现状</span><div class="htrack">
+            <div class="hseg gh fix" style="width:13%;"><span>✓命中 25.5K⋯</span></div>
+            <div class="hseg wr" style="width:30.1%;"><span>SP·动态上下文 4.5K</span></div>
+            <div class="hseg wr" style="width:30.1%;"><span>Tools·工具定义 4.5K</span></div>
+          </div><span class="hv badc">miss 9K</span></div>
+          <div class="hb"><span class="who">目标</span><div class="htrack">
+            <div class="hseg gh fix" style="width:13%;"><span>✓命中 27.5K⋯</span></div>
+            <div class="hseg gh" style="width:30.1%;"><span>Tools 4.5K 转命中</span></div>
+            <div class="hseg nw" style="width:13.4%;"><span>动态上下文 2K</span></div>
+          </div><span class="hv goodc">2K</span></div>
+        </div>
+        <span class="mbadge"><span class="pv">-78%</span><span class="pl">动态精简 +<br>工具定义转命中</span></span>
+      </div>
+      <div class="mgrp">
+        <span class="glb"><span class="t1">轮 2</span><span class="t2">输入~36K</span></span>
+        <div class="bars2">
+          <div class="hb"><span class="who">现状</span><div class="htrack">
+            <div class="hseg gh fix" style="width:13%;"><span>✓命中 25.5K⋯</span></div>
+            <div class="hseg wr" style="width:30.1%;"><span>SP·动态上下文 4.5K</span></div>
+            <div class="hseg wr" style="width:30.1%;"><span>Tools·工具定义 4.5K</span></div>
+            <div class="hseg wr" style="width:6.7%;"><span>1K</span></div>
+          </div><span class="hv badc">miss 10K</span></div>
+          <div class="hb"><span class="who">目标</span><div class="htrack">
+            <div class="hseg gh fix" style="width:13%;"><span>✓命中 27.5K⋯</span></div>
+            <div class="hseg gh" style="width:30.1%;"><span>Tools 4.5K 转命中</span></div>
+            <div class="hseg gh" style="width:6.7%;"><span>1K</span></div>
+            <div class="hseg nw" style="width:13.4%;"><span>动态上下文 2K</span></div>
+          </div><span class="hv goodc">2K</span></div>
+        </div>
+        <span class="mbadge"><span class="pv">-80%</span><span class="pl">省 8K<br>= 7+史1</span></span>
+      </div>
+      <div class="mgrp">
+        <span class="glb"><span class="t1">轮 3</span><span class="t2">输入~37K</span></span>
+        <div class="bars2">
+          <div class="hb"><span class="who">现状</span><div class="htrack">
+            <div class="hseg gh fix" style="width:13%;"><span>✓命中 25.5K⋯</span></div>
+            <div class="hseg wr" style="width:30.1%;"><span>SP·动态上下文 4.5K</span></div>
+            <div class="hseg wr" style="width:30.1%;"><span>Tools·工具定义 4.5K</span></div>
+            <div class="hseg wr" style="width:13.4%;"><span>UAT·历史 2K</span></div>
+          </div><span class="hv badc">miss 11K</span></div>
+          <div class="hb"><span class="who">目标</span><div class="htrack">
+            <div class="hseg gh fix" style="width:13%;"><span>✓命中 27.5K⋯</span></div>
+            <div class="hseg gh" style="width:30.1%;"><span>Tools 4.5K 转命中</span></div>
+            <div class="hseg gh" style="width:13.4%;"><span>UAT·历史 2K</span></div>
+            <div class="hseg nw" style="width:13.4%;"><span>动态上下文 2K</span></div>
+          </div><span class="hv goodc">2K</span></div>
+        </div>
+        <span class="mbadge"><span class="pv">-82%</span><span class="pl">花 11K 算力<br>答一句闲聊</span></span>
+      </div>
+      <div class="mgrp">
+        <span class="glb"><span class="t1">轮 5</span><span class="t2">输入~39K</span></span>
+        <div class="bars2">
+          <div class="hb"><span class="who">现状</span><div class="htrack">
+            <div class="hseg gh fix" style="width:13%;"><span>✓命中 25.5K⋯</span></div>
+            <div class="hseg wr" style="width:30.1%;"><span>SP·动态上下文 4.5K</span></div>
+            <div class="hseg wr" style="width:30.1%;"><span>Tools·工具定义 4.5K</span></div>
+            <div class="hseg wr" style="width:26.8%;"><span>UAT·对话历史 4K</span></div>
+          </div><span class="hv badc">miss 13K</span></div>
+          <div class="hb"><span class="who">目标</span><div class="htrack">
+            <div class="hseg gh fix" style="width:13%;"><span>✓命中 27.5K⋯</span></div>
+            <div class="hseg gh" style="width:30.1%;"><span>Tools 4.5K 转命中</span></div>
+            <div class="hseg gh" style="width:26.8%;"><span>UAT·对话历史 4K</span></div>
+            <div class="hseg nw" style="width:13.4%;"><span>动态上下文 2K</span></div>
+          </div><span class="hv goodc">2K</span></div>
+        </div>
+        <span class="mbadge"><span class="pv">-85%</span><span class="pl">省 11K<br>= 7+史4</span></span>
+      </div>
+      <div class="mgrp" style="border-top:1px dashed #cbd4e1; padding-top:.4em;">
+        <span class="glb"><span class="t1">轮数加权</span><span class="t2">每会话均值</span></span>
+        <div class="bars2">
+          <div class="hb"><span class="who">现状</span><div class="htrack">
+            <div class="hseg gh fix" style="width:13%;"><span>✓命中⋯</span></div>
+            <div class="hseg wr" style="width:70.8%;"><span>白算 21.4K</span></div>
+            <div class="hseg nw" style="width:16.2%;"><span>必须算 4.9K</span></div>
+          </div><span class="hv badc">26.3K</span></div>
+          <div class="hb"><span class="who">目标</span><div class="htrack">
+            <div class="hseg gh fix" style="width:13%;"><span>✓命中⋯</span></div>
+            <div class="hseg gh" style="width:54.2%;"><span>转命中 ~16K(工具定义 + 对话历史)</span></div>
+            <div class="hseg nw" style="width:16.2%;"><span>必须算 4.9K</span></div>
+          </div><span class="hv goodc">4.9K</span></div>
+        </div>
+        <span class="mbadge"><span class="pv">-81%</span><span class="pl">按 P1 轮数<br>分布加权</span></span>
+      </div>
+    </div>
+    <p class="segnote"><b>段释义</b>同 P2(UAT·对话历史 = 跨 query 沉淀的 finalAnswer 为主)。闲聊每轮唯一要付的就是动态上下文 2K,现状却重算 9~13K——<b>白算占比三类最高,降幅最大(-81%)</b>;但上下文短、占比 28%,绝对贡献居中(见 P5)。<b>时延视角:闲聊用户期待"秒回",轮 3 现算 11K→2K,首 token 等待的 prefill 部分 -82%,体验感知最强。</b></p>
+  </div>
+  <div class="footer"><span>KV Cache 收益闭环 · v6.9 · P4 闲聊(28%)</span><span>比例尺:轮行 15K 满刻度,加权行 26.3K;沉淀 ~1K/轮(回复 0.5 + 增量)</span></div>
+</section>
+
+<!-- ============ P5 轮数收益账 ============ -->
+<section class="slide">
+  <h2><span class="num">05</span>轮数维度收益账:<span class="hl">51% 的单轮会话贡献 11% 节省,11% 的长会话贡献 46%</span></h2>
+  <div class="row grow">
+    <div class="card" style="flex:1.3; display:flex; flex-direction:column;">
+      <h3>按轮数分桶的收益与贡献(业务 47/28/25 加权,每会话 prefill)</h3>
+      <table style="margin-top:.3em; font-size:.8em;">
+        <tr><th>会话轮数</th><th>会话占比</th><th>现状/会话</th><th>目标/会话</th><th>节省率</th><th>占现状算力</th><th>占总节省</th></tr>
+        <tr><td><b>1 轮</b></td><td>51%</td><td>15.7K</td><td>8.7K</td><td>-45%</td><td>15%</td><td><b>11%</b></td></tr>
+        <tr><td><b>2 轮</b></td><td>20%</td><td>37.5K</td><td>16.2K</td><td>-57%</td><td>15%</td><td>13%</td></tr>
+        <tr><td><b>3 轮</b></td><td>9%</td><td>62.6K</td><td>23.6K</td><td>-62%</td><td>11%</td><td>11%</td></tr>
+        <tr><td><b>4 轮</b></td><td>5.5%</td><td>88.6K</td><td>31.1K</td><td>-65%</td><td>9%</td><td>10%</td></tr>
+        <tr><td><b>5 轮</b></td><td>3.5%</td><td>115K</td><td>38.5K</td><td>-67%</td><td>8%</td><td>8%</td></tr>
+        <tr><td><b>6 轮+</b></td><td>11%</td><td>195.8K</td><td>60.9K</td><td><b class="goodc">-69%</b></td><td><b>42%</b></td><td><b class="goodc">46%</b></td></tr>
+        <tr><td><b>合计</b></td><td>100%</td><td><b>均 51.6K</b></td><td><b>均 19.6K</b></td><td><b class="goodc">-62%</b></td><td>100%</td><td>100%</td></tr>
+      </table>
+      <p style="margin-top:.4em;">节省率随轮数单调上升(-45% → -69%):轮数越深,对话历史越长,"动态上下文重写拖累全部历史"的代价越大;动态上下文精简(4.5→2K)让<b>单轮会话也有 -45% 的实感收益</b>。</p>
+    </div>
+    <div class="col" style="flex:1;">
+      <div class="card grow">
+        <h3>三个占比的对照:会话数 vs 算力 vs 节省</h3>
+        <div class="mchart" style="flex:none; margin-top:.3em; gap:.4em;">
+          <div class="mgrp">
+            <span class="glb"><span class="t1">1 轮</span><span class="t2">轻用户</span></span>
+            <div class="bars2">
+              <div class="hb"><span class="who">会话数</span><div class="htrack"><div class="hseg nw" style="width:100%;"><span>51%</span></div></div><span class="hv">51%</span></div>
+              <div class="hb"><span class="who">算力</span><div class="htrack"><div class="hseg wr" style="width:29%;"><span>15%</span></div></div><span class="hv">15%</span></div>
+              <div class="hb"><span class="who">节省</span><div class="htrack"><div class="hseg gh" style="width:22%;"><span>11%</span></div></div><span class="hv">11%</span></div>
+            </div>
+            <span class="mbadge"></span>
+          </div>
+          <div class="mgrp">
+            <span class="glb"><span class="t1">6 轮+</span><span class="t2">重度用户</span></span>
+            <div class="bars2">
+              <div class="hb"><span class="who">会话数</span><div class="htrack"><div class="hseg nw" style="width:22%;"><span>11%</span></div></div><span class="hv">11%</span></div>
+              <div class="hb"><span class="who">算力</span><div class="htrack"><div class="hseg wr" style="width:82%;"><span>42%</span></div></div><span class="hv">42%</span></div>
+              <div class="hb"><span class="who">节省</span><div class="htrack"><div class="hseg gh" style="width:90%;"><span>46%</span></div></div><span class="hv">46%</span></div>
+            </div>
+            <span class="mbadge"></span>
+          </div>
+        </div>
+        <p style="margin-top:.4em;"><b>收益天然集中在算力烧得最多的地方</b>:2 轮及以上的 49% 会话贡献 89% 的节省——精准打击长会话的浪费;动态上下文精简则普惠所有会话。</p>
+      </div>
+      <div class="card">
+        <h3>对单轮会话的正确预期</h3>
+        <p>单轮会话 -45% 的构成:动态上下文精简 2.5K + 工具定义解除连带 4.5K,均为每轮固定收益;改善同时体现在<b>时延</b>(首调用现算量下降)与总量。</p>
+      </div>
+    </div>
+  </div>
+  <div class="banner" style="margin-top:.55em;">读法:轮数分布把整体节省定格在 <b>-62%</b>;<b>长会话(重度用户)节省 -69%,是成本和体验痛点所在</b>;动态上下文精简让单轮轻用户也获得 -45% 的成本与首响应改善。</div>
+  <div class="footer"><span>KV Cache 收益闭环 · v6.9 · P5 轮数收益账</span><span>口径:业务占比 问答47/闲聊28/任务25(归一化);轮数分布与业务类型独立近似;6轮+按 8 轮建模</span></div>
+</section>
+
+<!-- ============ P6 汇总 ============ -->
+<section class="slide">
+  <h2><span class="num">06</span>整体收益与统计闭环:<span class="hl">prefill 与 TTFT 约降 62%</span>,每格数字可验证</h2>
+  <div class="kpi" style="margin-bottom:.55em;">
+    <div class="card"><div class="big g">-56%</div><div class="lbl"><b>问答</b>(47%)每会话 66.3K→29.5K<br>检索指针化可再降至 ~-80%</div></div>
+    <div class="card"><div class="big g">-81%</div><div class="lbl"><b>闲聊</b>(28%)每会话 26.3K→4.9K<br>时延体验第一受益者</div></div>
+    <div class="card"><div class="big g">-67%</div><div class="lbl"><b>任务</b>(25%)每会话 52.2K→17.3K<br>止血项另有增益</div></div>
+    <div class="card"><div class="big g">-62%</div><div class="lbl"><b>混合整体</b>:每会话 51.6K→19.6K<br>每调用 16.8K→6.4K</div></div>
+  </div>
+  <div class="row grow">
+    <div class="col" style="flex:1.05;">
+      <div class="card grow">
+        <h3>收益结构一页话(给领导的三句)</h3>
+        <ul>
+          <li><b>钱省在哪</b>:整体 -62%;长会话(11%)节省 -69%、贡献近一半节省额;动态上下文精简普惠全部会话(单轮也 -45%);</li>
+          <li><b>体验好在哪</b>:TTFT ∝ 现算量,稳态轮次首调用闲聊 -82% / 任务 -89%(Q2 调① 17.5→2K)/ 问答 -65%,越深的对话提速越明显;</li>
+          <li><b>还能更好</b>:两个放大器不在 -62% 内——device_info 止血(loop 若确在断,实际节省更大)、检索结果指针化(问答 -56%→~-80%)。</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>改造动作(对应收益来源)</h3>
+        <p>① 动态上下文(skills/memory/device)下沉 UAT 随 U 追加 → 消灭每轮重写连带;② <b>SP 预置 10 个高频 skill desc,available 只放引用 + memory/device 优化:4.5K→2K</b>;③ 工具定义解除连带(前缀纯静态);④ 裁剪改造:攒批 + 指针化;⑤ device_info 每 query 采样、loop 内冻结。</p>
+      </div>
+    </div>
+    <div class="col" style="flex:1;">
+      <div class="card grow">
+        <h3>统计闭环:怎么证明(不靠估算)</h3>
+        <table>
+          <tr><th>动作</th><th>说明</th></tr>
+          <tr><td><b>① 引擎实报</b></td><td>逐调用透传 cached_tokens → 实际推理量 = 输入 − 命中</td></tr>
+          <tr><td><b>② 应用记账</b></td><td>当轮新增 tokenize 计数 → 必要推理量;白算量 = ①−②,验收 = 归零</td></tr>
+          <tr><td><b>③ 四维打标</b></td><td>业务类型 × 调用类型(首调/loop)× 轮次 × 会话——P2–P5 每格数字直接可验</td></tr>
+          <tr><td><b>④ 灰度 A/B</b></td><td>同期同流量对比每调用实际推理量与 TTFT</td></tr>
+        </table>
+        <p style="margin-top:.35em;">第一周产出:实测替换本版推演基线(含命中率真实值,校准此前粗测的 ~60%)。</p>
+      </div>
+      <div class="card">
+        <h3>待回填/待确认(影响精度,不影响方向)</h3>
+        <p>① prefill 吞吐(时延换算绝对秒数);② device_info 刷新时机;③ skills 引用最终压到 1K 还是 0.5K(后者每轮再省 0.5K);④ 6 轮+ 会话轮数均值(现按 8)。</p>
+      </div>
+    </div>
+  </div>
+  <div class="banner" style="margin-top:.55em;">结论:按全模块实测基线与真实流量分布(轮数 × 业务 47/28/25),<b>排布改造 + 动态上下文精简使 prefill 算力与首 token 时延整体约降 62%</b>;长会话 -69%、闲聊稳态 -82%;叠加止血与指针化还有上行空间。<b>全部数字由"引擎实报 + 应用记账 + 四维打标 + 灰度 A/B"闭环验证。</b></div>
+  <div class="footer"><span>KV Cache 收益闭环 · v6.9 · P6 汇总</span><span>基线:P1;任务:P2;问答:P3;闲聊:P4;轮数账:P5;公式:每 query 节省 ≈ 7K + 对话历史(动态精简 2.5 + 工具定义 4.5 + UAT)</span></div>
+</section>
+
+</div>
+
+<div class="dots" id="dots"></div>
+<div class="nav">
+  <button id="prev">‹</button>
+  <span class="pg" id="pg">1 / 6</span>
+  <button id="next">›</button>
+</div>
+
+<script>
+  const slides = [...document.querySelectorAll('.slide')];
+  const dotsBox = document.getElementById('dots');
+  let cur = 0;
+  slides.forEach((_, i) => {
+    const d = document.createElement('i');
+    if (i === 0) d.classList.add('on');
+    d.onclick = () => go(i);
+    dotsBox.appendChild(d);
+  });
+  const dots = [...dotsBox.children];
+  function go(i) {
+    cur = (i + slides.length) % slides.length;
+    slides.forEach((s, j) => s.classList.toggle('active', j === cur));
+    dots.forEach((d, j) => d.classList.toggle('on', j === cur));
+    document.getElementById('pg').textContent = (cur + 1) + ' / ' + slides.length;
+  }
+  document.getElementById('prev').onclick = () => go(cur - 1);
+  document.getElementById('next').onclick = () => go(cur + 1);
+  document.addEventListener('keydown', e => {
+    if (e.key === 'ArrowRight' || e.key === ' ' || e.key === 'PageDown') go(cur + 1);
+    if (e.key === 'ArrowLeft' || e.key === 'PageUp') go(cur - 1);
+  });
+</script>
+</body>
+</html>
