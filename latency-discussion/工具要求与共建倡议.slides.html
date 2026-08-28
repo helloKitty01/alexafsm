@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>共建低时延工具生态：问题、要求与建议</title>
+<style>
+  :root {
+    --bg: #e9eef6;
+    --slide-bg: linear-gradient(135deg, #ffffff 0%, #f8fbfe 55%, #f2f7fd 100%);
+    --card: #ffffff;
+    --card-border: #dfe6f0;
+    --text: #1e2a3d;
+    --muted: #5a6b84;
+    --accent: #2f6fed;
+    --accent2: #0ea578;
+    --warn: #d97a06;
+    --danger: #d0453c;
+    --purple: #7c5cd6;
+    --code-bg: #f3f6fb;
+    --code-text: #24405f;
+    --mono: "SF Mono", "JetBrains Mono", Consolas, "Courier New", monospace;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { background: var(--bg); }
+  body {
+    font-family: "PingFang SC", "Microsoft YaHei", "Noto Sans SC", -apple-system, sans-serif;
+    color: var(--text);
+    display: flex; justify-content: center; align-items: flex-start;
+    padding: 28px 16px; min-height: 100vh;
+  }
+  .slide {
+    width: min(1280px, 96vw);
+    aspect-ratio: 16 / 9;
+    background: var(--slide-bg);
+    border: 1px solid var(--card-border);
+    border-radius: 18px;
+    box-shadow: 0 18px 44px rgba(30,42,61,.14);
+    padding: 2.2% 2.8%;
+    display: flex; flex-direction: column;
+    overflow: hidden; position: relative;
+    font-size: clamp(9.5px, 1.06vw, 14px);
+  }
+  .slide::before {
+    content: ""; position: absolute; inset: 0 0 auto 0; height: 4px;
+    background: linear-gradient(90deg, var(--accent), var(--accent2));
+    border-radius: 18px 18px 0 0;
+  }
+
+  /* ---- 标题区 ---- */
+  .header { display: flex; align-items: center; justify-content: space-between; gap: 1.6em; margin-bottom: .75em; }
+  h1 { font-size: 1.72em; font-weight: 700; white-space: nowrap; }
+  h1 .hl { color: var(--accent); }
+  .equation {
+    display: flex; align-items: center; gap: 1em;
+    background: linear-gradient(90deg, rgba(47,111,237,.07), rgba(14,165,120,.06));
+    border: 1px solid rgba(47,111,237,.25);
+    border-radius: 10px; padding: .5em 1em; flex: 1; min-width: 0;
+  }
+  .equation .formula { font-family: var(--mono); font-size: .95em; font-weight: 700; color: var(--code-text); white-space: nowrap; }
+  .equation .formula em { font-style: normal; color: var(--accent); }
+  .equation p { color: var(--muted); font-size: .84em; line-height: 1.4; }
+  .equation p strong { color: var(--text); }
+
+  /* ---- 问题链横条 ---- */
+  .problem {
+    background: #fdf7f0;
+    border: 1px solid rgba(217,122,6,.35);
+    border-radius: 12px;
+    padding: .6em 1em .65em;
+    margin-bottom: .75em;
+  }
+  .problem .p-head { display: flex; align-items: center; gap: .7em; margin-bottom: .4em; }
+  .problem .p-tag {
+    flex: none; font-size: .78em; font-weight: 700; color: var(--warn);
+    background: rgba(217,122,6,.1); border: 1px solid rgba(217,122,6,.35);
+    border-radius: 99px; padding: .14em .7em;
+  }
+  .problem .p-title { font-weight: 700; font-size: .95em; }
+  .problem .p-title code { font-size: .9em; }
+  .chain { display: flex; align-items: stretch; gap: .5em; }
+  .chain .node {
+    flex: 1; min-width: 0;
+    background: #fff; border: 1px solid var(--card-border);
+    border-radius: 8px; padding: .4em .6em;
+    font-size: .84em; line-height: 1.4; color: var(--muted);
+    box-shadow: 0 1px 4px rgba(30,42,61,.05);
+  }
+  .chain .node strong { display: block; color: var(--text); font-size: .95em; }
+  .chain .node.bad { border-color: rgba(208,69,60,.5); }
+  .chain .node.bad strong { color: var(--danger); }
+  .chain .arr { align-self: center; color: var(--warn); font-weight: 700; flex: none; }
+  .problem .p-note { margin-top: .4em; font-size: .86em; color: var(--text); }
+  .problem .p-note strong { color: var(--danger); }
+
+  /* ---- 五维度卡片 ---- */
+  .dims { display: grid; grid-template-columns: 1.25fr 1fr 1fr 1fr 1fr; gap: .7em; flex: 1; min-height: 0; margin-bottom: .75em; }
+  .dim {
+    background: var(--card);
+    border: 1px solid var(--card-border);
+    border-radius: 12px;
+    padding: .7em .8em;
+    min-width: 0; display: flex; flex-direction: column;
+    box-shadow: 0 2px 8px rgba(30,42,61,.04);
+  }
+  .dim.key { border-color: rgba(47,111,237,.55); background: linear-gradient(180deg, rgba(47,111,237,.05), #fff 40%); }
+  .dim h3 { font-size: .98em; font-weight: 700; display: flex; align-items: baseline; gap: .45em; margin-bottom: .15em; white-space: nowrap; }
+  .dim h3 .no { color: var(--accent); font-family: var(--mono); font-size: .9em; }
+  .dim .var {
+    font-size: .74em; color: var(--purple); font-weight: 600; margin-bottom: .4em;
+  }
+  .dim ul { list-style: none; flex: 1; }
+  .dim li { color: var(--muted); font-size: .84em; line-height: 1.42; padding-left: .9em; position: relative; margin-bottom: .28em; }
+  .dim li::before { content: "•"; color: var(--accent); position: absolute; left: 0; }
+  .dim li strong { color: var(--text); font-weight: 600; }
+  .dim code {
+    font-family: var(--mono); font-size: .92em;
+    background: var(--code-bg); color: var(--code-text);
+    border: 1px solid #e4eaf3; padding: 0 .3em; border-radius: 4px;
+  }
+  .dim .anchor {
+    margin-top: .45em; padding-top: .4em; border-top: 1px dashed #dbe3ee;
+    font-size: .78em; color: var(--accent2); font-weight: 600; line-height: 1.35;
+  }
+
+  /* ---- 共建横条 ---- */
+  .cobuild {
+    background: linear-gradient(90deg, rgba(14,165,120,.07), rgba(47,111,237,.06));
+    border: 1px solid rgba(14,165,120,.35);
+    border-radius: 12px;
+    padding: .6em 1em .65em;
+  }
+  .cobuild .c-head { display: flex; align-items: center; gap: .7em; margin-bottom: .45em; }
+  .cobuild .c-tag {
+    flex: none; font-size: .78em; font-weight: 700; color: var(--accent2);
+    background: rgba(14,165,120,.1); border: 1px solid rgba(14,165,120,.4);
+    border-radius: 99px; padding: .14em .7em;
+  }
+  .cobuild .c-title { font-weight: 700; font-size: .95em; }
+  .c-items { display: flex; gap: 1em; }
+  .c-items > div { flex: 1; min-width: 0; font-size: .84em; line-height: 1.45; color: var(--muted); }
+  .c-items strong { display: block; color: var(--text); margin-bottom: .1em; }
+  .c-items em { font-style: normal; color: var(--accent2); font-weight: 600; }
+
+  @media print {
+    body { padding: 0; background: #fff; }
+    .slide { width: 100%; border-radius: 0; box-shadow: none; }
+  }
+</style>
+</head>
+<body>
+
+<section class="slide">
+  <div class="header">
+    <h1>共建低时延工具生态：<span class="hl">问题、要求与建议</span></h1>
+    <div class="equation">
+      <span class="formula">T ≈ k×SkillLoad + Σ<em>ᴹ</em>(推理 + 执行) + TTFT</span>
+      <p><strong>时延的源头变量由工具设计决定</strong>：参数 token、执行时长、loop 轮数 M、下一轮 prefill —— 框架侧优化只能兜底，源头治理靠工具提供方一起共建。</p>
+    </div>
+  </div>
+
+  <!-- 核心问题 -->
+  <div class="problem">
+    <div class="p-head">
+      <span class="p-tag">核心问题</span>
+      <span class="p-title">CLI / ArkTS 脚本类工具缺少结构化 schema，无法转换为 function call —— 这不是时延数字问题，是快系统的资格问题</span>
+    </div>
+    <div class="chain">
+      <div class="node"><strong>无结构化 schema</strong>只有帮助文本 / 用法说明，参数不可机读</div>
+      <span class="arr">→</span>
+      <div class="node"><strong>无法转 function call</strong>模型只能拼自由文本命令串</div>
+      <span class="arr">→</span>
+      <div class="node"><strong>快系统不可调用</strong>小模型 FC 快路径（1~2s）被堵死</div>
+      <span class="arr">→</span>
+      <div class="node"><strong>慢系统里也全面失效</strong>参数级安全校验 / 变量解析 / 短句柄 / 并行调度均不可用</div>
+      <span class="arr">→</span>
+      <div class="node bad"><strong>永远走 10~40s 慢路径</strong>且是长尾错误与幻觉高发区</div>
+    </div>
+    <div class="p-note">◎ 没有 schema 的工具，<strong>框架侧的时延优化几乎全部失效</strong> —— 所以第一条要求：一切工具必须可 function call 化。</div>
+  </div>
+
+  <!-- 五个维度 -->
+  <div class="dims">
+    <div class="dim key">
+      <h3><span class="no">①</span>schema 信息（FC 化）</h3>
+      <div class="var">决定快系统资格 · 选对工具（M）· prefill</div>
+      <ul>
+        <li><strong>机器可读声明</strong>：参数 JSON Schema（类型/必填/枚举/默认）+ 返回值 schema + 错误码表</li>
+        <li><strong>CLI 类</strong>：manifest 映射 flags 或高频子命令独立包装，命令串由框架拼装，<strong>模型不接触命令行</strong></li>
+        <li><strong>ArkTS 类</strong>：装饰器编译期提取，或伴生元数据文件过渡（CI 防漂移）</li>
+        <li>description 说清"何时用 / 何时不用"，与易混工具可区分</li>
+      </ul>
+      <div class="anchor">锚点：单工具 schema ≤150tk，示例放 skill 不常驻</div>
+    </div>
+    <div class="dim">
+      <h3><span class="no">②</span>参数设计</h3>
+      <div class="var">压输出 token · 消标识符幻觉</div>
+      <ul>
+        <li>结构化字段 + 枚举优先，禁整段命令串 / JSON 字符串作参数</li>
+        <li>内部标识符（bundleName / UUID）不让模型直接填：人类可读名或变量 / 短句柄解析</li>
+        <li>可选参数必有默认值，必填 ≤5 个</li>
+      </ul>
+      <div class="anchor">锚点：单次调用 ≤50tk（现长尾 300tk → 仅解码 9s）</div>
+    </div>
+    <div class="dim">
+      <h3><span class="no">③</span>执行时长</h3>
+      <div class="var">压 T_执行 · 不挂死 loop</div>
+      <ul>
+        <li>声明档位 <code>quick/normal/long</code>；long 档必须异步化（句柄 + 轮询）</li>
+        <li>响应超时与取消，超时返回已完成部分</li>
+        <li>声明只读 / 幂等 → 校验分级，省 0.5s 固定税</li>
+      </ul>
+      <div class="anchor">锚点：同步工具 P95 ≤2s，纳入 SLO 监控</div>
+    </div>
+    <div class="dim">
+      <h3><span class="no">④</span>工具粒度</h3>
+      <div class="var">压 M（乘数，杠杆最大）</div>
+      <ul>
+        <li>一次调用 = <strong>一个用户可感知的完整动作</strong></li>
+        <li>反模式：强制先查内部 ID（过细）/ 万能 action 分发（过粗）</li>
+        <li>批量数组参数；高频序列合并由日志数据驱动</li>
+      </ul>
+      <div class="anchor">锚点：每省 1 个 loop = −5~11s</div>
+    </div>
+    <div class="dim">
+      <h3><span class="no">⑤</span>返回值</h3>
+      <div class="var">压下轮 prefill · 纠错一次到位</div>
+      <ul>
+        <li>结构化返回 + 大小上限，超限分页给句柄；禁日志转储 / 整文件回传</li>
+        <li><strong>错误三要素</strong>：错误码 + 原因 + 可执行纠错线索 → 纠错只付 1 loop</li>
+        <li>长路径 / 长 ID 登记短句柄；机器噪声走日志不进上下文</li>
+      </ul>
+      <div class="anchor">锚点：单次返回 ≤1~2k tk</div>
+    </div>
+  </div>
+
+  <!-- 共建倡议 -->
+  <div class="cobuild">
+    <div class="c-head">
+      <span class="c-tag">共建倡议</span>
+      <span class="c-title">要求即邀请：分级推进、平台配套、收益共享，数字门槛均开放讨论</span>
+    </div>
+    <div class="c-items">
+      <div><strong>分级推进</strong>MUST（准入门槛）/ SHOULD（评分建议）两档；量化门槛先拍后调，以埋点数据校准</div>
+      <div><strong>平台配套</strong>框架方提供 CLI / ArkTS 转换脚手架、schema lint、返回值大小与 SLO 自动化检测，降低接入成本</div>
+      <div><strong>存量整改</strong>按 <em>调用频次 × 时延贡献</em> 排序分批迁移，不搞一刀切；新工具按 checklist 准入</div>
+      <div><strong>收益共享</strong>达标工具进入快系统能力集：高频任务 <em>10~40s → 1~2s</em>，调用量与曝光随之提升</div>
+    </div>
+  </div>
+</section>
+
+</body>
+</html>
