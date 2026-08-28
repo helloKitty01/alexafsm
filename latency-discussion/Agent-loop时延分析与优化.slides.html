@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>基于 Skill 的 Agent Loop 端到端时延分析与优化</title>
+<style>
+  :root {
+    --bg: #e9edf3;
+    --slide-bg: linear-gradient(150deg, #ffffff 0%, #fafbfd 55%, #f2f6fc 100%);
+    --card: #ffffff;
+    --card-border: #dde4ee;
+    --text: #1f2a3d;
+    --muted: #5b6a82;
+    --accent: #2563eb;
+    --accent-soft: #eaf1fe;
+    --accent2: #0a9d6e;
+    --accent2-soft: #e6f7f0;
+    --warn: #d97706;
+    --warn-soft: #fdf3e3;
+    --purple: #7c5cd6;
+    --purple-soft: #f1edfc;
+    --code-bg: #f1f5fb;
+    --mono: "SF Mono", "JetBrains Mono", Consolas, "Courier New", monospace;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { background: var(--bg); }
+  body {
+    font-family: "PingFang SC", "Microsoft YaHei", "Noto Sans SC", -apple-system, sans-serif;
+    color: var(--text);
+    display: flex; flex-direction: column; align-items: center; gap: 26px;
+    padding: 28px 16px; min-height: 100vh;
+  }
+  .slide {
+    width: min(1280px, 96vw);
+    aspect-ratio: 16 / 9;
+    background: var(--slide-bg);
+    border: 1px solid var(--card-border);
+    border-radius: 16px;
+    box-shadow: 0 14px 40px rgba(31,42,61,.10);
+    padding: 2.4% 3.0%;
+    display: flex; flex-direction: column;
+    overflow: hidden; position: relative;
+    font-size: clamp(10px, 1.10vw, 14.5px);
+  }
+  .slide::before {
+    content: ""; position: absolute; inset: 0 0 auto 0; height: 4px;
+    background: linear-gradient(90deg, var(--accent), var(--accent2));
+    border-radius: 16px 16px 0 0;
+  }
+  .pageno { position: absolute; right: 1.6em; bottom: 1.0em; color: #9aa7bc; font-size: .82em; }
+
+  .header { display: flex; align-items: baseline; justify-content: space-between; gap: 1.5em; margin-bottom: .9em; }
+  h1 { font-size: 1.7em; font-weight: 700; white-space: nowrap; }
+  h1 .hl { color: var(--accent); }
+  .subtitle { color: var(--muted); font-size: .95em; text-align: right; line-height: 1.4; }
+
+  .card {
+    background: var(--card);
+    border: 1px solid var(--card-border);
+    border-radius: 12px;
+    padding: .9em 1.1em;
+    min-height: 0;
+  }
+  h3 { font-size: 1em; font-weight: 700; margin-bottom: .5em; display: flex; align-items: center; gap: .5em; }
+  h3 .dot { width: .55em; height: .55em; border-radius: 50%; background: var(--accent); flex: none; }
+  h3.green .dot { background: var(--accent2); }
+  h3.warn .dot { background: var(--warn); }
+  h3 small { font-weight: 400; color: var(--muted); font-size: .82em; margin-left: .3em; }
+
+  ul { list-style: none; }
+  li { color: var(--muted); line-height: 1.5; padding-left: 1em; position: relative; margin-bottom: .32em; font-size: .93em; }
+  li::before { content: "•"; color: var(--accent); position: absolute; left: 0; }
+  li strong, p strong { color: var(--text); font-weight: 600; }
+  p { color: var(--muted); line-height: 1.5; }
+  code {
+    font-family: var(--mono); font-size: .88em;
+    background: var(--code-bg); color: #1d4ed8;
+    padding: .08em .35em; border-radius: 5px; border: 1px solid #e2e9f5;
+  }
+
+  .tag {
+    display: inline-block; font-size: .76em; font-weight: 600;
+    border-radius: 99px; padding: .18em .75em;
+    background: var(--accent-soft); color: var(--accent); border: 1px solid #c5d8fb;
+  }
+  .tag.green  { background: var(--accent2-soft); color: var(--accent2); border-color: #b6e6d4; }
+  .tag.warn   { background: var(--warn-soft);   color: var(--warn);   border-color: #f3ddb5; }
+  .tag.purple { background: var(--purple-soft); color: var(--purple); border-color: #ddd2f5; }
+
+  /* ---------- 第 1 页 ---------- */
+  .formula {
+    background: var(--accent-soft); border: 1px solid #c5d8fb; border-radius: 10px;
+    padding: .6em 1.1em; display: flex; align-items: center; gap: 1.2em; margin-bottom: .9em;
+  }
+  .formula .expr { font-family: var(--mono); font-weight: 700; font-size: 1.08em; color: var(--text); white-space: nowrap; }
+  .formula .expr .n { color: var(--warn); }
+  .formula .expr .add { color: var(--accent); }
+  .formula p { font-size: .88em; }
+
+  .timeline { display: flex; gap: .35em; margin: .55em 0 .4em; }
+  .seg { border-radius: 8px; padding: .5em .6em; min-width: 0; border: 1px solid; }
+  .seg .t { font-weight: 700; font-size: .88em; white-space: nowrap; }
+  .seg .v { font-family: var(--mono); font-size: .82em; margin-top: .12em; white-space: nowrap; }
+  .seg .d { font-size: .76em; color: var(--muted); margin-top: .18em; line-height: 1.35; }
+  .seg.s1 { flex: 0 0 9%;  background: #f4f0fc; border-color: #ddd2f5; } .seg.s1 .t,.seg.s1 .v { color: var(--purple); }
+  .seg.s2 { flex: 0 0 18%; background: var(--accent-soft); border-color: #c5d8fb; } .seg.s2 .t,.seg.s2 .v { color: var(--accent); }
+  .seg.s3 { flex: 1;       background: var(--warn-soft); border-color: #f3ddb5; } .seg.s3 .t,.seg.s3 .v { color: var(--warn); }
+  .seg.s4 { flex: 0 0 12%; background: #fdeaea; border-color: #f5cccc; } .seg.s4 .t,.seg.s4 .v { color: #c2413d; }
+  .seg.s5 { flex: 0 0 16%; background: var(--accent2-soft); border-color: #b6e6d4; } .seg.s5 .t,.seg.s5 .v { color: var(--accent2); }
+
+  .note-band {
+    background: var(--warn-soft); border: 1px solid #f3ddb5; border-radius: 8px;
+    padding: .45em .9em; font-size: .87em; color: var(--muted); margin-bottom: .8em;
+  }
+  .note-band strong { color: var(--warn); }
+
+  .lever-grid { display: grid; grid-template-columns: 1fr 1fr; gap: .9em; flex: 1; min-height: 0; }
+  .lever-grid .map { display: flex; flex-direction: column; gap: .45em; margin-top: .2em; }
+  .map-row { display: flex; align-items: center; gap: .6em; }
+  .map-row .pt {
+    flex: none; font-weight: 700; font-size: .8em; border-radius: 6px; padding: .2em .55em;
+    background: var(--code-bg); border: 1px solid var(--card-border); color: var(--text); white-space: nowrap;
+  }
+  .map-row .desc { color: var(--muted); font-size: .88em; line-height: 1.4; min-width: 0; }
+
+  /* ---------- 问题点区块（第 2~4 页） ---------- */
+  .pt-stack { display: flex; flex-direction: column; gap: .9em; flex: 1; min-height: 0; }
+  .pt-block { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+  .pt-head { display: flex; align-items: center; gap: .7em; margin-bottom: .55em; }
+  .pt-head .num {
+    flex: none; width: 1.7em; height: 1.7em; border-radius: 50%;
+    background: var(--accent); color: #fff; font-weight: 700; font-size: .95em;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .pt-head .name { font-weight: 700; font-size: 1.05em; }
+  .pt-head .meta { color: var(--muted); font-size: .84em; }
+  .pt-cols { display: grid; grid-template-columns: 1fr 1.45fr; gap: .8em; flex: 1; min-height: 0; }
+  .pt-cols .col { background: var(--card); border: 1px solid var(--card-border); border-radius: 10px; padding: .7em .9em; min-height: 0; }
+  .col-title { font-size: .82em; font-weight: 700; margin-bottom: .4em; display: flex; align-items: center; gap: .45em; }
+  .col-title.problem { color: var(--warn); }
+  .col-title.solution { color: var(--accent2); }
+  .col-title::before { content: ""; width: .5em; height: .5em; border-radius: 50%; flex: none; }
+  .col-title.problem::before { background: var(--warn); }
+  .col-title.solution::before { background: var(--accent2); }
+  .pt-cols .col.problem-col { background: #fffdf8; border-color: #f3e5c8; }
+  .pt-cols .col.solution-col { background: #f9fdfb; border-color: #cdeadd; }
+
+  .mini-flow { display: flex; align-items: center; gap: .4em; flex-wrap: nowrap; margin-top: .35em; }
+  .mini-flow .step {
+    background: var(--code-bg); border: 1px solid var(--card-border);
+    border-radius: 7px; padding: .3em .55em; font-size: .8em; color: var(--text); white-space: nowrap;
+    line-height: 1.3; min-width: 0; overflow: hidden; text-overflow: ellipsis;
+  }
+  .mini-flow .step small { display: block; color: var(--muted); font-size: .85em; }
+  .mini-flow .arr { color: var(--accent); font-weight: 700; flex: none; font-size: .85em; }
+
+  /* ---------- 优先级路线（第 4 页底部） ---------- */
+  .roadmap { display: flex; align-items: stretch; gap: .4em; margin-top: .45em; }
+  .roadmap .rstep {
+    flex: 1; border-radius: 8px; padding: .45em .55em; min-width: 0;
+    background: var(--code-bg); border: 1px solid var(--card-border);
+  }
+  .roadmap .rstep .rn { font-weight: 700; font-size: .78em; color: var(--accent); }
+  .roadmap .rstep .rt { font-size: .8em; font-weight: 600; color: var(--text); line-height: 1.3; margin-top: .1em; }
+  .roadmap .rstep.first { background: var(--accent-soft); border-color: #c5d8fb; }
+  .roadmap .rstep.last  { background: var(--purple-soft); border-color: #ddd2f5; }
+  .roadmap .rarr { color: #9aa7bc; font-weight: 700; align-self: center; flex: none; font-size: .85em; }
+
+  .takeaway {
+    margin-top: .7em; padding: .55em .9em;
+    background: var(--accent2-soft); border: 1px solid #b6e6d4; border-radius: 8px;
+    color: var(--text); font-size: .92em; line-height: 1.5;
+  }
+  .takeaway strong { color: var(--accent2); }
+
+  @media print {
+    body { padding: 0; gap: 0; background: #fff; }
+    .slide { width: 100%; border-radius: 0; box-shadow: none; page-break-after: always; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ============ 第 1 页：时延全景与问题分类 ============ -->
+<section class="slide">
+  <div class="header">
+    <h1>基于 Skill 的 Agent Loop <span class="hl">端到端时延</span>：拆解与分类</h1>
+    <div class="subtitle">六类问题 · 两类杠杆 · 一个分析框架</div>
+  </div>
+
+  <div class="formula">
+    <span class="expr">T ≈ <span class="n">Σ<sub>i=1..N</sub></span> ( <span class="add">TTFT + n<sub>out</sub>×t<sub>decode</sub> + T<sub>安全校验</sub> + T<sub>工具执行</sub></span> )</span>
+    <p><strong>N（loop 次数）是乘数</strong>，减一次 loop 省下整个单 loop 成本；括号内各项是单 loop 内的<strong>加数</strong>。所有优化都落在这两类杠杆上。</p>
+  </div>
+
+  <div class="card" style="margin-bottom:.8em">
+    <h3><span class="dot"></span>一次 loop 的时序拆解<small>（当前实测 / 典型值）</small></h3>
+    <div class="timeline">
+      <div class="seg s1"><div class="t">检索/预处理</div><div class="v">数十 ms</div><div class="d">skill 检索、上下文组装（框架侧）</div></div>
+      <div class="seg s2"><div class="t">首 Token（TTFT）</div><div class="v">≈1300 ms</div><div class="d">prefill 占比待测，KV cache 命中是关键变量</div></div>
+      <div class="seg s3"><div class="t">增量生成</div><div class="v">30 ms/token × 输出 token 数</div><div class="d">多数调用几十 token（1~3s）；<strong>典型问题</strong>：长参数（如绝对路径）达 300 token → 9s</div></div>
+      <div class="seg s4"><div class="t">安全校验</div><div class="v">≈500 ms</div><div class="d">每次工具调用前的固定税</div></div>
+      <div class="seg s5"><div class="t">工具执行</div><div class="v">数百 ms ~ 数秒</div><div class="d">因工具而异，个别超长</div></div>
+    </div>
+    <div class="note-band" style="margin-bottom:0">
+      <strong>注意：</strong>增量生成的 9s 是"长参数工具调用"这一<strong>典型问题案例</strong>，并非普遍情况；但它说明单 loop 内增量生成的上限远高于 TTFT，参数 token 压缩的收益天花板最高。单 loop 合计约 <strong>2~11s</strong>。
+    </div>
+  </div>
+
+  <div class="lever-grid">
+    <div class="card">
+      <h3 class="warn"><span class="dot"></span>杠杆一：减少 loop 次数 N<small>乘数 · 每减一次省 2~11s</small></h3>
+      <div class="map">
+        <div class="map-row"><span class="pt">问题点 ①</span><div class="desc">skill 加载额外占用 1~2 次 loop</div></div>
+        <div class="map-row"><span class="pt">问题点 ④</span><div class="desc">幻觉先错后对、工具粒度不合理导致多次往返</div></div>
+        <div class="map-row"><span class="pt">问题点 ⑥</span><div class="desc">快慢双系统：高频任务绕开多轮 loop，直接快路径</div></div>
+      </div>
+    </div>
+    <div class="card">
+      <h3><span class="dot"></span>杠杆二：降低单 loop 成本<small>加数 · 逐项压缩</small></h3>
+      <div class="map">
+        <div class="map-row"><span class="pt">问题点 ②</span><div class="desc">工具调用参数 token 过多 → 增量生成时长</div></div>
+        <div class="map-row"><span class="pt">问题点 ③</span><div class="desc">安全校验 500ms 固定税 + 工具执行超长</div></div>
+        <div class="map-row"><span class="pt">问题点 ⑤</span><div class="desc">推理性能：TTFT 与增量 token 时延（模型/缓存）</div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="takeaway">◎ <strong>第 0 步是埋点测量：</strong>每请求拆解 loop 数分布、每 loop 各阶段耗时与 token 数——否则优先级排序只是估算。</div>
+  <div class="pageno">1 / 4</div>
+</section>
+
+<!-- ============ 第 2 页：问题点 ①②（skill 加载 + 参数生成） ============ -->
+<section class="slide">
+  <div class="header">
+    <h1>单 Loop 成本（上）：<span class="hl">Skill 加载</span>与<span class="hl">参数生成</span></h1>
+    <div class="subtitle">问题点 ① ② · 一个减 loop、一个减 token</div>
+  </div>
+
+  <div class="pt-stack">
+    <div class="pt-block">
+      <div class="pt-head">
+        <span class="num">①</span><span class="name">Skill 加载耗时</span>
+        <span class="meta">每次加载 = 一整个 loop（TTFT + 生成 + 工具执行），2s 起</span>
+      </div>
+      <div class="pt-cols">
+        <div class="col problem-col">
+          <div class="col-title problem">典型问题</div>
+          <ul>
+            <li>加载"有时一次、有时两次"，<strong>先归因</strong>：是 search + load 两步，还是 load 错了重载——解法完全不同</li>
+            <li>预加载若注入 system prompt，会击穿 KV cache（前缀全灭）</li>
+          </ul>
+        </div>
+        <div class="col solution-col">
+          <div class="col-title solution">优化方向</div>
+          <ul>
+            <li><strong>索引常驻稳定前缀</strong>：全量 skill 索引（名称+一句话描述）放静态区，模型直接 load，消掉 search 那次 loop</li>
+            <li><strong>按检索置信度分流</strong>：高置信 → 框架预取正文，随当轮 user message 被动注入（0 额外 loop，不破坏缓存）；低置信 → 模型主动 load</li>
+            <li>会话内已加载的 skill 留在消息流历史里，不重复加载</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <div class="pt-block">
+      <div class="pt-head">
+        <span class="num">②</span><span class="name">工具调用生成耗时（输出 token 数）</span>
+        <span class="meta">30ms/token，参数越长解码越久</span>
+      </div>
+      <div class="pt-cols">
+        <div class="col problem-col">
+          <div class="col-title problem">典型问题</div>
+          <ul>
+            <li>参数直接输出<strong>原始绝对路径 / 长标识符</strong>，最多 300 token → 仅解码就 9s</li>
+            <li>凭记忆写 bundleName 等标识符 → 幻觉，错一次再赔一个 loop</li>
+          </ul>
+          <div class="mini-flow">
+            <span class="step">/data/storage/el2/base/.../report.pdf<br><small>~40 token，且易抄错</small></span>
+            <span class="arr">vs</span>
+            <span class="step">f1<br><small>1 token 短句柄</small></span>
+          </div>
+        </div>
+        <div class="col solution-col">
+          <div class="col-title solution">优化方向</div>
+          <ul>
+            <li><strong>变量方案</strong>（已有设计）：<code>${app.抖音.bundleName}</code>，框架拦截器查表求值，顺带结构性消除标识符幻觉</li>
+            <li><strong>schema 改写</strong>：把 <code>bundleName</code> 重定义为 <code>appName</code>，模型直接写"抖音"，零学习成本，主场景优先</li>
+            <li><strong>短句柄</strong>：工具结果里的长路径/长 ID 登记短句柄（<code>f1</code>），后续模型传句柄、拦截器还原，全工具通用</li>
+            <li><strong>schema 卫生</strong>：默认值、枚举化、相对路径 + 会话级 cwd</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="pageno">2 / 4</div>
+</section>
+
+<!-- ============ 第 3 页：问题点 ③⑤（安全校验/工具执行 + 推理性能） ============ -->
+<section class="slide">
+  <div class="header">
+    <h1>单 Loop 成本（下）：<span class="hl">安全校验、工具执行</span>与<span class="hl">推理性能</span></h1>
+    <div class="subtitle">问题点 ③ ⑤ · 框架侧优化 + 模型/缓存侧优化</div>
+  </div>
+
+  <div class="pt-stack">
+    <div class="pt-block">
+      <div class="pt-head">
+        <span class="num">③</span><span class="name">安全校验与工具执行时长</span>
+        <span class="meta">校验 500ms 固定税 · 三个正交手段可叠加</span>
+      </div>
+      <div class="pt-cols">
+        <div class="col problem-col">
+          <div class="col-title problem">典型问题</div>
+          <ul>
+            <li>每次工具调用前<strong>无差别同步校验 500ms</strong>，只读查询也要付</li>
+            <li>个别工具本身执行超长，阻塞整个 loop</li>
+          </ul>
+        </div>
+        <div class="col solution-col">
+          <div class="col-title solution">优化方向</div>
+          <ul>
+            <li><strong>分级（按需校验）</strong>：只读/幂等工具白名单跳过同步校验、改异步审计；高危（删除/权限/支付）保留完整同步校验</li>
+            <li><strong>并行（藏进解码时间）</strong>：工具调用参数在输出流中完整出现的瞬间即开始校验，与模型剩余输出并行，多数情况体感为零</li>
+            <li><strong>缓存</strong>：相同（工具, 归一化参数）的校验结果复用；校验若走 LLM 判定，前置本地规则引擎，不确定才升级</li>
+            <li><strong>工具执行</strong>：独立超时预算（超时信息返回模型而非挂死）；天然长耗时工具异步化，返回任务句柄后续轮询</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <div class="pt-block">
+      <div class="pt-head">
+        <span class="num">⑤</span><span class="name">推理性能（TTFT + 增量 token 时延）</span>
+        <span class="meta">TTFT 1300ms · 增量 30ms/token · 候选模型 glm5.2 / deepseek v4</span>
+      </div>
+      <div class="pt-cols">
+        <div class="col problem-col">
+          <div class="col-title problem">典型问题</div>
+          <ul>
+            <li>TTFT 1300ms 中 <strong>prefill 占比未测</strong>——动态 skill 注入 system prompt 导致每 query KV cache 全量失效，是 prefill 的主要嫌疑</li>
+            <li>只按裸时延选模型，忽略正确率下降对 loop 次数的反噬</li>
+          </ul>
+        </div>
+        <div class="col solution-col">
+          <div class="col-title solution">优化方向</div>
+          <ul>
+            <li><strong>KV cache 排布</strong>（已有讨论）：动态内容移出 system prompt、消息流 append-only，前缀命中后 TTFT 可望降到数百 ms</li>
+            <li><strong>模型评测算总账</strong>：真实 trace 上比"工具调用正确率 × 时延"——错一次多付一整个 loop（2~11s）</li>
+            <li><strong>按 loop 类型路由</strong>：简单"选工具填参"用快模型 + 关/缩思维链；规划、纠错步骤用大模型</li>
+            <li><strong>限制无效输出</strong>：skill 中明确"直接输出工具调用，不复述计划"，省数十~上百 token</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="pageno">3 / 4</div>
+</section>
+
+<!-- ============ 第 4 页：问题点 ④⑥ + 优先级路线 ============ -->
+<section class="slide">
+  <div class="header">
+    <h1>减少 <span class="hl">Loop 次数</span>与<span class="hl">快慢双系统</span> · 优先级路线</h1>
+    <div class="subtitle">问题点 ④ ⑥ · 乘数杠杆 + 长期架构</div>
+  </div>
+
+  <div class="pt-stack" style="flex:1">
+    <div class="pt-block">
+      <div class="pt-head">
+        <span class="num">④</span><span class="name">工具 loop 效率（减少 loop 次数）</span>
+        <span class="meta">先做数据挖掘：高频调用序列 + 每工具首调失败率</span>
+      </div>
+      <div class="pt-cols">
+        <div class="col problem-col">
+          <div class="col-title problem">典型问题</div>
+          <ul>
+            <li><strong>幻觉先错后对</strong>：首次调用出错，反思后才正确，每错一次赔一个 loop</li>
+            <li><strong>工具粒度不合理</strong>：本可合并为一个的被拆成多个，串行多次往返</li>
+            <li>相互独立的调用被<strong>串行执行</strong>（本可并行）</li>
+          </ul>
+        </div>
+        <div class="col solution-col">
+          <div class="col-title solution">优化方向</div>
+          <ul>
+            <li><strong>结构性消幻觉</strong>：变量方案 / 封闭词表注入（模型从列表选名，不自由发挥）</li>
+            <li><strong>错误消息工程</strong>：失败的 tool result 自带纠错线索（如附上应用列表），保证纠错一次到位而非多次试探</li>
+            <li><strong>复合工具 / 批量参数</strong>：日志挖掘高频二元/三元序列后合并；同类操作支持数组参数，N 次变 1 次</li>
+            <li><strong>并行工具调用</strong>：模型一次输出多个独立调用、框架并发执行——低成本高收益，常被忽略</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <div class="pt-block">
+      <div class="pt-head">
+        <span class="num">⑥</span><span class="name">慢系统 → 快系统迁移（skill+loop → function call）</span>
+        <span class="meta">长期项 · "编译"关系而非替代关系</span>
+      </div>
+      <div class="pt-cols">
+        <div class="col problem-col">
+          <div class="col-title problem">定位与边界</div>
+          <ul>
+            <li>慢系统 = 解释器（处理长尾），快系统 = 编译产物（小模型 FC，高频任务 1~2s）</li>
+            <li>快系统只接：<strong>单意图、无条件分支、不需环境反馈</strong>的任务</li>
+          </ul>
+        </div>
+        <div class="col solution-col">
+          <div class="col-title solution">关键设计</div>
+          <ul>
+            <li><strong>三态路由</strong>：高置信→快；低置信/多步→慢；快系统失败→回退慢。回退时快系统时延白付，<strong>路由阈值要保守</strong></li>
+            <li><strong>数据飞轮</strong>：慢系统成功轨迹 = 快系统训练/评测集；回退 case 反哺路由阈值</li>
+            <li><strong>一致性</strong>：两系统共享工具执行层（含拦截器）与安全校验，避免行为漂移</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <div class="card" style="flex:none">
+      <h3 class="green" style="margin-bottom:.3em"><span class="dot"></span>优先级路线<small>按"收益 × 落地成本"排序</small></h3>
+      <div class="roadmap">
+        <div class="rstep first"><div class="rn">0</div><div class="rt">埋点测量<br>时延拆解</div></div><span class="rarr">→</span>
+        <div class="rstep"><div class="rn">1</div><div class="rt">参数 token 压缩<br>（设计已有）</div></div><span class="rarr">→</span>
+        <div class="rstep"><div class="rn">2</div><div class="rt">校验分级<br>+ 并行</div></div><span class="rarr">→</span>
+        <div class="rstep"><div class="rn">3</div><div class="rt">并行调用<br>+ 复合工具</div></div><span class="rarr">→</span>
+        <div class="rstep"><div class="rn">4</div><div class="rt">KV cache 排布<br>（设计已有）</div></div><span class="rarr">→</span>
+        <div class="rstep"><div class="rn">5</div><div class="rt">skill<br>混合预加载</div></div><span class="rarr">→</span>
+        <div class="rstep"><div class="rn">6</div><div class="rt">模型路由<br>/ 评测换型</div></div><span class="rarr">→</span>
+        <div class="rstep last"><div class="rn">7</div><div class="rt">快慢<br>双系统</div></div>
+      </div>
+    </div>
+  </div>
+  <div class="pageno">4 / 4</div>
+</section>
+
+</body>
+</html>
