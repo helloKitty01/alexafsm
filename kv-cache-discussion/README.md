@@ -22,7 +22,8 @@
 | [12-上下文长度实测需求.md](./12-上下文长度实测需求.md) | 交给内部模型的测量需求:模块定义与识别方法 + token 统计口径 + JSON 输出 schema,用于替换假设值 |
 | [KV-Cache统计点位与自动化.slides.html](./KV-Cache统计点位与自动化.slides.html) | 统计落地单页初版(三栏布局含验证映射表,已被 v1 取代,留档) |
 | [KV-Cache统计点位与自动化.v1.slides.html](./KV-Cache统计点位与自动化.v1.slides.html) | 统计落地单页 v1(右下留白较多,已被 v1.1 取代,留档) |
-| [KV-Cache统计点位与自动化.v1.1.slides.html](./KV-Cache统计点位与自动化.v1.1.slides.html) | 统计落地单页 PPT v1.1(配合收益闭环 v7.2,面向领导):左块统计点位(六点位清单含方案标识 + 明细 JSON 示例 + 落地节奏);右块三段式——怎么算(断点归因)/ 怎么比(当前方案 vs 目标方案定义、会话粒度分流同表对比、四项关键对比表:实际推理量 ~15K→6-7K、白算 ~10K→<1K 硬验收、命中率 60%→85%+、TTFT 约-69%)/ 怎么跑守(管线四步 + 三条报警) |
+| [KV-Cache统计点位与自动化.v1.1.slides.html](./KV-Cache统计点位与自动化.v1.1.slides.html) | 统计落地单页 v1.1(归因图仅当前方案且带数字,已被 v1.2 取代,留档) |
+| [KV-Cache统计点位与自动化.v1.2.slides.html](./KV-Cache统计点位与自动化.v1.2.slides.html) | 统计落地单页 PPT v1.2(配合收益闭环 v7.2,面向领导):左块点位表细化到字段级(类型+示例/枚举:bounds 分方案两种顺序、标签枚举 biz/call/scheme/q、⑥输出与时间注明回复由下一条明细②③自动覆盖);右块——怎么算(当前/目标双结构示意图,只标模块名不标数字,"改造=把断点 d 往后推")/ 怎么比(方案定义+四项关键对比表)/ 怎么跑守(管线+报警) |
 | [KV-Cache收益闭环.v2.slides.html](./KV-Cache收益闭环.v2.slides.html) | 汇报幻灯片 v2(结构条误将 Tools 并入静态区置前,已被 v3 取代,留档) |
 | [KV-Cache收益闭环.v3.slides.html](./KV-Cache收益闭环.v3.slides.html) | 汇报幻灯片 v3(单页深色,已被 v4 取代,留档) |
 | [KV-Cache收益闭环.v4.slides.html](./KV-Cache收益闭环.v4.slides.html) | 汇报幻灯片 v4(单页浅色,预估参数,已被 v5 取代,留档) |
