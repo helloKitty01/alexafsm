@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>KV Cache 收益统计:点位与自动化计算(单页)</title>
+<style>
+  :root {
+    --bg: #e9edf4;
+    --slide-bg: linear-gradient(135deg, #ffffff 0%, #f7f9fd 60%, #eef3fb 100%);
+    --card: #f7f9fc;
+    --card-border: #dfe5ee;
+    --text: #1f2a3d;
+    --muted: #5c6b84;
+    --accent: #2563eb;
+    --good: #059669;
+    --warn: #d97706;
+    --bad: #dc2626;
+    --mono: "SF Mono", "JetBrains Mono", Consolas, "Courier New", monospace;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { background: var(--bg); height: 100%; }
+  body {
+    font-family: "PingFang SC", "Microsoft YaHei", "Noto Sans SC", -apple-system, sans-serif;
+    color: var(--text);
+    display: flex; justify-content: center; align-items: center;
+    padding: 16px 12px; min-height: 100vh;
+  }
+  .deck { position: relative; width: min(96vw, calc((100vh - 32px) * 1.7778)); }
+  .slide {
+    width: 100%;
+    aspect-ratio: 16 / 9;
+    background: var(--slide-bg);
+    border: 1px solid var(--card-border);
+    border-radius: 18px;
+    box-shadow: 0 18px 50px rgba(31,42,61,.16);
+    padding: 2% 2.8%;
+    display: flex; flex-direction: column;
+    overflow: hidden; position: relative;
+    font-size: clamp(9.5px, min(1.08vw, 1.92vh), 22px);
+  }
+  .slide::before {
+    content: ""; position: absolute; inset: 0 0 auto 0; height: 5px;
+    background: linear-gradient(90deg, var(--accent), var(--good));
+    border-radius: 18px 18px 0 0;
+  }
+  h2 { font-size: 1.26em; font-weight: 700; margin-bottom: .38em; }
+  h2 .hl { color: var(--accent); }
+  .card {
+    background: var(--card); border: 1px solid var(--card-border);
+    border-radius: 12px; padding: .65em .85em;
+    overflow: hidden;
+  }
+  .card h3 { font-size: .92em; margin-bottom: .34em; color: var(--text); }
+  .card p, .card li { color: var(--muted); font-size: .8em; line-height: 1.46; }
+  .card li { margin-left: 1.1em; margin-bottom: .22em; }
+  .card b { color: var(--text); font-weight: 700; }
+  .goodc { color: var(--good) !important; }
+  .warnc { color: var(--warn) !important; }
+  .badc { color: var(--bad) !important; }
+  .mono { font-family: var(--mono); }
+
+  .row { display: flex; gap: .75em; min-height: 0; }
+  .col { display: flex; flex-direction: column; gap: .55em; min-width: 0; }
+  .grow { flex: 1; min-height: 0; min-width: 0; }
+
+  .banner {
+    border-radius: 10px; padding: .44em .9em; font-size: .86em;
+    background: linear-gradient(90deg, rgba(37,99,235,.08), rgba(5,150,105,.07));
+    border: 1px solid rgba(37,99,235,.28); color: var(--text); line-height: 1.44;
+  }
+  .banner b { color: var(--accent); }
+
+  .kpi { display: flex; gap: .75em; }
+  .kpi .card { flex: 1; text-align: center; padding: .38em .3em; }
+  .kpi .big { font-size: 1.12em; font-weight: 800; color: var(--accent); font-family: var(--mono); }
+  .kpi .big.g { color: var(--good); }
+  .kpi .big.w { color: var(--warn); }
+  .kpi .lbl { color: var(--muted); font-size: .68em; margin-top: .12em; line-height: 1.3; }
+  .kpi .lbl b { color: var(--text); }
+
+  table { border-collapse: collapse; width: 100%; font-size: .76em; }
+  th, td { text-align: left; padding: .3em .45em; border-bottom: 1px solid var(--card-border); }
+  th { color: var(--accent); font-weight: 700; white-space: nowrap; }
+  td { color: var(--muted); line-height: 1.35; }
+  td b { color: var(--text); }
+  .tag { display: inline-block; border-radius: 999px; padding: .05em .5em; font-size: .88em; font-weight: 700; }
+  .tag.ready { background: rgba(5,150,105,.12); color: var(--good); }
+  .tag.dev { background: rgba(217,119,6,.12); color: var(--warn); }
+
+  pre.attr {
+    font-family: var(--mono); background: #fff;
+    border: 1px solid var(--card-border); border-radius: 8px;
+    padding: .55em .75em; font-size: .74em; line-height: 1.55;
+    color: var(--text); overflow: hidden; white-space: pre;
+  }
+  pre.attr .g { color: var(--good); font-weight: 700; }
+  pre.attr .r { color: var(--bad); font-weight: 700; }
+  pre.attr .b { color: var(--accent); font-weight: 700; }
+  pre.attr .c { color: var(--muted); }
+
+  /* 断点归因示意条 */
+  .abar { display: flex; height: 1.6em; border-radius: 6px; overflow: hidden; border: 1px solid var(--card-border); margin-top: .3em; }
+  .aseg { display: flex; align-items: center; justify-content: center; min-width: 0; }
+  .aseg span { font-size: .6em; font-weight: 700; color: #fff; white-space: nowrap; text-shadow: 0 1px 2px rgba(0,0,0,.3); }
+  .aseg.hit { background: rgba(5,150,105,.68); }
+  .aseg.waste { background: rgba(220,38,38,.85); }
+  .aseg.waste + .aseg.waste { border-left: 1px solid rgba(255,255,255,.85); }
+  .aseg.new { background: rgba(37,99,235,.8); }
+  .amarks { display: flex; font-size: .62em; color: var(--muted); font-family: var(--mono); margin-top: .12em; }
+
+  .flow { display: flex; align-items: stretch; gap: .4em; margin-top: .3em; }
+  .fstep { flex: 1; background: #fff; border: 1px solid var(--card-border); border-radius: 9px; padding: .45em .55em; text-align: center; }
+  .fstep .fn { font-size: .74em; font-weight: 700; color: var(--accent); }
+  .fstep .fd { font-size: .64em; color: var(--muted); line-height: 1.35; margin-top: .15em; }
+  .farr { display: flex; align-items: center; color: var(--muted); font-size: .9em; flex: none; }
+
+  .footer {
+    margin-top: auto; padding-top: .35em; display: flex;
+    justify-content: space-between; color: var(--muted); font-size: .66em; gap: 1em;
+  }
+</style>
+</head>
+<body>
+<div class="deck">
+
+<section class="slide">
+  <h2>收益统计与自动化:<span class="hl">2 个引擎字段 + 4 类应用埋点,把整套收益账变成日报</span></h2>
+
+  <div class="kpi" style="margin-bottom:.5em;">
+    <div class="card"><div class="big g">2 字段</div><div class="lbl"><b>引擎侧现成</b>:prompt_tokens / cached_tokens<br>开 prefix cache 即返回,透传落日志</div></div>
+    <div class="card"><div class="big w">4 类</div><div class="lbl"><b>应用侧埋点</b>:模块边界快照 / 新增记账 /<br>三维标签 / completion+时间戳</div></div>
+    <div class="card"><div class="big">5 张表</div><div class="lbl"><b>天级离线聚合</b>:调用明细 → Q 序号 →<br>会话分桶 → 业务 → 全局</div></div>
+    <div class="card"><div class="big" style="color:var(--bad);">3 条报警</div><div class="lbl"><b>自动防回退</b>:loop 白算>0 /<br>白算>1K/调用 / 公式残差超限</div></div>
+  </div>
+
+  <div class="row grow">
+    <!-- 左:点位清单 -->
+    <div class="card" style="flex:1.05; display:flex; flex-direction:column;">
+      <h3>统计点位清单(每次 LLM 调用一条记录)</h3>
+      <table style="margin-top:.2em;">
+        <tr><th>点位</th><th>内容</th><th>状态</th></tr>
+        <tr><td><b>① 输入量</b></td><td class="mono">prompt_tokens(引擎 usage)</td><td><span class="tag ready">现成</span></td></tr>
+        <tr><td><b>② 命中量</b></td><td class="mono">cached_tokens(引擎 usage)= 断点深度 d</td><td><span class="tag ready">现成</span></td></tr>
+        <tr><td><b>③ 模块边界快照</b></td><td>构造 prompt 时记录各段 token 数与边界:SP固定 / 动态上下文(skills·memory·device)/ Tools / history / 当轮新增(skill正文·webSearch·工具结果)</td><td><span class="tag dev">埋点</span></td></tr>
+        <tr><td><b>④ 新增记账</b></td><td>当轮新消息 tokenize 计数 = 必要推理量</td><td><span class="tag dev">埋点</span></td></tr>
+        <tr><td><b>⑤ 标签</b></td><td>业务类型 × Q 序号 × 调用类型(首调/loop)× 会话 ID</td><td><span class="tag dev">埋点</span></td></tr>
+        <tr><td><b>⑥ 辅助</b></td><td class="mono">completion_tokens(算沉淀)/ 时间戳(驻留备用)</td><td><span class="tag ready">现成</span></td></tr>
+      </table>
+      <p style="margin-top:.35em;">③⑤ 是唯一的开发量:<b>构造器本来就知道这些边界,成本是"顺手记下来"</b>;tokenizer 与推理侧一致,块粒度(16/64 token)误差留 ~0.5K 裕量。</p>
+    </div>
+
+    <!-- 中:断点归因 -->
+    <div class="card" style="flex:1.15; display:flex; flex-direction:column;">
+      <h3>核心机制:断点归因——白算构成自动拆解,无需人工</h3>
+      <pre class="attr" style="margin-top:.2em;">边界:b₁ SP固定末 &lt; b₂ 动态末 &lt; b₃ Tools末 &lt; b₄ history末 &lt; b₅=prompt_tokens
+断点:d = cached_tokens
+<span class="b">miss</span> = b₅ − d = <span class="r">白算(b₄ − d)</span> + <span class="g">新增(b₅ − b₄)</span>
+<span class="r">白算</span> ∩ 各模块区间 → 自动拆出 [动态 | Tools | history] 三段</pre>
+      <div class="abar">
+        <div class="aseg hit" style="flex:25.5;"><span>命中 d=25.5K</span></div>
+        <div class="aseg waste" style="flex:4.5;"><span>动态 4.5</span></div>
+        <div class="aseg waste" style="flex:4.5;"><span>Tools 4.5</span></div>
+        <div class="aseg waste" style="flex:10.5;"><span>history 10.5</span></div>
+        <div class="aseg new" style="flex:12;"><span>新增 12</span></div>
+      </div>
+      <div class="amarks">
+        <span style="flex:25.5;">↑d(断点)</span><span style="flex:19.5; text-align:center;">↑白算 = b₄−d(自动分段)</span><span style="flex:12; text-align:right;">↑新增 = b₅−b₄</span>
+      </div>
+      <p style="margin-top:.35em;"><b>P2–P4 每根条形的每个色块,都对应一个可直接 SQL 出来的量</b>——图不再是推演,是查询结果。示例为问答 Q2:miss 29.5K = 白算 19.5 + 新增 12(webSearch 10 + 动态 2)。</p>
+      <h3 style="margin-top:.4em;">自动化管线(天级,无人工)</h3>
+      <div class="flow">
+        <div class="fstep"><div class="fn">采集</div><div class="fd">网关/框架埋点<br>每调用一行明细</div></div>
+        <div class="farr">→</div>
+        <div class="fstep"><div class="fn">归因</div><div class="fd">断点拆解白算三段<br>+ 新增分量</div></div>
+        <div class="farr">→</div>
+        <div class="fstep"><div class="fn">聚合</div><div class="fd">Q 序号 / 会话分桶 /<br>业务 / 全局 四视图</div></div>
+        <div class="farr">→</div>
+        <div class="fstep"><div class="fn">看板+报警</div><div class="fd">日报刷新<br>回退自动告警</div></div>
+      </div>
+    </div>
+
+    <!-- 右:验证映射与报警 -->
+    <div class="col" style="flex:1;">
+      <div class="card grow">
+        <h3>统计量 → 汇报页数字的验证映射</h3>
+        <table style="margin-top:.2em;">
+          <tr><th>聚合视图</th><th>验证对象</th></tr>
+          <tr><td>模块快照均值</td><td><b>P1 基线表</b>(25.5/4.5/4.5K…逐格核对)</td></tr>
+          <tr><td>断点归因分段</td><td><b>P2–P4 条形图</b>每个色块</td></tr>
+          <tr><td>按 Q 序号聚合</td><td><b>P5 表</b> + 公式拟合:实测省 vs ΔS(n)≈7+6.1(n−1)</td></tr>
+          <tr><td>会话长度分桶</td><td><b>P6</b>(1Q~6Q+ 的算力/节省占比)</td></tr>
+          <tr><td>业务×全局加权</td><td><b>P7</b>(-69% 整体,灰度 A/B 出实测值)</td></tr>
+        </table>
+      </div>
+      <div class="card">
+        <h3>三条自动报警(防回退验收线)</h3>
+        <p>① <b class="badc">loop 调用白算 > 0</b>:追加式本该恒零,出现即回归(device_info 刷新/序列化不稳);<br>② <b class="badc">改造后白算 > 1K/调用</b>:违反"除新增外全命中"验收线;<br>③ <b class="warnc">公式残差超限</b>:实测每 Q 节省偏离 7+6.1(n−1) 过多 → 参数漂移(如 webSearch 变大),提示更新基线。</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="banner" style="margin-top:.5em;">一句话:引擎给"断点",应用给"边界",<b>两者相减自动完成 miss 的全部归因</b>——收益不靠估算,每天以日报形式自证;改造上线前先跑一周,基线实测替换推演,灰度 A/B 直接出最终收益数。</div>
+  <div class="footer"><span>KV Cache 收益统计 · 点位与自动化(单页,配合收益闭环 v7.2 使用)</span><span>字段依据:文档 10(度量体系)阶段①②;示例数字取自 v7.2 问答 Q2;块粒度误差 ~0.5K 计入阈值裕量</span></div>
+</section>
+
+</div>
+</body>
+</html>
