@@ -21,7 +21,8 @@
 | [KV-Cache收益闭环.slides.html](./KV-Cache收益闭环.slides.html) | 汇报用 2 页 HTML 幻灯片(基于 11,只用 prefill 计算量口径):P1 钱花在哪+逐请求账目条形图,P2 三级台阶+两个计数器统计闭环 |
 | [12-上下文长度实测需求.md](./12-上下文长度实测需求.md) | 交给内部模型的测量需求:模块定义与识别方法 + token 统计口径 + JSON 输出 schema,用于替换假设值 |
 | [KV-Cache统计点位与自动化.slides.html](./KV-Cache统计点位与自动化.slides.html) | 统计落地单页初版(三栏布局含验证映射表,已被 v1 取代,留档) |
-| [KV-Cache统计点位与自动化.v1.slides.html](./KV-Cache统计点位与自动化.v1.slides.html) | 统计落地单页 PPT v1(配合收益闭环 v7.2,面向领导):左块统计点位(六点位清单+现成/埋点标记+落地节奏三步),右块怎么统计与分析(断点归因公式与示意条 / 天级四步管线 / 三条防回退报警);验证映射表已删 |
+| [KV-Cache统计点位与自动化.v1.slides.html](./KV-Cache统计点位与自动化.v1.slides.html) | 统计落地单页 v1(右下留白较多,已被 v1.1 取代,留档) |
+| [KV-Cache统计点位与自动化.v1.1.slides.html](./KV-Cache统计点位与自动化.v1.1.slides.html) | 统计落地单页 PPT v1.1(配合收益闭环 v7.2,面向领导):左块统计点位(六点位清单含方案标识 + 明细 JSON 示例 + 落地节奏);右块三段式——怎么算(断点归因)/ 怎么比(当前方案 vs 目标方案定义、会话粒度分流同表对比、四项关键对比表:实际推理量 ~15K→6-7K、白算 ~10K→<1K 硬验收、命中率 60%→85%+、TTFT 约-69%)/ 怎么跑守(管线四步 + 三条报警) |
 | [KV-Cache收益闭环.v2.slides.html](./KV-Cache收益闭环.v2.slides.html) | 汇报幻灯片 v2(结构条误将 Tools 并入静态区置前,已被 v3 取代,留档) |
 | [KV-Cache收益闭环.v3.slides.html](./KV-Cache收益闭环.v3.slides.html) | 汇报幻灯片 v3(单页深色,已被 v4 取代,留档) |
 | [KV-Cache收益闭环.v4.slides.html](./KV-Cache收益闭环.v4.slides.html) | 汇报幻灯片 v4(单页浅色,预估参数,已被 v5 取代,留档) |
