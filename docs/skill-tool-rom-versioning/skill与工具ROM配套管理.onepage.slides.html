@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Skill 与工具的 ROM 配套管理 · 一页纸</title>
+<style>
+  :root {
+    --bg: #0f1420; --panel: #171e2e; --panel2: #1e2740; --ink: #e8ecf5; --muted: #93a0b8;
+    --acc: #5b8cff; --acc2: #38d39f; --warn: #ffb454; --err: #ff6b81; --purple: #b48cff;
+    --code-bg: #0b0f18; --line: #2a3550;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--ink);
+    font-family: "PingFang SC", "Microsoft YaHei", "Noto Sans CJK SC", -apple-system, sans-serif;
+    padding: 26px 36px; min-height: 100vh; }
+  .page { max-width: 1560px; margin: 0 auto; display: flex; flex-direction: column; gap: 14px; }
+
+  .header { display: flex; align-items: baseline; gap: 18px; border-bottom: 2px solid var(--acc); padding-bottom: 10px; }
+  .header h1 { font-size: 26px; }
+  .header .one-liner { font-size: 15px; color: var(--muted); }
+  .header .one-liner b { color: var(--warn); }
+
+  .row { display: flex; gap: 14px; }
+  .row > * { flex: 1; min-width: 0; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 12px 16px; }
+  .card h2 { font-size: 15px; margin-bottom: 8px; letter-spacing: 1px; }
+  .card h2.c1 { color: var(--err); } .card h2.c2 { color: var(--acc2); } .card h2.c3 { color: var(--acc); }
+  .card h2.c4 { color: var(--purple); }
+  .card p, .card li { font-size: 13px; line-height: 1.65; color: var(--ink); }
+  .card ul { padding-left: 18px; }
+  .muted { color: var(--muted); }
+  em { color: var(--warn); font-style: normal; font-weight: 600; }
+  code.inline { background: var(--code-bg); border: 1px solid var(--line); border-radius: 4px; padding: 0 6px;
+    font-size: .92em; font-family: Consolas, monospace; color: #9fc0ff; }
+
+  .arch { background: var(--panel); border: 1px solid var(--acc); border-radius: 12px; padding: 14px 16px; }
+  .arch h2 { font-size: 15px; color: var(--acc); margin-bottom: 10px; letter-spacing: 1px; }
+  .flow { display: flex; align-items: stretch; }
+  .node { background: var(--panel2); border: 1.5px solid var(--acc); border-radius: 10px; padding: 9px 11px;
+    flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; justify-content: center; }
+  .node b { font-size: 13px; color: #fff; }
+  .node span { font-size: 11.5px; color: var(--muted); line-height: 1.5; }
+  .node.tool { border-color: var(--acc2); } .node.mem { border-color: var(--warn); } .node.guard { border-color: var(--err); }
+  .arrow { align-self: center; padding: 0 6px; color: var(--acc); font-size: 18px; font-weight: 700; flex: none; }
+  .loopback { text-align: center; font-size: 12px; color: var(--muted); margin-top: 6px; }
+  .loopback b { color: var(--acc2); }
+
+  table.matrix { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+  table.matrix th, table.matrix td { border: 1px solid var(--line); padding: 6px 10px; text-align: left; line-height: 1.5; }
+  table.matrix th { background: var(--panel2); color: var(--acc); font-size: 12.5px; white-space: nowrap; }
+  table.matrix td.type { white-space: nowrap; font-weight: 600; }
+  table.matrix td.ver { white-space: nowrap; text-align: center; font-weight: 700; }
+  table.matrix tr.ok td.type { color: var(--acc2); }
+  table.matrix tr.add td.type { color: var(--warn); }
+  table.matrix tr.brk td.type { color: var(--err); }
+  table.matrix tr.net td.type { color: var(--purple); }
+  table.matrix td .how { color: var(--muted); }
+
+  .strip { display: flex; gap: 14px; align-items: stretch; }
+  .strip .card { display: flex; flex-direction: column; justify-content: center; }
+  .pills { display: flex; align-items: center; gap: 6px; font-size: 12.5px; flex-wrap: wrap; }
+  .pills .st { background: var(--panel2); border: 1px solid var(--line); border-radius: 999px; padding: 3px 12px; white-space: nowrap; }
+  .pills .st.hot { border-color: var(--acc2); } .pills .st.cold { border-color: var(--warn); } .pills .st.dead { border-color: var(--err); }
+  .pills .a { color: var(--acc); font-weight: 700; }
+
+  @media print {
+    body { padding: 10px; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <div class="header">
+    <h1>Skill 与工具的 <span style="color:var(--acc);">ROM 配套管理</span></h1>
+    <div class="one-liner">工具随 ROM 慢速 OTA（机队<b>永久碎片化</b>）· skill 云端天级迭代 —— 双速发布用 <b>能力清单 + 兼容声明 + 按能力分发</b> 配套管理</div>
+  </div>
+
+  <div class="row">
+    <div class="card">
+      <h2 class="c1">问题 · 双速发布</h2>
+      <ul>
+        <li>工具 = ROM 内实现：<em>月级 OTA</em>，回滚极难，停更机型永远到不了新版本</li>
+        <li>skill = 提示词文档：<em>天级云端下发</em>，即时回滚，可全量收敛</li>
+        <li>任何时刻机队都是<em>工具集版本的一个分布</em>，不是单一版本 —— 与 Android API level 处境同构</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h2 class="c2">管理地基 · 三件套（任何策略的前提）</h2>
+      <ul>
+        <li><em>工具侧</em>：设备会话建立时上报<b>能力清单</b>（工具列表 + 工具集 API level，单调递增）</li>
+        <li><em>skill 侧</em>：metadata 声明 <code class="inline">min_tool_api</code> / <code class="inline">required_tools</code> / <code class="inline">max_tool_api</code></li>
+        <li><em>分发侧</em>：按设备能力解析，取<b>满足要求的最新版本</b>；skill 索引按工具 API level 分通道生成</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h2 class="c3">核心原则 · 四条</h2>
+      <ul>
+        <li><em>检测能力而非版本</em>：L0 里就是设备真实工具列表，skill 分支零成本判断（≙ feature detection）</li>
+        <li><em>分支是过渡态</em>：老路径占比达标即删，回归单路径</li>
+        <li><em>破坏性变更在 ROM 侧缓冲</em>：deprecated alias 保 1~2 版，把破坏性降级为增量</li>
+        <li><em>"找不到工具→升级"只做安全网</em>，不做主策略</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="arch">
+    <h2>管理流水线 · 从会话建立到调用兜底</h2>
+    <div class="flow">
+      <div class="node tool"><b>① 设备上报能力清单</b><span>工具列表 + schema 版本<br>+ 工具集 API level</span></div>
+      <div class="arrow">→</div>
+      <div class="node"><b>② 云端拼装 L0</b><span>真实工具 schema<br>+ 分通道 skill 索引（带版本号）</span></div>
+      <div class="arrow">→</div>
+      <div class="node"><b>③ load_skill 按能力解析</b><span>在满足 min_tool_api /<br>required_tools 的版本中取最新</span></div>
+      <div class="arrow">→</div>
+      <div class="node mem"><b>④ 会话级钉住</b><span>(skill 版本, 工具 API level)<br>冻结并写日志，中途不换版</span></div>
+      <div class="arrow">→</div>
+      <div class="node guard"><b>⑤ pre-call 安全网</b><span>调用不存在的工具 → 拦截，<br>回喂结构化错误 + 替代工具清单</span></div>
+    </div>
+    <div class="loopback">安全网触发率按 <b>≈ 0</b> 运营：&gt; 0 即说明分发通道有 bug；"建议升级 ROM"只在替代路径也走不通时由<b>产品层</b>呈现，不写进 skill 文本</div>
+  </div>
+
+  <div class="card">
+    <h2 class="c3">兼容性决策矩阵 · 按"工具变更类型"选策略</h2>
+    <table class="matrix">
+      <tr><th>工具变更类型</th><th>skill 策略</th><th>怎么做</th><th>在役版本</th></tr>
+      <tr class="ok">
+        <td class="type">无变更</td>
+        <td><b>最新 skill 全量替换</b>，旧版全部下线</td>
+        <td class="how">灰度放量 + 即时回滚；索引攒批更新控制 L0 失效频率</td>
+        <td class="ver" style="color:var(--acc2);">1</td>
+      </tr>
+      <tr class="add">
+        <td class="type">增量：新增工具 / 加可选参数</td>
+        <td><b>单 skill + 能力分支</b>（不开新版本）</td>
+        <td class="how">正文写"若工具列表中存在 X 则用之，否则老工具组合（步骤…）"；模型看 L0 即可判断，零额外 loop；渗透率达标后删分支</td>
+        <td class="ver" style="color:var(--warn);">1（含分支 ≤2 个）</td>
+      </tr>
+      <tr class="brk">
+        <td class="type">破坏性：改名 / 参数语义变化 / 删除</td>
+        <td><b>版本门控</b>：新旧 skill 并存，按能力分发</td>
+        <td class="how">老 skill 用 max_tool_api 封顶冻结（只修安全问题）；ROM 侧优先做 deprecated alias，能不走到这里就不走</td>
+        <td class="ver" style="color:var(--err);">2（限期共存）</td>
+      </tr>
+      <tr class="net">
+        <td class="type">任何情况的兜底</td>
+        <td><b>pre-call 存在性校验</b>（安全网）</td>
+        <td class="how">拦截 → <code class="inline">tool_not_available</code> + 替代工具清单回喂模型自纠；防通道 bug / 索引陈旧等 corner case</td>
+        <td class="ver">— 触发率 ≈ 0</td>
+      </tr>
+    </table>
+    <p class="muted" style="font-size:12px; margin-top:8px;">反面教材：全量替换最新 skill + 老 ROM 上报"找不到工具"引导升级 —— 老 ROM 用户体验是<b style="color:var(--err);">"坏"而不是"旧"</b>；且 L0 工具列表里根本没有新工具，"skill 让调 X 但列表没有 X"的矛盾上下文会诱发幻觉调用，错误以更隐蔽的方式劣化。</p>
+  </div>
+
+  <div class="strip">
+    <div class="card" style="flex: 2;">
+      <h2 class="c2">多版本运营纪律（版本门控的配套）</h2>
+      <div class="pills">
+        <span class="st hot">在役版本硬上限 ≤ 2~3</span><span class="a">·</span>
+        <span class="st">修复默认打最新版，按老版本设备占比决定是否回灌</span><span class="a">·</span>
+        <span class="st">评估只跑在役 (skill × API level) 组合，非笛卡尔积</span><span class="a">·</span>
+        <span class="st cold">老路径占比 &lt; 阈值 → 删能力分支</span><span class="a">·</span>
+        <span class="st dead">ROM EOL → 对应 skill 冻结归档</span>
+      </div>
+    </div>
+    <div class="card">
+      <h2 class="c4">观测三指标</h2>
+      <p style="font-size:12.5px;"><code class="inline">tool_not_available</code> 拦截率（目标 ≈ 0）· 能力分支老路径使用占比（定删分支时机）· 各工具 API level 设备占比（定冻结 / EOL 时机）</p>
+    </div>
+  </div>
+
+</div>
+</body>
+</html>
