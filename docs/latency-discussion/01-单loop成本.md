@@ -47,7 +47,7 @@ skill_search 由框架在模型调用前执行（几十 ms 量级），不占模
 
 ### 2.1 变量方案（已有完整设计）
 
-见 [`docs/variable-resolution/`](../docs/variable-resolution/工具参数变量解析机制方案.md)：
+见 [`variable-resolution/`](../variable-resolution/工具参数变量解析机制方案.md)：
 `${app.抖音.bundleName}` 替代长标识符，同时结构性消除幻觉（减 loop，见 02）。
 
 注意事项：新语法有学习成本，模型写错变量语法会增加 loop 反噬时延。

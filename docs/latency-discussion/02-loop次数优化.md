@@ -16,7 +16,7 @@
 
 ### 结构性消除（优先）
 
-变量方案 / schema 改写（见 [`docs/variable-resolution/`](../docs/variable-resolution/工具参数变量解析机制方案.md)）：
+变量方案 / schema 改写（见 [`variable-resolution/`](../variable-resolution/工具参数变量解析机制方案.md)）：
 模型永远只表达"哪个应用"，真实标识符来自查表，标识符类幻觉从机制上不可能发生。
 
 ### 封闭词表注入
