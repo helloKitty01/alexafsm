@@ -3,7 +3,7 @@
 讨论基于 skill 体系的 Agent loop 的端到端响应时延问题与优化方案。
 内容随讨论持续迭代，与既有讨论的关系：
 
-- [`docs/variable-resolution/`](../docs/variable-resolution/)：工具参数变量解析机制，
+- [`variable-resolution/`](../variable-resolution/)：工具参数变量解析机制，
   直接对应本讨论"单 loop 成本 → 参数 token 压缩"一节，设计已完整。
 - [`kv-cache-discussion/`](../kv-cache-discussion/)：KV cache 与上下文排布，
   直接对应本讨论"推理性能 → TTFT/prefill"一节。
@@ -19,8 +19,7 @@
 | [工具要求与共建倡议.slides.html](./工具要求与共建倡议.slides.html) | **汇报单页（浅色）**：核心问题链（CLI/ArkTS 无 schema → 无法 FC 化 → 快系统不可调用）+ 五维度要求卡片（含量化锚点）+ 共建倡议（分级推进 / 平台配套 / 存量整改 / 收益共享） |
 | [Agent-loop时延分析与优化.slides.v3.html](./Agent-loop时延分析与优化.slides.v3.html) | **汇报材料（当前版本，2 页）**：P1 现状端到端架构图（SkillLoad ×0~3，含预加载最优账）；P2 时延方程 + 按时延构成逐项方案 + 敏感性对比 + 落地顺序 |
 | [推理性能与KV-cache优化.slides.html](./推理性能与KV-cache优化.slides.html) | **专题单页**：KV cache 命中率 60%→90% 时延测算（glm5.2 / ds-v4）、端到端收益阶梯（13s→9s→7s）、可达性分析与四层业界优化方案（排布/路由/容量/引擎） |
-| [Agent-loop时延分析与优化.slides.v2.html](./Agent-loop时延分析与优化.slides.v2.html) | v2（5 页，已被 v3 取代，留档） |
-| [Agent-loop时延分析与优化.slides.html](./Agent-loop时延分析与优化.slides.html) | 初版（4 页，留档） |
+| [history/](./history/) | 历史版本留档：Agent-loop时延分析与优化 初版（4 页）与 v2（5 页），已被 v3 取代 |
 
 ## 已确认口径（v3 采用）
 
