@@ -1,0 +1,476 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>多任务管理 Agent：需求理解与初步方案（文本输出版）</title>
+<style>
+  :root {
+    --bg: #e9eef6;
+    --slide-bg: linear-gradient(135deg, #ffffff 0%, #f8fbfe 55%, #f2f7fd 100%);
+    --card: #ffffff;
+    --card-border: #dfe6f0;
+    --text: #1e2a3d;
+    --muted: #5a6b84;
+    --accent: #2f6fed;
+    --accent2: #0ea578;
+    --warn: #d97a06;
+    --danger: #d0453c;
+    --purple: #7c5cd6;
+    --code-bg: #f3f6fb;
+    --code-text: #24405f;
+    --mono: "SF Mono", "JetBrains Mono", Consolas, "Courier New", monospace;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { background: var(--bg); }
+  body {
+    font-family: "PingFang SC", "Microsoft YaHei", "Noto Sans SC", -apple-system, sans-serif;
+    color: var(--text);
+    display: flex; flex-direction: column; align-items: center;
+    padding: 28px 16px; gap: 28px; min-height: 100vh;
+  }
+  .slide {
+    width: min(1280px, 96vw);
+    aspect-ratio: 16 / 9;
+    background: var(--slide-bg);
+    border: 1px solid var(--card-border);
+    border-radius: 18px;
+    box-shadow: 0 18px 44px rgba(30,42,61,.14);
+    padding: 2% 2.6%;
+    display: flex; flex-direction: column;
+    overflow: hidden; position: relative;
+    font-size: clamp(9.5px, 1.02vw, 14px);
+  }
+  .slide::before {
+    content: ""; position: absolute; inset: 0 0 auto 0; height: 4px;
+    background: linear-gradient(90deg, var(--accent), var(--accent2));
+    border-radius: 18px 18px 0 0;
+  }
+  .pageno { position: absolute; right: 1.6em; bottom: 1em; font-family: var(--mono); font-size: .8em; color: var(--muted); }
+
+  .header { display: flex; align-items: baseline; justify-content: space-between; gap: 1.4em; margin-bottom: .6em; }
+  h1 { font-size: 1.6em; font-weight: 700; white-space: nowrap; }
+  h1 .hl { color: var(--accent); }
+  .subtitle { color: var(--muted); font-size: .92em; line-height: 1.4; text-align: right; }
+  .subtitle strong { color: var(--text); }
+
+  code, .mono {
+    font-family: var(--mono); font-size: .92em;
+    background: var(--code-bg); color: var(--code-text);
+    border: 1px solid #e4eaf3; padding: 0 .3em; border-radius: 4px;
+  }
+
+  .cols { display: flex; gap: .9em; flex: 1; min-height: 0; }
+  .col { display: flex; flex-direction: column; gap: .7em; min-width: 0; min-height: 0; }
+
+  .panel {
+    background: var(--card); border: 1px solid var(--card-border); border-radius: 12px;
+    padding: .7em .9em; box-shadow: 0 2px 8px rgba(30,42,61,.04);
+    display: flex; flex-direction: column; min-height: 0;
+  }
+  .panel > h2 { font-size: 1em; font-weight: 700; margin-bottom: .45em; display: flex; align-items: baseline; gap: .5em; }
+  .panel > h2 .tag {
+    flex: none; font-size: .72em; font-weight: 700; color: var(--accent);
+    background: rgba(47,111,237,.08); border: 1px solid rgba(47,111,237,.3);
+    border-radius: 99px; padding: .1em .65em;
+  }
+  .panel > h2 .tag.green { color: var(--accent2); background: rgba(14,165,120,.08); border-color: rgba(14,165,120,.3); }
+  .panel > h2 .tag.warn { color: var(--warn); background: rgba(217,122,6,.08); border-color: rgba(217,122,6,.3); }
+  .panel ul { list-style: none; }
+  .panel li { color: var(--muted); font-size: .86em; line-height: 1.45; padding-left: .95em; position: relative; margin-bottom: .3em; }
+  .panel li::before { content: "•"; color: var(--accent); position: absolute; left: 0; }
+  .panel li strong { color: var(--text); font-weight: 600; }
+  .panel p { color: var(--muted); font-size: .86em; line-height: 1.45; }
+  .panel p strong { color: var(--text); }
+
+  /* ---- 聊天 mockup ---- */
+  .chat { display: flex; flex-direction: column; gap: .4em; overflow: hidden; }
+  .bubble { max-width: 92%; border-radius: 10px; padding: .38em .7em; font-size: .84em; line-height: 1.4; }
+  .bubble.user { align-self: flex-end; background: linear-gradient(135deg, #2f6fed, #4a84f2); color: #fff; border-bottom-right-radius: 3px; }
+  .bubble.agent { align-self: flex-start; background: var(--code-bg); color: var(--text); border: 1px solid var(--card-border); border-bottom-left-radius: 3px; }
+  .taskcard {
+    align-self: flex-start; width: 88%;
+    border: 1px solid var(--card-border); border-left: 3px solid var(--accent);
+    background: #fff; border-radius: 8px; padding: .32em .65em;
+    font-size: .8em; line-height: 1.35; display: flex; align-items: center; gap: .6em;
+    box-shadow: 0 1px 4px rgba(30,42,61,.06);
+  }
+  .taskcard .tid { font-family: var(--mono); font-weight: 700; color: var(--accent); flex: none; font-size: .9em; }
+  .taskcard .tname { color: var(--text); font-weight: 600; flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .taskcard .tstate { flex: none; font-size: .88em; font-weight: 700; border-radius: 99px; padding: .06em .6em; }
+  .st-run { color: var(--accent); background: rgba(47,111,237,.1); }
+  .st-wait { color: var(--purple); background: rgba(124,92,214,.1); }
+  .st-done { color: var(--accent2); background: rgba(14,165,120,.1); }
+  .st-stop { color: var(--danger); background: rgba(208,69,60,.1); }
+  .st-user { color: var(--warn); background: rgba(217,122,6,.12); }
+  .taskcard.stopped { border-left-color: var(--danger); opacity: .85; }
+  .taskcard.waiting { border-left-color: var(--purple); }
+  .taskcard.done { border-left-color: var(--accent2); }
+  .taskcard.asking { border-left-color: var(--warn); }
+
+  /* ---- 需求编号卡片 ---- */
+  .reqs { display: grid; grid-template-columns: 1fr 1fr; gap: .55em; flex: 1; min-height: 0; }
+  .req { background: var(--card); border: 1px solid var(--card-border); border-radius: 10px; padding: .5em .7em; min-width: 0; }
+  .req h3 { font-size: .9em; font-weight: 700; margin-bottom: .2em; }
+  .req h3 .no { color: var(--accent); font-family: var(--mono); margin-right: .4em; }
+  .req p { color: var(--muted); font-size: .8em; line-height: 1.42; }
+  .req p strong { color: var(--text); }
+  .req.key { border-color: rgba(47,111,237,.5); background: linear-gradient(180deg, rgba(47,111,237,.05), #fff 45%); }
+
+  /* ---- 流程链 ---- */
+  .flow { display: flex; align-items: stretch; gap: .45em; }
+  .flow .node {
+    flex: 1; min-width: 0; background: #fff; border: 1px solid var(--card-border);
+    border-radius: 8px; padding: .42em .55em; font-size: .8em; line-height: 1.38; color: var(--muted);
+  }
+  .flow .node strong { display: block; color: var(--text); font-size: .95em; margin-bottom: .1em; }
+  .flow .node.hl { border-color: rgba(47,111,237,.55); background: linear-gradient(180deg, rgba(47,111,237,.06), #fff 50%); }
+  .flow .arr { align-self: center; color: var(--accent); font-weight: 700; flex: none; }
+
+  /* ---- 架构图 ---- */
+  .arch { display: flex; flex-direction: column; gap: .5em; flex: 1; min-height: 0; }
+  .arch-layer { border-radius: 12px; padding: .55em .8em; border: 1px solid var(--card-border); background: var(--card); }
+  .arch-layer.front { border-color: rgba(47,111,237,.45); background: linear-gradient(180deg, rgba(47,111,237,.06), #fff 60%); }
+  .arch-layer.mid   { border-color: rgba(124,92,214,.45); background: linear-gradient(180deg, rgba(124,92,214,.06), #fff 60%); }
+  .arch-layer.back  { border-color: rgba(14,165,120,.45); background: linear-gradient(180deg, rgba(14,165,120,.06), #fff 60%); }
+  .arch-layer h3 { font-size: .92em; font-weight: 700; margin-bottom: .3em; display: flex; gap: .6em; align-items: baseline; }
+  .arch-layer h3 .who { font-size: .78em; font-weight: 600; color: var(--muted); }
+  .arch-items { display: flex; gap: .5em; }
+  .arch-items .it {
+    flex: 1; min-width: 0; background: #fff; border: 1px solid var(--card-border); border-radius: 8px;
+    padding: .35em .55em; font-size: .78em; line-height: 1.35; color: var(--muted);
+  }
+  .arch-items .it strong { display: block; color: var(--text); font-size: .96em; }
+  .arch-arrows { display: flex; justify-content: space-around; color: var(--muted); font-size: .78em; }
+  .arch-arrows span b { color: var(--accent); font-family: var(--mono); }
+
+  /* ---- 表格 ---- */
+  table { width: 100%; border-collapse: collapse; font-size: .82em; }
+  th, td { text-align: left; padding: .4em .6em; border-bottom: 1px solid #edf1f7; vertical-align: top; line-height: 1.42; }
+  th { color: var(--muted); font-size: .88em; font-weight: 700; background: #f6f9fd; white-space: nowrap; }
+  td strong { color: var(--text); }
+  td { color: var(--muted); }
+  tr:last-child td { border-bottom: none; }
+
+  /* ---- 时序走查 ---- */
+  .timeline { display: flex; flex-direction: column; gap: .45em; flex: 1; min-height: 0; }
+  .trow { display: flex; gap: .6em; align-items: stretch; }
+  .trow .qcol { flex: none; width: 17%; background: rgba(47,111,237,.06); border: 1px solid rgba(47,111,237,.25); border-radius: 8px; padding: .4em .6em; font-size: .8em; line-height: 1.38; }
+  .trow .qcol b { color: var(--accent); font-family: var(--mono); display: block; font-size: .92em; }
+  .trow .steps { flex: 1; display: flex; gap: .45em; min-width: 0; }
+  .trow .steps .node { flex: 1; min-width: 0; background: #fff; border: 1px solid var(--card-border); border-radius: 8px; padding: .38em .55em; font-size: .78em; line-height: 1.36; color: var(--muted); }
+  .trow .steps .node strong { display: block; color: var(--text); font-size: .96em; }
+  .trow .steps .node.decision { border-color: rgba(217,122,6,.5); background: #fdf9f2; }
+  .trow .steps .node.decision strong { color: var(--warn); }
+  .trow .steps .arr { align-self: center; color: var(--accent); font-weight: 700; flex: none; font-size: .85em; }
+
+  .callout {
+    border-radius: 10px; padding: .5em .85em; font-size: .84em; line-height: 1.45;
+    background: rgba(14,165,120,.07); border: 1px solid rgba(14,165,120,.35); color: var(--text);
+  }
+  .callout.warn { background: #fdf7f0; border-color: rgba(217,122,6,.4); }
+  .callout b { color: var(--accent2); }
+  .callout.warn b { color: var(--warn); }
+</style>
+</head>
+<body>
+
+<!-- ═══════════════ P1 需求理解 ═══════════════ -->
+<section class="slide">
+  <div class="header">
+    <h1>多任务管理 Agent：<span class="hl">需求理解</span></h1>
+    <p class="subtitle">范围：<strong>文本输出</strong>（omni 全双工放下一步）｜入口：<strong>Query 驱动 + 事件驱动</strong><br>定位：对话即任务控制台 —— 会话不被任务阻塞，任务以卡片形式活在对话流里</p>
+  </div>
+  <div class="cols">
+    <div class="col" style="flex: 0 0 38%;">
+      <div class="panel" style="flex:1;">
+        <h2><span class="tag">场景回放</span>三轮对话，六个任务</h2>
+        <div class="chat">
+          <div class="bubble user">帮我生成一个小男孩玩耍的图片</div>
+          <div class="bubble agent">好的，已经开始为您生成</div>
+          <div class="taskcard stopped"><span class="tid">T1</span><span class="tname">图片·小男孩玩耍</span><span class="tstate st-stop">已停止?</span></div>
+          <div class="bubble user">不对，帮我生成一个小女孩玩耍的</div>
+          <div class="bubble agent">好的，现在帮您生成女孩玩耍的图片</div>
+          <div class="taskcard"><span class="tid">T2</span><span class="tname">图片·小女孩玩耍</span><span class="tstate st-run">生成中</span></div>
+          <div class="bubble user">再帮我生成 3 张图片，完成后再帮我生成一个视频</div>
+          <div class="bubble agent">好的，3 张图片开始生成，完成后自动生成视频</div>
+          <div class="taskcard"><span class="tid">T3.1</span><span class="tname">图片 ×3 并行</span><span class="tstate st-run">生成中</span></div>
+          <div class="taskcard"><span class="tid">T3.2</span><span class="tname">图片 ×3 并行</span><span class="tstate st-run">生成中</span></div>
+          <div class="taskcard"><span class="tid">T3.3</span><span class="tname">图片 ×3 并行</span><span class="tstate st-run">生成中</span></div>
+          <div class="taskcard waiting"><span class="tid">T4</span><span class="tname">视频（输入=T3 三图）</span><span class="tstate st-wait">等待依赖</span></div>
+        </div>
+      </div>
+    </div>
+    <div class="col" style="flex:1;">
+      <div class="reqs">
+        <div class="req"><h3><span class="no">R1</span>非阻塞应答</h3><p>每个 Query <strong>先秒回一句话，任务后台跑</strong>。对话永远可用，不被任何任务占住 —— T1 还在生成时 Q2 照常处理。</p></div>
+        <div class="req"><h3><span class="no">R2</span>任务卡片 = 任务的 UI 锚点</h3><p>任务插入对话流成为<strong>状态自更新的卡片</strong>（排队/生成中/完成/失败/已取消），进度更新<strong>不产生新聊天气泡</strong>、不刷屏。</p></div>
+        <div class="req key"><h3><span class="no">R3</span>意图路由：Query 不都是新任务</h3><p>每个 Query 先分类：<strong>新增 / 修正 / 取消 / 查询</strong>。Q2 的"不对"是<strong>修正</strong> —— 要落到 T1 头上，而不是简单多开一个任务。</p></div>
+        <div class="req key"><h3><span class="no">R4</span>修正语义：替代 + 旧任务处置</h3><p>修正 = 创建 T2 <strong>+ 决定 T1 怎么办</strong>（取消 / 跑完标记"已被替代"）。这是场景中"[图片1卡片停止?]"的问号，需要一条明确策略（见 P4）。</p></div>
+        <div class="req key"><h3><span class="no">R5</span>批量 + 依赖编排</h3><p>Q3 一句话 = <strong>fan-out</strong>（T3.1–3.3 并行）<strong>+ join</strong>（三张齐）<strong>+ 链式触发</strong>（T4 视频，输入引用三图产物）。T4 创建即插卡，状态"等待依赖"。</p></div>
+        <div class="req"><h3><span class="no">R6</span>事件驱动统一</h3><p>"T3 全部完成"是一个<strong>事件</strong>；定时、外部事件（系统事件/自定义监视）走<strong>同一条事件总线</strong>触发任务 —— 任务链只是事件驱动的特例。</p></div>
+      </div>
+      <div class="callout" style="margin-top:.6em;">
+        <b>一句话方案主张：</b>一切请求统一为 <span class="mono">Task = Trigger + Goal + Policy</span>；即时 Query 是 <span class="mono">trigger=immediate</span> 的特例，"完成后再做 X"是 <span class="mono">trigger=on_tasks_done</span> 的特例 —— 一套中枢管到底。
+      </div>
+    </div>
+  </div>
+  <span class="pageno">1 / 6</span>
+</section>
+
+<!-- ═══════════════ P2 任务模型 ═══════════════ -->
+<section class="slide">
+  <div class="header">
+    <h1>统一任务模型：<span class="hl">Task = Trigger + Goal + Policy</span></h1>
+    <p class="subtitle">触发（什么时候干）与执行（怎么干）解耦；LLM 只在<strong>创建期</strong>与<strong>事件后处置期</strong>介入</p>
+  </div>
+  <div class="cols" style="margin-bottom:.6em;">
+    <div class="col" style="flex:1.15;">
+      <div class="panel" style="flex:1;">
+        <h2><span class="tag">Trigger 类型</span>四种触发，覆盖全部场景</h2>
+        <table>
+          <tr><th>类型</th><th>含义</th><th>本场景对应</th></tr>
+          <tr><td><code>immediate</code></td><td>立即执行（普通 Query 的默认）</td><td><strong>T1 / T2 / T3.1–3.3</strong></td></tr>
+          <tr><td><code>on_tasks_done</code></td><td>依赖任务集合全部完成（join）</td><td><strong>T4</strong>：deps=[T3.1,T3.2,T3.3]</td></tr>
+          <tr><td><code>at / cron</code></td><td>定时（一次 / 周期）</td><td>"明早 8 点再生成一批"</td></tr>
+          <tr><td><code>on_event</code></td><td>事件总线上的事件（系统事件 / 自定义监视命中）</td><td>"到家后……""盯发布会……"</td></tr>
+        </table>
+        <p style="margin-top:.5em;"><strong>Goal 保留自然语言原话</strong>（执行时结合上下文重新理解），只有 Trigger / Policy 结构化 —— 它们需要被非 LLM 组件精确执行。T4 的 Goal 里以<strong>产物句柄</strong>引用 T3 三图：<code>inputs=[T3.1.out, T3.2.out, T3.3.out]</code>。</p>
+      </div>
+    </div>
+    <div class="col" style="flex:1;">
+      <div class="panel" style="flex:1;">
+        <h2><span class="tag green">意图路由</span>每个 Query 先过四分类</h2>
+        <div class="flow" style="margin-bottom:.5em;">
+          <div class="node hl"><strong>新增</strong>创建 Task，插卡</div>
+          <div class="node hl"><strong>修正</strong>新 Task 替代旧 Task + 旧任务处置</div>
+          <div class="node"><strong>取消/暂停</strong>指向已有 Task</div>
+          <div class="node"><strong>查询</strong>读任务表回答，零新任务</div>
+        </div>
+        <ul>
+          <li><strong>指代解析在"活跃任务表"上做</strong>：会话上下文常驻一份轻量任务摘要（每任务一行：id / 目标 / 状态 / 进度），"不对""第二张""那个视频"都解析到具体 task id；</li>
+          <li>歧义时<strong>先问再动</strong>："你是想替换刚才那张男孩的图，还是再加一张？"；</li>
+          <li>卡片上的按钮（停止 / 重试）与口头指令<strong>走同一条路由</strong>，行为完全一致。</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+  <div class="panel">
+    <h2><span class="tag warn">生命周期</span>TaskRun 状态机（新增 <code>superseded</code>：被修正替代）</h2>
+    <div class="flow">
+      <div class="node"><strong>created</strong>解析完成，卡片插入对话流</div>
+      <div class="arr">→</div>
+      <div class="node"><strong>waiting_deps / queued</strong>等依赖（T4）或等调度额度</div>
+      <div class="arr">→</div>
+      <div class="node hl"><strong>running</strong>执行器工作，进度直写卡片（不过 LLM）</div>
+      <div class="arr">→</div>
+      <div class="node"><strong>waiting_user</strong>需澄清/授权，挂起并在对话中提问</div>
+      <div class="arr">→</div>
+      <div class="node hl"><strong>done / failed</strong>完成事件上总线，触发下游 join 判定</div>
+      <div class="arr">→</div>
+      <div class="node"><strong>cancelled / superseded</strong>用户取消 / 被新任务替代（卡片保留可追溯）</div>
+    </div>
+  </div>
+  <span class="pageno">2 / 6</span>
+</section>
+
+<!-- ═══════════════ P3 架构 ═══════════════ -->
+<section class="slide">
+  <div class="header">
+    <h1>初步架构：<span class="hl">会话 Agent + 任务中枢 + 执行器池</span></h1>
+    <p class="subtitle">双通道消息流：<strong>对话流</strong>（话轮，LLM 生成）与<strong>任务状态流</strong>（卡片更新，事件直驱）分离</p>
+  </div>
+  <div class="arch">
+    <div class="arch-layer front">
+      <h3>会话 Agent（LLM）<span class="who">—— 唯一与用户对话的角色</span></h3>
+      <div class="arch-items">
+        <div class="it"><strong>意图路由</strong>新增 / 修正 / 取消 / 查询四分类 + 活跃任务表上的指代解析</div>
+        <div class="it"><strong>任务编译</strong>一句话 → N 个 Task（Trigger/Goal/Policy），fan-out + join 依赖建图</div>
+        <div class="it"><strong>秒回应答</strong>"好的，已经开始生成" + 插入任务卡片占位</div>
+        <div class="it"><strong>事件后处置</strong>失败 / 需澄清 / 全部完成时，代表任务向用户开口</div>
+      </div>
+    </div>
+    <div class="arch-arrows"><span><b>①</b> 创建/修正/取消任务 ↓</span><span><b>④</b> 需要对话的事件（失败/澄清/汇总）↑</span><span><b>⑤</b> 卡片状态更新（直驱 UI，不过 LLM）↗</span></div>
+    <div class="arch-layer mid">
+      <h3>任务中枢（非 LLM，可靠常驻）<span class="who">—— 状态与调度的唯一权威</span></h3>
+      <div class="arch-items">
+        <div class="it"><strong>任务表 + 依赖 DAG</strong>Task/TaskRun 持久化；join 计数；产物句柄登记</div>
+        <div class="it"><strong>触发器引擎</strong>immediate / at·cron / on_tasks_done / on_event 统一管理</div>
+        <div class="it"><strong>事件总线</strong>任务完成·失败·进度、定时到点、外部事件，全部过总线可审计</div>
+        <div class="it"><strong>调度器</strong>并发额度、优先级、取消信号下发、失败重试策略</div>
+      </div>
+    </div>
+    <div class="arch-arrows"><span><b>②</b> 派发 TaskRun ↓</span><span><b>③</b> 进度 / 完成 / 失败事件 ↑</span></div>
+    <div class="arch-layer back">
+      <h3>执行器池<span class="who">—— 无状态 worker，可横向扩展</span></h3>
+      <div class="arch-items">
+        <div class="it"><strong>生图 worker</strong>接收 Goal + 上下文，产物写存储、登记句柄</div>
+        <div class="it"><strong>生视频 worker</strong>输入 = 依赖任务的产物句柄</div>
+        <div class="it"><strong>Agentic worker</strong>深度研究 / App 操控等长任务（subagent loop，后续接入）</div>
+        <div class="it"><strong>取消协议</strong>响应中枢的 cancel 信号，及时释放资源、清理半成品</div>
+      </div>
+    </div>
+  </div>
+  <div class="callout" style="margin-top:.55em;">
+    <b>为什么这样切：</b>① 卡片进度更新事件直驱 UI，<b>零 token、零时延</b>，LLM 不参与刷进度；② 中枢独立于 LLM 存活，会话模型故障不丢任务；③ 该中枢即 03 章"调度与状态层"，下一步接 omni 时<b>前台换成全双工秘书、中枢与执行层原样复用</b>。
+  </div>
+  <span class="pageno">3 / 6</span>
+</section>
+
+<!-- ═══════════════ P4 场景走查 ═══════════════ -->
+<section class="slide">
+  <div class="header">
+    <h1>场景走查：<span class="hl">三轮对话的系统内部时序</span></h1>
+    <p class="subtitle">重点：Q2 修正的旧任务处置决策、Q3 的 fan-out + join 编排</p>
+  </div>
+  <div class="timeline">
+    <div class="trow">
+      <div class="qcol"><b>Q1</b>生成小男孩玩耍图片</div>
+      <div class="steps">
+        <div class="node"><strong>路由=新增</strong>编译 T1：<span class="mono">immediate</span></div>
+        <div class="arr">→</div>
+        <div class="node"><strong>秒回 + 插卡</strong>"已经开始生成" + T1 卡片[排队]</div>
+        <div class="arr">→</div>
+        <div class="node"><strong>调度执行</strong>生图 worker 跑 T1，进度直写卡片</div>
+      </div>
+    </div>
+    <div class="trow">
+      <div class="qcol"><b>Q2</b>"不对"，要小女孩玩耍</div>
+      <div class="steps">
+        <div class="node"><strong>路由=修正</strong>指代解析 → 落在 T1（唯一活跃且刚创建）</div>
+        <div class="arr">→</div>
+        <div class="node"><strong>创建 T2</strong>Goal 继承 T1 上下文 + 替换主体；插 T2 卡片</div>
+        <div class="arr">→</div>
+        <div class="node decision"><strong>决策点：T1 怎么办？</strong>建议按进度分档（见下方策略框）；T1 卡片显示终态，保留可追溯</div>
+      </div>
+    </div>
+    <div class="trow">
+      <div class="qcol"><b>Q3</b>再生成 3 张，完成后生成视频</div>
+      <div class="steps">
+        <div class="node"><strong>路由=新增（批量）</strong>编译 4 个 Task：T3.1–3.3 <span class="mono">immediate</span> 并行 + T4 <span class="mono">on_tasks_done[T3.*]</span></div>
+        <div class="arr">→</div>
+        <div class="node"><strong>一次性插 4 张卡</strong>T3.x [生成中]、T4 [等待依赖 0/3] —— 用户创建时就能看到全链路</div>
+        <div class="arr">→</div>
+        <div class="node"><strong>事件驱动 join</strong>每张图完成 → 总线事件 → 中枢 join 计数 1/3→3/3 → 自动启动 T4，卡片翻为[生成中]，全程无需用户催</div>
+      </div>
+    </div>
+  </div>
+  <div class="cols" style="flex:0 0 auto; margin-top:.55em;">
+    <div class="panel" style="flex:1.2;">
+      <h2><span class="tag warn">设计决策</span>修正时旧任务（T1）的处置策略</h2>
+      <table>
+        <tr><th>方案</th><th>行为</th><th>适用</th></tr>
+        <tr><td><strong>A. 立即取消</strong></td><td>发 cancel，卡片→"已取消（被 T2 替代）"</td><td>刚开始跑、成本未沉没 —— <strong>默认</strong></td></tr>
+        <tr><td><strong>B. 跑完但降级</strong></td><td>继续生成，卡片→"已被替代"，产物静默入库</td><td>进度 &gt;80%，沉没成本已付，留着或许有用</td></tr>
+      </table>
+      <p style="margin-top:.4em;">建议：<strong>按进度阈值自动选 A/B</strong>，卡片明示结果；用户可在卡片上一键"还是要这张"。修正判定置信度低时先反问，避免误杀（见 P6）。</p>
+    </div>
+    <div class="panel" style="flex:1;">
+      <h2><span class="tag green">检验</span>该场景验证了哪些机制</h2>
+      <ul>
+        <li>R1 非阻塞：T1 在跑，Q2/Q3 照常处理；</li>
+        <li>R3/R4 修正路由 + 替代语义（T2 ⇄ T1）；</li>
+        <li>R5 一句话编译出 <strong>fan-out + join + 链式任务</strong>；</li>
+        <li>R6 "3 图完成"作为事件自动触发 T4 —— <strong>与定时/外部事件同一总线</strong>；</li>
+        <li>R2 六张卡片各自独立更新，对话流不被进度刷屏。</li>
+      </ul>
+    </div>
+  </div>
+  <span class="pageno">4 / 6</span>
+</section>
+
+<!-- ═══════════════ P5 扩展场景验证 ═══════════════ -->
+<section class="slide">
+  <div class="header">
+    <h1>扩展场景验证：<span class="hl">需求与方案是否兜得住</span></h1>
+    <p class="subtitle">在同一模型下推演 7 个典型场景 —— 全部只用 P2/P3 已有机制，<strong>无需新增概念</strong></p>
+  </div>
+  <div class="panel" style="flex:1;">
+    <table>
+      <tr><th style="width:26%;">场景（用户说）</th><th>系统行为</th><th style="width:24%;">用到的机制</th></tr>
+      <tr>
+        <td><strong>"图好了吗？"</strong></td>
+        <td>路由=查询 → 读任务表汇总口头回答（"T2 快好了，3 张图完成 2 张"），<strong>不新建任务</strong></td>
+        <td>意图路由·查询分支；活跃任务表</td>
+      </tr>
+      <tr>
+        <td><strong>"第二张重新生成，光线亮一点"</strong></td>
+        <td>指代解析 → T3.2；创建 T3.2'（原 Goal + 追加约束 + 引用原产物），T3.2 标记 superseded；<strong>T4 的依赖自动改指 T3.2'</strong>，若 T4 已启动则询问是否重做</td>
+        <td>指代解析；修正语义；依赖 DAG 改写</td>
+      </tr>
+      <tr>
+        <td><strong>T3.2 生成失败</strong>（系统事件）</td>
+        <td>自动重试 ×N；仍失败 → T4 转 <span class="mono">waiting_user</span>，会话 Agent 开口："第二张失败了，重试 / 用两张先做视频 / 取消视频？"</td>
+        <td>失败事件；join 阻塞策略；waiting_user 澄清（带候选项）</td>
+      </tr>
+      <tr>
+        <td><strong>"视频改成竖屏的"</strong>（T4 还在等待依赖）</td>
+        <td>路由=修正 → T4 未启动，<strong>直接改 Goal，零成本</strong>；若已 running，按 checkpoint 决定改参续跑或重启</td>
+        <td>修正落在 waiting 态任务；steering</td>
+      </tr>
+      <tr>
+        <td><strong>"算了，视频不要了"</strong></td>
+        <td>取消 T4；<strong>上游 T3.x 不受影响</strong>继续生成（产物本身仍是用户要的）；若 T3.x 仅为 T4 服务才级联询问</td>
+        <td>取消传播策略（下游取消默认不上溯）</td>
+      </tr>
+      <tr>
+        <td><strong>"这批图片生成完发我邮箱"</strong></td>
+        <td>追加任务 T5：<span class="mono">on_tasks_done[T3.*]</span>，delivery=email —— <strong>与 T4 共享同一组依赖</strong>，一个事件可触发多个下游</td>
+        <td>事件多播；Policy.delivery</td>
+      </tr>
+      <tr>
+        <td><strong>"明早 8 点把这些图再精修一遍"</strong></td>
+        <td>创建 T6：<span class="mono">at(明日8:00)</span>，Goal 引用 T3 产物句柄 —— 定时与任务链是同一套 Trigger 的两个类型</td>
+        <td>at/cron Trigger；产物句柄跨任务引用</td>
+      </tr>
+    </table>
+  </div>
+  <div class="callout" style="margin-top:.55em;">
+    <b>结论：</b>7 个场景没有一个需要为它单独发明机制 —— 意图路由（4 分类）× Trigger（4 类型）× 生命周期（含 waiting_user / superseded）× 事件总线，这四件套的组合封闭性较好。下一步接入长任务（深度研究 / App 操控）时复用同一骨架，只是 worker 变成 agentic loop。
+  </div>
+  <span class="pageno">5 / 6</span>
+</section>
+
+<!-- ═══════════════ P6 决策与开放问题 ═══════════════ -->
+<section class="slide">
+  <div class="header">
+    <h1>关键设计决策与<span class="hl">开放问题</span></h1>
+    <p class="subtitle">已定主张先对齐，开放问题带倾向供拍板</p>
+  </div>
+  <div class="cols">
+    <div class="col" style="flex:1;">
+      <div class="panel" style="flex:1;">
+        <h2><span class="tag green">已定主张</span>本次对齐的六条</h2>
+        <ul>
+          <li><strong>统一任务模型</strong>：即时 Query、定时、事件、任务链共用 <span class="mono">Task = Trigger + Goal + Policy</span>，不做多套机制；</li>
+          <li><strong>双通道消息流</strong>：进度更新事件直驱卡片 UI，不过 LLM、不产生聊天气泡；LLM 只管创建期与事件后处置期；</li>
+          <li><strong>意图路由四分类</strong>先于任务创建，指代解析基于会话内常驻的活跃任务表；</li>
+          <li><strong>修正 = 替代 + 处置</strong>：新增 <span class="mono">superseded</span> 终态，卡片保留可追溯、可一键找回；</li>
+          <li><strong>join 由中枢计数</strong>，完成事件多播，一组依赖可同时触发视频、发邮件等多个下游；</li>
+          <li><strong>中枢非 LLM 常驻</strong>：任务与触发器持久化，会话模型故障不丢任务。</li>
+        </ul>
+      </div>
+    </div>
+    <div class="col" style="flex:1.25;">
+      <div class="panel" style="flex:1;">
+        <h2><span class="tag warn">开放问题</span>待拍板（附倾向）</h2>
+        <table>
+          <tr><th>#</th><th>问题</th><th>倾向</th></tr>
+          <tr><td>1</td><td><strong>修正 vs 新增的误判兜底</strong>："再来一张女孩的"到底是改 T2 还是加一张？</td><td>置信度低即反问一句；误判后提供"恢复旧任务"一键回退</td></tr>
+          <tr><td>2</td><td><strong>旧任务处置阈值</strong>：A 取消 / B 跑完降级的进度分界</td><td>先拍 80%，上线后按沉没成本与用户找回率调</td></tr>
+          <tr><td>3</td><td><strong>join 失败默认策略</strong>：部分依赖失败时下游等不等</td><td>重试 ×2 后转 waiting_user 询问，不静默降级</td></tr>
+          <tr><td>4</td><td><strong>并发上限与排队呈现</strong>：同时 N 个生成任务的额度、排队卡片怎么显示</td><td>额度按资源池；卡片显式"排队中 第 k 位"</td></tr>
+          <tr><td>5</td><td><strong>活跃任务表的规模控制</strong>：几十个任务时会话上下文怎么办</td><td>活跃度分层：进行中逐条、已完成折叠为计数</td></tr>
+          <tr><td>6</td><td><strong>跨会话可见性</strong>：新开会话能否看到/操作旧会话的任务</td><td>能——任务属于用户不属于会话；另设任务收件箱视图</td></tr>
+        </table>
+      </div>
+      <div class="callout" style="margin-top:.6em;">
+        <b>下一步：</b>① 按本方案落一版最小闭环（生图/生视频两类 worker + 四分类路由 + join）；② 接入长任务 worker（waiting_user 澄清链路实测）；③ 前台替换为 omni 全双工秘书 —— 中枢与执行层设计保持不变。
+      </div>
+    </div>
+  </div>
+  <span class="pageno">6 / 6</span>
+</section>
+
+</body>
+</html>
