@@ -22,3 +22,4 @@
 | [docs/skill-env-variables/](./docs/skill-env-variables/) | Skill 分支环境变量传入方案（前台应用为例，通道选择与决策矩阵，含业界实现调研） |
 | [docs/thinking-tool-calls/](./docs/thinking-tool-calls/) | 思考模式（Thought）与 Function Call 的时序机制（先想后调、三层"出不出 thought"原因） |
 | [docs/skill-tool-rom-versioning/](./docs/skill-tool-rom-versioning/) | Skill 与工具的 ROM 配套管理（双速发布、版本感知、工具治理、单 skill 可行性、重组情形，含单页与 8 页详解 HTML 幻灯片） |
+| [docs/phone-assistant-automation/](./docs/phone-assistant-automation/) | 手机智慧助手需求与方案（全双工 omni 假设下的统一任务模型：定时/事件/自定义监视/长时异步任务，双脑架构 + 打扰管理器） |
