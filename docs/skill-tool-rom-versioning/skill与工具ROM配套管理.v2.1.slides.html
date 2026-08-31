@@ -303,7 +303,7 @@
 <div class="slide">
   <div class="header">
     <h1>skill 何时依赖<span class="hl">端侧智慧助手 APP</span> 版本<small>判别总则、机制清单与设计约束</small></h1>
-    <div class="headline"><p><strong>一句话总结：端侧是纯工具执行 → skill 不依赖 APP 版本；端侧含 Agent harness（skill 运行框架）→ skill 依赖 APP 版本。</strong>依赖的从来不是 APP 本身，而是<em>"模型输出协议"的端侧解释器</em>。</p></div>
+    <div class="headline"><p><strong>一句话总结：端侧是纯工具执行 → skill 不依赖 APP 版本；端侧含 Agent harness（skill 运行框架）→ skill 依赖 APP 版本。</strong>另有第二条链路：APP 同时是<em>工具 provider</em>，其工具变更同样牵动 skill（左下）。</p></div>
   </div>
   <div class="grid two">
     <div class="card">
@@ -337,11 +337,15 @@
         <tr><td>cap 条件块渲染 / 分发 / 索引</td><td>云端编译期</td><td><strong style="color:var(--accent2);">否</strong></td></tr>
       </table>
     </div>
-    <div class="card band" style="border-color: rgba(14,165,120,.4);">
-      <h3 class="green"><span class="dot"></span>设计约束与兜底</h3>
-      <p style="font-size:.9em;"><strong>① 端侧纯执行器原则（架构约束）</strong>：机制协议尽量云端解释，端侧只留纯执行 —— skill 对 APP 版本的依赖被<em>结构性消除</em>大半。
-      <strong>② 无法云端化的收编为机制契约</strong>：助手 APP 作为 provider，其 runtime 能力（<code>env_report</code>、<code>result_envelope: 2</code>…）进登记表条目，查表键扩展为 ROM × 机型 × <em>助手 APP 版本段</em>（APP 走应用市场周级更新，是三个键里变化最快、升级也最轻的）。
-      <strong>③ skill 声明 <code>required_runtime</code></strong>：CI 扫描正文语法自动推导（用了 <code>${}</code> 就要求对应 runtime），不靠人写；机制降级与工具降级同一套能力分支写法（如"无 env_context 时改调 get_foreground_app 查询"）。</p>
+    <div class="card" style="border-color: rgba(217,122,6,.4);">
+      <h3 class="warn"><span class="dot"></span>第二条链路 · 助手 APP 也是工具提供者</h3>
+      <p style="font-size:.88em;">APP 自身注册业务工具（内置备忘、搜索、会话管理…），<strong>APP 升级 = 工具契约变化，skill 随之联动</strong>。处理回到常规工具管理轨道：以 provider = 助手 APP 进登记表（查表键含 APP 版本段），同样受 <strong>T0/T1/T2</strong> 稳定性承诺与 S3/S4 流程约束，破坏性变更走"快通道先行"。特殊点只在发布通道：应用市场<em>周级</em>更新、可独立于 ROM、可产品内引导升级 —— 它是"最快的工具慢通道"，登记与灰度节奏按周管理。</p>
+    </div>
+    <div class="card" style="border-color: rgba(14,165,120,.4);">
+      <h3 class="green"><span class="dot"></span>设计约束与兜底（机制链路）</h3>
+      <p style="font-size:.88em;"><strong>① 端侧纯执行器原则</strong>：机制协议尽量云端解释，端侧只留纯执行 —— 依赖被<em>结构性消除</em>大半。
+      <strong>② 无法云端化的收编为机制契约</strong>：runtime 能力（<code>env_report</code>、<code>result_envelope: 2</code>…）进登记表，查表键扩展为 ROM × 机型 × <em>助手 APP 版本段</em>。
+      <strong>③ <code>required_runtime</code> 由 CI 自动推导</strong>（正文用了 <code>${}</code> 即要求对应 runtime）；机制降级与工具降级同一套能力分支写法（如"无 env_context 时改调 get_foreground_app"）。</p>
     </div>
   </div>
   <div class="pageno">4 / 7</div>
