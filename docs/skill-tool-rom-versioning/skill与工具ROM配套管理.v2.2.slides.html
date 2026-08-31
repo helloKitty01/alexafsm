@@ -209,7 +209,7 @@
       <p style="margin-top:.4em; font-size:.88em;">skill 的兼容声明<strong>只对这个对象</strong>（<code>min_tool_api</code> + <code>required_tools</code>）；ROM / 机型 / 组件版本降级为生产对象时的<em>输入</em>，被封装在生产侧，消费侧永远不可见。</p>
     </div>
   </div>
-  <div class="pageno">1 / 9</div>
+  <div class="pageno">1 / 10</div>
 </div>
 
 <!-- ================= 第 2 页 · 逻辑结构图 ================= -->
@@ -254,7 +254,7 @@
       </div>
     </div>
   </div>
-  <div class="pageno">2 / 9</div>
+  <div class="pageno">2 / 10</div>
 </div>
 
 <!-- ================= 第 3 页 · 路线对比与演进 ================= -->
@@ -296,7 +296,7 @@
       <p><strong>API level 不能代表 ROM，设计上也不应让它代表</strong>：同一 ROM 不同机型工具集可能不同；多个 ROM 小版本共享同一契约；独立 OTA 组件可不升 ROM 改变工具集。API level 语义锚定的是<em>工具契约快照</em>（对能力清单的离散化编号），运营节奏可对齐 ROM 大版本，但 skill 声明永远针对 API level + required_tools。自检规则：若发现"必须用 ROM 版本号才能表达某差异"，说明有能力没被清单表达 —— 正确动作是<strong>补清单字段</strong>，不是引入 ROM 维度。</p>
     </div>
   </div>
-  <div class="pageno">3 / 9</div>
+  <div class="pageno">3 / 10</div>
 </div>
 
 <!-- ================= 第 4 页 · skill 对端侧智慧助手 APP 版本的依赖 ================= -->
@@ -348,7 +348,7 @@
       <strong>③ <code>required_runtime</code> 由 CI 自动推导</strong>（正文用了 <code>${}</code> 即要求对应 runtime）；机制降级与工具降级同一套能力分支写法（如"无 env_context 时改调 get_foreground_app"）。</p>
     </div>
   </div>
-  <div class="pageno">4 / 9</div>
+  <div class="pageno">4 / 10</div>
 </div>
 
 <!-- ================= 第 5 页 · 日常操作手册 ================= -->
@@ -393,7 +393,7 @@
       <p><strong>风险不对称</strong>：新增子技能的失败模式是"老设备得不到新东西"（可接受）；修改既有流程去依赖新工具的失败模式是"老设备上原来能用的功能坏了"（<strong style="color:var(--err);">功能回退，事故级</strong>）。前者轻流程，后者重流程 —— 判据不是"改了多少"，而是"是否触碰老设备的既有行为"。</p>
     </div>
   </div>
-  <div class="pageno">5 / 9</div>
+  <div class="pageno">5 / 10</div>
 </div>
 
 <!-- ================= 第 6 页 · 工具什么时候变化及双轨治理 ================= -->
@@ -445,14 +445,14 @@
       </ul>
     </div>
   </div>
-  <div class="pageno">6 / 9</div>
+  <div class="pageno">6 / 10</div>
 </div>
 
 <!-- ================= 第 7 页 · skill 多版本管理 ================= -->
 <div class="slide">
   <div class="header">
     <h1>skill <span class="hl">多版本管理</span> · 触发、处理、收编<small>多版本是例外不是默认</small></h1>
-    <div class="headline"><p><strong>准入规则：开门控版本需 TMG 审批</strong> —— 开版本像开分支一样有长期维护成本。纯体验优化、增量工具的能力分支、机制降级分支<em>都不触发多版本</em>，在单版本内解决。</p></div>
+    <div class="headline"><p><strong>三类定义</strong>：<em>灰度</em> = 同一人群新旧短期共存（发布风控）；<em>门控</em> = 不同契约档位各用其版（兼容性 —— 按<strong>登记表推导的 API level</strong> 分发，落地≈按 ROM 版本段，无需自建工具集）；<em>实验</em> = 同一人群分桶 A/B（效果对比）。多版本是例外不是默认，<strong>开门控版本需 TMG 审批</strong>。</p></div>
   </div>
   <div class="grid two">
     <div class="card">
@@ -460,7 +460,7 @@
       <table>
         <tr><th>触发</th><th>类型</th><th>生命周期</th></tr>
         <tr><td>任何内容变更发布（必经灰度）</td><td><span class="tag green">灰度</span></td><td>天级 · 必收敛</td></tr>
-        <tr><td>工具破坏性变更（老 toolset 用老版）</td><td><span class="tag err">门控</span></td><td>月~年</td></tr>
+        <tr><td>工具破坏性变更（老契约档位用老版）</td><td><span class="tag err">门控</span></td><td>月~年</td></tr>
         <tr><td>既有流程改依赖新工具（S1 禁令例外，TMG 批准）</td><td><span class="tag err">门控</span></td><td>月~年</td></tr>
         <tr><td>能力分支超预算（&gt;2~3 个）拆版本</td><td><span class="tag err">门控</span></td><td>月~年</td></tr>
         <tr><td>引用 T2 实验工具</td><td><span class="tag err">门控</span></td><td>随工具晋级 / 下线</td></tr>
@@ -473,10 +473,10 @@
       <div class="example"><span class="g">发送消息@3.x</span>（main · tool_api ≥ 8）      <span class="dim">← 功能演进只在主线</span>
 <span class="w">发送消息@2.7</span>（frozen · tool_api 6~7）  <span class="dim">← max_tool_api 封顶，只接安全回灌</span></div>
       <ul style="font-size:.88em; margin-top:.45em;">
-        <li><strong>唯一解析 + 会话钉住</strong>：toolset 定版本线 → 实验桶 → 灰度桶，顺序固定函数确定；日志强制 (skill_version, toolset_id)</li>
+        <li><strong>唯一解析 + 会话钉住</strong>：契约档位（API level）定版本线 → 实验桶 → 灰度桶，顺序固定函数确定；日志强制 (skill_version, toolset_id)</li>
         <li><strong>每 skill 一条主线 + 至多 1~2 条冻结线</strong>；冻结线回灌前先看受影响设备占比是否值得</li>
         <li><strong>单源纪律</strong>：门控版本优先由单源多渲染产出（cap 条件块），独立文本分支只留给破坏性场景</li>
-        <li><strong>评估</strong>：每条在役线对其 toolset 快照回归；任何线发布都重跑<em>选择评估</em>（防索引描述互扰）</li>
+        <li><strong>评估</strong>：每条在役线对其档位的 golden manifest 快照回归；任何线发布都重跑<em>选择评估</em>（防索引描述互扰）</li>
       </ul>
     </div>
     <div class="card band" style="border-color: rgba(14,165,120,.4);">
@@ -487,10 +487,47 @@
       <strong>回滚版本</strong>：修复后重走灰度。配<strong>收编看板</strong>：每条冻结线标注（设备占比 / 上次回灌 / 预计 EOL），进例行运营 review，防僵尸版本。</p>
     </div>
   </div>
-  <div class="pageno">7 / 9</div>
+  <div class="pageno">7 / 10</div>
 </div>
 
-<!-- ================= 第 8 页 · 防错清单 ================= -->
+<!-- ================= 第 8 页 · 评审管理一页 ================= -->
+<div class="slide">
+  <div class="header">
+    <h1><span class="hl">评审管理</span>一页 · 什么要评、评什么、谁来评<small>工具 / skill 分支与版本 / 重组 —— 全量评审事项</small></h1>
+    <div class="headline"><p><strong>效率原则：CI 分流，人只评"破坏性 + 例外"。</strong>兼容变更零评审自动放行 + 登记；评审判据锚定两点：<em>是否影响老设备既有行为、是否增加长期在役版本</em>（即不可逆性）。</p></div>
+  </div>
+  <div class="grid two">
+    <div class="card" style="grid-row: 1 / 3;">
+      <h3><span class="dot"></span>评审事项清单</h3>
+      <table>
+        <tr><th>评审对象</th><th>触发</th><th>评审要点</th></tr>
+        <tr><td><strong>工具破坏性变更 / 删除</strong>（T1+）</td><td>CI schema diff 判定破坏</td><td>四件套：动机、diff、受影响 skill 清单（依赖索引自动出）、迁移方案（alias / shim + skill 适配计划）；批准后走快通道先行</td></tr>
+        <tr><td><strong>工具晋级 T2 → T1</strong></td><td>纳入稳定承诺前</td><td>schema 质量、命名规范、行为回归评估 → 进 golden manifest</td></tr>
+        <tr><td><strong>三方工具准入 / 退出</strong></td><td>接入时（变更审不到）</td><td>schema 质量、稳定性历史、owner 响应 SLA；默认 T2 登记</td></tr>
+        <tr><td><strong>架构级批量变更</strong>（意图框架升级、执行器换代）</td><td>立项时</td><td>整体专项评审，整体产出新 API level，严禁零敲碎打</td></tr>
+        <tr><td><strong>skill 开门控版本</strong></td><td>申请开版本线时</td><td>长期维护成本审批：为何能力分支 / 单源条件块解决不了</td></tr>
+        <tr><td><strong>skill 既有 SOP 引入新工具依赖</strong>（S1 例外）</td><td>舆情 / 强诉求驱动时</td><td>老设备既有行为影响评估 + 配套新版本方案</td></tr>
+        <tr><td><strong>skill 重组 changeset</strong></td><td>拆 / 合 / 改名 / 分层</td><td>选择评估报告 + 描述互斥 / 覆盖检查结果 + alias 计划</td></tr>
+      </table>
+    </div>
+    <div class="card" style="border-color: rgba(14,165,120,.4);">
+      <h3 class="green"><span class="dot"></span>免评审白名单（CI 自动放行 + 登记）</h3>
+      <p style="font-size:.88em;">兼容性工具变更（新增工具、加可选参数、返回加字段）· skill 纯体验优化（无新工具依赖，CI 扫描把关）· 能力分支的增删（含机制降级分支）· 灰度放量 / 回滚 · 实验开启（须带截止日）—— <strong>全部自动放行</strong>，只留登记与通知，不进人工评审。</p>
+    </div>
+    <div class="card">
+      <h3 class="purple"><span class="dot"></span>分工与节奏</h3>
+      <ul style="font-size:.88em;">
+        <li><strong>平台 TMG 管契约</strong>：schema、兼容性判定、API level 纳入、机制契约（runtime）—— 契约的消费方是模型和 skill 体系</li>
+        <li><strong>垂域 TMG 管实现</strong>：工具实现质量、业务话术、skill 内容正确性</li>
+        <li><strong>节奏</strong>：随 ROM 大版本<em>成套批量评审</em>为主；助手 APP / 云端工具走周级例会；安全合规走紧急通道</li>
+        <li><strong>材料全部自动生成</strong>：依赖索引出影响面、CI 出 diff 分类、评估平台出回归报告 —— 评审会只做判断，不做考古</li>
+      </ul>
+    </div>
+  </div>
+  <div class="pageno">8 / 10</div>
+</div>
+
+<!-- ================= 第 9 页 · 防错清单 ================= -->
 <div class="slide">
   <div class="header">
     <h1>保证不出错 · <span class="hl">七类错误，七个结构性防错</span><small>不靠小心，靠让错误无法发生或立即暴露</small></h1>
@@ -518,10 +555,10 @@
       </div>
     </div>
   </div>
-  <div class="pageno">8 / 9</div>
+  <div class="pageno">9 / 10</div>
 </div>
 
-<!-- ================= 第 9 页 · 落地优先级与速记 ================= -->
+<!-- ================= 第 10 页 · 落地优先级与速记 ================= -->
 <div class="slide">
   <div class="header">
     <h1><span class="hl">落地优先级</span>与速记<small>先立对象，再上门禁，路线 B 先行</small></h1>
@@ -556,7 +593,7 @@
       </ul>
     </div>
   </div>
-  <div class="pageno">9 / 9</div>
+  <div class="pageno">10 / 10</div>
 </div>
 
 </body>
