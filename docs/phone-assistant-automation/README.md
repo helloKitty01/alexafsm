@@ -12,8 +12,8 @@
 | [02-统一任务模型.md](./02-统一任务模型.md) | Task = Trigger × Goal × Policy；Trigger 类型系统；事件两层设计（系统事件管理器 + watch 归约为"轮询+判定"）；TaskRun 生命周期（`waiting_user` 一等状态）；一句话到任务的创建链路 |
 | [03-架构方案.md](./03-架构方案.md) | 三层架构（全双工前台秘书 / 非 LLM 调度中枢 / 深度模型执行后台）；双脑设计与任务摘要卡片；subagent 与 checkpoint；打扰管理器（主动性唯一出口）；两条全链路串讲 |
 | [04-关键难题与开放问题.md](./04-关键难题与开放问题.md) | 对话×任务结合的四个子问题；长任务管理（澄清回拨、steering、可靠性、失败呈现）；全双工特有问题；开放问题清单与推进顺序 |
-| [多任务管理Agent.slides.v1.2.html](./多任务管理Agent.slides.v1.2.html) | **汇报材料（当前版本 v1.2，9 页）**：以 v1.0 场景叙事为骨架 + 讨论修正——消息·响应·任务三层模型（任务要够格：5 条升格判据 + 溢出升格 + 命名管理）、意图路由六分类（chat/new_task/followup/steer/control/query，对齐现有 steer/followup/multitask 概念）、主 loop = player-coach（回答"核心 loop 是谁"）、loop×事件三段式（订阅/阻塞/唤醒，loop 永不阻塞）、双层上下文（UAT 主干 + TaskRun 支线，三处交汇）、16 场景全表（验收基准）、v1.1 机制压缩附录、已定主张与开放问题 |
-| [history/](./history/) | 历史版本留档：多任务管理 Agent 幻灯片 v1.0（6 页初版方案）、v1.1（7 页机制细化，已压缩为 v1.2 附录页） |
+| [多任务管理Agent.slides.v1.3.html](./多任务管理Agent.slides.v1.3.html) | **汇报材料（当前版本 v1.3，10 页）**：双入口需求（Query 驱动 + 自动化触发补齐主线）、消息·响应·任务三层模型（回复时机三分：纯语言即答 / 同步等待后答 / 异步 ack，由工具 latency 契约决定）、意图路由六分类、主 loop = player-coach + 对端异构执行体三形态（长时工具 / subAgent / A2A，steer 能力分级）、双层上下文（主转录 + TaskRun 支线）、**UAT 接口设计**（事件 = user 角色信封、支线阻塞 = 未返回的 tool call、`<active_tasks>` 尾部注入、工具三层：openClaw 业务工具 / 任务管理八件套 / finalAnswer，`forward_user_reply` ≠ finalAnswer 澄清）、16 场景全表、v1.1 机制附录、已定主张与开放问题 |
+| [history/](./history/) | 历史版本留档：多任务管理 Agent 幻灯片 v1.0（6 页初版）、v1.1（7 页机制细化）、v1.2（9 页三层模型版），均已被 v1.3 取代 |
 
 ## 核心结论（当前版本）
 

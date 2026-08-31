@@ -1,0 +1,653 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>多任务管理 Agent v1.3：双入口 × 三层模型 × UAT 接口 × 异构执行体</title>
+<style>
+  :root {
+    --bg: #e9eef6;
+    --slide-bg: linear-gradient(135deg, #ffffff 0%, #f8fbfe 55%, #f2f7fd 100%);
+    --card: #ffffff;
+    --card-border: #dfe6f0;
+    --text: #1e2a3d;
+    --muted: #5a6b84;
+    --accent: #2f6fed;
+    --accent2: #0ea578;
+    --warn: #d97a06;
+    --danger: #d0453c;
+    --purple: #7c5cd6;
+    --code-bg: #f3f6fb;
+    --code-text: #24405f;
+    --mono: "SF Mono", "JetBrains Mono", Consolas, "Courier New", monospace;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { background: var(--bg); }
+  body {
+    font-family: "PingFang SC", "Microsoft YaHei", "Noto Sans SC", -apple-system, sans-serif;
+    color: var(--text);
+    display: flex; flex-direction: column; align-items: center;
+    padding: 28px 16px; gap: 28px; min-height: 100vh;
+  }
+  .slide {
+    width: min(1280px, 96vw);
+    aspect-ratio: 16 / 9;
+    background: var(--slide-bg);
+    border: 1px solid var(--card-border);
+    border-radius: 18px;
+    box-shadow: 0 18px 44px rgba(30,42,61,.14);
+    padding: 2% 2.6%;
+    display: flex; flex-direction: column;
+    overflow: hidden; position: relative;
+    font-size: clamp(9.5px, 1.02vw, 14px);
+  }
+  .slide::before {
+    content: ""; position: absolute; inset: 0 0 auto 0; height: 4px;
+    background: linear-gradient(90deg, var(--accent), var(--accent2));
+    border-radius: 18px 18px 0 0;
+  }
+  .pageno { position: absolute; right: 1.6em; bottom: 1em; font-family: var(--mono); font-size: .8em; color: var(--muted); }
+
+  .header { display: flex; align-items: baseline; justify-content: space-between; gap: 1.4em; margin-bottom: .6em; }
+  h1 { font-size: 1.6em; font-weight: 700; white-space: nowrap; }
+  h1 .hl { color: var(--accent); }
+  h1 .ver { font-family: var(--mono); font-size: .6em; color: var(--accent2); vertical-align: super; margin-left: .3em; }
+  .subtitle { color: var(--muted); font-size: .92em; line-height: 1.4; text-align: right; }
+  .subtitle strong { color: var(--text); }
+
+  code, .mono {
+    font-family: var(--mono); font-size: .92em;
+    background: var(--code-bg); color: var(--code-text);
+    border: 1px solid #e4eaf3; padding: 0 .3em; border-radius: 4px;
+  }
+
+  .cols { display: flex; gap: .9em; flex: 1; min-height: 0; }
+  .col { display: flex; flex-direction: column; gap: .7em; min-width: 0; min-height: 0; }
+
+  .panel {
+    background: var(--card); border: 1px solid var(--card-border); border-radius: 12px;
+    padding: .7em .9em; box-shadow: 0 2px 8px rgba(30,42,61,.04);
+    display: flex; flex-direction: column; min-height: 0;
+  }
+  .panel > h2 { font-size: 1em; font-weight: 700; margin-bottom: .45em; display: flex; align-items: baseline; gap: .5em; }
+  .panel > h2 .tag {
+    flex: none; font-size: .72em; font-weight: 700; color: var(--accent);
+    background: rgba(47,111,237,.08); border: 1px solid rgba(47,111,237,.3);
+    border-radius: 99px; padding: .1em .65em;
+  }
+  .panel > h2 .tag.green { color: var(--accent2); background: rgba(14,165,120,.08); border-color: rgba(14,165,120,.3); }
+  .panel > h2 .tag.warn { color: var(--warn); background: rgba(217,122,6,.08); border-color: rgba(217,122,6,.3); }
+  .panel > h2 .tag.purple { color: var(--purple); background: rgba(124,92,214,.08); border-color: rgba(124,92,214,.3); }
+  .panel ul { list-style: none; }
+  .panel li { color: var(--muted); font-size: .86em; line-height: 1.45; padding-left: .95em; position: relative; margin-bottom: .3em; }
+  .panel li::before { content: "•"; color: var(--accent); position: absolute; left: 0; }
+  .panel li strong { color: var(--text); font-weight: 600; }
+  .panel p { color: var(--muted); font-size: .86em; line-height: 1.45; }
+  .panel p strong { color: var(--text); }
+
+  /* 聊天 mockup */
+  .chat { display: flex; flex-direction: column; gap: .4em; overflow: hidden; }
+  .bubble { max-width: 92%; border-radius: 10px; padding: .38em .7em; font-size: .84em; line-height: 1.4; }
+  .bubble.user { align-self: flex-end; background: linear-gradient(135deg, #2f6fed, #4a84f2); color: #fff; border-bottom-right-radius: 3px; }
+  .bubble.agent { align-self: flex-start; background: var(--code-bg); color: var(--text); border: 1px solid var(--card-border); border-bottom-left-radius: 3px; }
+  .taskcard {
+    align-self: flex-start; width: 88%;
+    border: 1px solid var(--card-border); border-left: 3px solid var(--accent);
+    background: #fff; border-radius: 8px; padding: .32em .65em;
+    font-size: .8em; line-height: 1.35; display: flex; align-items: center; gap: .6em;
+    box-shadow: 0 1px 4px rgba(30,42,61,.06);
+  }
+  .taskcard .tid { font-family: var(--mono); font-weight: 700; color: var(--accent); flex: none; font-size: .9em; }
+  .taskcard .tname { color: var(--text); font-weight: 600; flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .taskcard .tstate { flex: none; font-size: .88em; font-weight: 700; border-radius: 99px; padding: .06em .6em; }
+  .st-run { color: var(--accent); background: rgba(47,111,237,.1); }
+  .st-wait { color: var(--purple); background: rgba(124,92,214,.1); }
+  .st-stop { color: var(--danger); background: rgba(208,69,60,.1); }
+  .taskcard.stopped { border-left-color: var(--danger); opacity: .85; }
+  .taskcard.waiting { border-left-color: var(--purple); }
+
+  /* 需求卡片 */
+  .reqs { display: grid; grid-template-columns: 1fr 1fr; gap: .55em; flex: 1; min-height: 0; }
+  .req { background: var(--card); border: 1px solid var(--card-border); border-radius: 10px; padding: .5em .7em; min-width: 0; }
+  .req h3 { font-size: .9em; font-weight: 700; margin-bottom: .2em; }
+  .req h3 .no { color: var(--accent); font-family: var(--mono); margin-right: .4em; }
+  .req p { color: var(--muted); font-size: .8em; line-height: 1.42; }
+  .req p strong { color: var(--text); }
+  .req.key { border-color: rgba(47,111,237,.5); background: linear-gradient(180deg, rgba(47,111,237,.05), #fff 45%); }
+
+  .flow { display: flex; align-items: stretch; gap: .45em; }
+  .flow .node {
+    flex: 1; min-width: 0; background: #fff; border: 1px solid var(--card-border);
+    border-radius: 8px; padding: .42em .55em; font-size: .8em; line-height: 1.38; color: var(--muted);
+  }
+  .flow .node strong { display: block; color: var(--text); font-size: .95em; margin-bottom: .1em; }
+  .flow .node.hl { border-color: rgba(47,111,237,.55); background: linear-gradient(180deg, rgba(47,111,237,.06), #fff 50%); }
+  .flow .node.green { border-color: rgba(14,165,120,.55); background: linear-gradient(180deg, rgba(14,165,120,.06), #fff 50%); }
+  .flow .node.purpleb { border-color: rgba(124,92,214,.55); background: linear-gradient(180deg, rgba(124,92,214,.06), #fff 50%); }
+  .flow .node.warnb { border-color: rgba(217,122,6,.5); background: #fdf9f2; }
+  .flow .node.warnb strong { color: var(--warn); }
+  .flow .arr { align-self: center; color: var(--accent); font-weight: 700; flex: none; }
+
+  table { width: 100%; border-collapse: collapse; font-size: .82em; }
+  th, td { text-align: left; padding: .36em .55em; border-bottom: 1px solid #edf1f7; vertical-align: top; line-height: 1.4; }
+  th { color: var(--muted); font-size: .88em; font-weight: 700; background: #f6f9fd; white-space: nowrap; }
+  td strong { color: var(--text); }
+  td { color: var(--muted); }
+  tr:last-child td { border-bottom: none; }
+
+  .callout {
+    border-radius: 10px; padding: .5em .85em; font-size: .84em; line-height: 1.45;
+    background: rgba(14,165,120,.07); border: 1px solid rgba(14,165,120,.35); color: var(--text);
+  }
+  .callout.warn { background: #fdf7f0; border-color: rgba(217,122,6,.4); }
+  .callout.blue { background: rgba(47,111,237,.06); border-color: rgba(47,111,237,.35); }
+  .callout b { color: var(--accent2); }
+  .callout.warn b { color: var(--warn); }
+  .callout.blue b { color: var(--accent); }
+
+  /* 三层模型带 */
+  .band {
+    border-radius: 10px; padding: .5em .8em;
+    font-size: .86em; color: var(--text); line-height: 1.42;
+    border: 1px solid var(--card-border); background: #fff;
+  }
+  .band strong { font-weight: 700; }
+  .band.msg  { border-color: rgba(47,111,237,.4); background: linear-gradient(90deg, rgba(47,111,237,.07), #fff 60%); }
+  .band.resp { border-color: rgba(14,165,120,.4); background: linear-gradient(90deg, rgba(14,165,120,.07), #fff 60%); }
+  .band.task { border-color: rgba(124,92,214,.4); background: linear-gradient(90deg, rgba(124,92,214,.07), #fff 60%); }
+  .down { text-align: center; color: var(--accent); font-weight: 700; font-size: .82em; line-height: 1.1; }
+
+  /* 时序走查 */
+  .timeline { display: flex; flex-direction: column; gap: .45em; flex: 1; min-height: 0; }
+  .trow { display: flex; gap: .6em; align-items: stretch; }
+  .trow .qcol { flex: none; width: 17%; background: rgba(47,111,237,.06); border: 1px solid rgba(47,111,237,.25); border-radius: 8px; padding: .4em .6em; font-size: .8em; line-height: 1.38; }
+  .trow .qcol b { color: var(--accent); font-family: var(--mono); display: block; font-size: .92em; }
+  .trow .steps { flex: 1; display: flex; gap: .45em; min-width: 0; }
+  .trow .steps .node { flex: 1; min-width: 0; background: #fff; border: 1px solid var(--card-border); border-radius: 8px; padding: .38em .55em; font-size: .78em; line-height: 1.36; color: var(--muted); }
+  .trow .steps .node strong { display: block; color: var(--text); font-size: .96em; }
+  .trow .steps .node.decision { border-color: rgba(217,122,6,.5); background: #fdf9f2; }
+  .trow .steps .node.decision strong { color: var(--warn); }
+  .trow .steps .arr { align-self: center; color: var(--accent); font-weight: 700; flex: none; font-size: .85em; }
+
+  /* 双层上下文图 */
+  .ctx { display: flex; gap: .7em; flex: 1; min-height: 0; }
+  .thread { flex: 1; border-radius: 12px; border: 1px solid var(--card-border); padding: .6em .8em; display: flex; flex-direction: column; min-width: 0; }
+  .thread.uat { border-color: rgba(47,111,237,.5); background: linear-gradient(180deg, rgba(47,111,237,.05), #fff 45%); }
+  .thread.trun { border-color: rgba(124,92,214,.5); background: linear-gradient(180deg, rgba(124,92,214,.05), #fff 45%); }
+  .thread h3 { font-size: .95em; font-weight: 700; margin-bottom: .35em; }
+  .thread h3 small { font-weight: 400; color: var(--muted); font-size: .8em; margin-left: .4em; }
+  .thread ul { list-style: none; }
+  .thread li { color: var(--muted); font-size: .82em; line-height: 1.45; padding-left: .9em; position: relative; margin-bottom: .28em; }
+  .thread li::before { content: "•"; color: var(--accent); position: absolute; left: 0; }
+  .thread li strong { color: var(--text); }
+  .meet { flex: none; width: 17%; display: flex; flex-direction: column; justify-content: center; gap: .5em; }
+  .meet .m { background: #fff; border: 1px solid rgba(14,165,120,.45); border-radius: 8px; padding: .35em .5em; font-size: .74em; line-height: 1.35; color: var(--muted); text-align: center; }
+  .meet .m strong { display: block; color: var(--accent2); font-size: .95em; }
+</style>
+</head>
+<body>
+
+<!-- ═══════════ P1 需求理解 ═══════════ -->
+<section class="slide">
+  <div class="header">
+    <h1>多任务管理 Agent<span class="ver">v1.3</span>：<span class="hl">需求理解</span></h1>
+    <p class="subtitle">范围：<strong>文本输出</strong>（omni 放下一步）｜双入口：<strong>Query 驱动 + 自动化触发（定时 / OS 事件 / 监视）</strong><br>定位：对话即任务控制台 —— 会话不被任务阻塞，任务以卡片形式活在对话流里</p>
+  </div>
+  <div class="cols">
+    <div class="col" style="flex: 0 0 38%;">
+      <div class="panel" style="flex:1;">
+        <h2><span class="tag">场景回放</span>一条对话流：即时任务 + 自动化任务同流</h2>
+        <div class="chat">
+          <div class="bubble user">帮我生成一个小男孩玩耍的图片</div>
+          <div class="bubble agent">好的，已经开始为您生成</div>
+          <div class="taskcard stopped"><span class="tid">T1</span><span class="tname">生成小男孩玩耍图</span><span class="tstate st-stop">已替代?</span></div>
+          <div class="bubble user">不对，帮我生成一个小女孩玩耍的</div>
+          <div class="bubble agent">好的，现在帮您生成女孩玩耍的图片</div>
+          <div class="taskcard"><span class="tid">T2</span><span class="tname">生成小女孩玩耍图</span><span class="tstate st-run">生成中</span></div>
+          <div class="bubble user">再帮我生成 3 张图片，完成后再帮我生成一个视频</div>
+          <div class="bubble agent">好的，3 张图片开始生成，完成后自动生成视频</div>
+          <div class="taskcard"><span class="tid">T3.1–3.3</span><span class="tname">组「3 图 + 视频」·图片 ×3 并行</span><span class="tstate st-run">生成中</span></div>
+          <div class="taskcard waiting"><span class="tid">T4</span><span class="tname">组「3 图 + 视频」·视频（输入 = 三图）</span><span class="tstate st-wait">等待依赖 0/3</span></div>
+          <div class="bubble user">每天 7 点半给我早报；另外到家后提醒我取快递</div>
+          <div class="bubble agent">已设好：每日早报下次明早 7:30；到家提醒已订阅到家事件</div>
+          <div class="taskcard waiting"><span class="tid">T5</span><span class="tname">每日早报（cron 7:30）</span><span class="tstate st-wait">待触发</span></div>
+          <div class="taskcard waiting"><span class="tid">T6</span><span class="tname">到家提醒取快递（geofence 事件）</span><span class="tstate st-wait">已订阅</span></div>
+        </div>
+      </div>
+    </div>
+    <div class="col" style="flex:1;">
+      <div class="reqs">
+        <div class="req key"><h3><span class="no">R0</span>响应 ≠ 任务</h3><p>"你好""心情不好""查天气"是<strong>即时响应</strong>：loop 就地干完，零任务对象。<strong>任务要够格才建</strong>（升格判据见 P2）—— 修正 v1.0/v1.1 "一切皆任务"的过重设计。</p></div>
+        <div class="req"><h3><span class="no">R1</span>非阻塞应答</h3><p>每个 Query <strong>先秒回，任务后台跑</strong>。对话永远可用 —— T1 在生成时 Q2 照常处理，任务跑着照样闲聊。</p></div>
+        <div class="req"><h3><span class="no">R2</span>任务卡片 = 任务的 UI 锚点</h3><p>够格任务插卡，<strong>状态自更新</strong>（排队/生成中/完成/失败/已替代），进度<strong>不产生聊天气泡</strong>、不刷屏。</p></div>
+        <div class="req key"><h3><span class="no">R3</span>意图路由六分类</h3><p><strong>chat / new_task / followup / steer / control / query</strong>，与现有 Agent 概念（steer、followup、multitask）对齐（P3）。Q2 的"不对"是 steer 替换级。</p></div>
+        <div class="req key"><h3><span class="no">R4</span>批量 + 依赖编排</h3><p>Q3 一句话 = <strong>fan-out</strong>（3 图并行）<strong>+ join</strong>（三张齐）<strong>+ 链式触发</strong>（视频引用三图产物）。同源任务成<strong>组</strong>，支持组级操作。</p></div>
+        <div class="req key"><h3><span class="no">R5</span>自动化任务（v1.3 补齐主线）</h3><p><strong>定时 cron / OS 系统事件 / watch 监视</strong>三类触发，与"3 图完成"走<strong>同一条事件总线</strong>。特点是<strong>创建与执行分离</strong>：触发不丢（进程被杀仍生效）、交付通道声明、错过补偿、到点"要不要叫醒 LLM"（L1/L2 分流的需求来源）。</p></div>
+      </div>
+      <div class="callout" style="margin-top:.6em;">
+        <b>v1.3 主张：</b>两大入口殊途同归——一切入站皆<b>消息</b>，消息唤起主 loop；就地干完叫<b>响应</b>（含同步等待工具返回后作答，P2）；够格才建<b>任务</b>（<span class="mono">Task = Trigger + Goal + Policy</span>）。主 loop 是 <b>player-coach</b>（P4），对端是异构执行体，接口落在 UAT 上（P6）。
+      </div>
+    </div>
+  </div>
+  <span class="pageno">1 / 10</span>
+</section>
+
+<!-- ═══════════ P2 消息/响应/任务三层 ═══════════ -->
+<section class="slide">
+  <div class="header">
+    <h1>消息 · 响应 · 任务<span class="hl">三层模型</span>：任务要够格</h1>
+    <p class="subtitle">回答"一切皆任务会不会太重" —— <strong>会</strong>；聊天不建任务、不命名、不插卡，只留会话历史</p>
+  </div>
+  <div style="display:flex; flex-direction:column; gap:.35em; margin-bottom:.6em;">
+    <div class="band msg"><strong>① 消息层（一切入站）</strong>　<span class="mono">Msg{type: user_query | event | task_callback | clarify_answer, payload, task_ref?}</span> —— 统一进主 Agent 收件箱，串行唤起 loop</div>
+    <div class="down">↓ loop 判断：能就地干完吗？</div>
+    <div class="band resp"><strong>② 响应层（默认路径）</strong>　纯语言即答，或<strong>同步等待工具返回后作答</strong>（查天气必须拿到结果才能回）——就地完成，零任务对象：无卡片、无命名、无状态机</div>
+    <div class="down">↓ 够格（判据任一命中）才升格 ↓</div>
+    <div class="band task"><strong>③ 任务层（够格才建）</strong>　<span class="mono">Task = Trigger + Goal + Policy</span>：插卡、命名、进任务表与生命周期管理 —— v1.0 的全部机制只作用于这一层</div>
+  </div>
+  <div class="cols">
+    <div class="col" style="flex:1.15;">
+      <div class="panel" style="flex:1;">
+        <h2><span class="tag">升格判据</span>任一满足 → 建任务</h2>
+        <table>
+          <tr><th>#</th><th>判据</th><th>例子</th></tr>
+          <tr><td>1</td><td><strong>耗时超阈值或不可预估</strong>（拍 5s，待调）</td><td>生成图/视频、深度研究</td></tr>
+          <tr><td>2</td><td><strong>非即时触发器</strong>（定时/事件/依赖）</td><td>早报 cron、到家提醒、join 后做视频</td></tr>
+          <tr><td>3</td><td><strong>用户可能中途控制</strong>（停/改/看进度）</td><td>批量修图、App 操控</td></tr>
+          <tr><td>4</td><td><strong>用户走开后还要继续</strong>（异步交付）</td><td>盯发布会 → 邮件</td></tr>
+          <tr><td>5</td><td><strong>有副作用需重试/补偿</strong></td><td>发邮件、订票、支付类</td></tr>
+        </table>
+        <div class="flow" style="margin-top:.55em;">
+          <div class="node green"><strong>兜底：溢出升格</strong>以为是轻查询，工具执行超阈值</div>
+          <div class="arr">→</div>
+          <div class="node warnb"><strong>自动转后台</strong>包装成任务 + 插卡，回一句"我在弄，好了叫你"</div>
+          <div class="arr">→</div>
+          <div class="node"><strong>只升不降</strong>判据不必完美，判错有退路；降格无意义</div>
+        </div>
+      </div>
+    </div>
+    <div class="col" style="flex:1;">
+      <div class="panel" style="flex:1;">
+        <h2><span class="tag purple">任务命名管理</span>只有够格任务才需要</h2>
+        <ul>
+          <li><strong>title</strong>：动宾短语 ≤12 字（"生成小女孩玩耍图"），<strong>创建轮 loop 顺手产出</strong>，不额外调用；</li>
+          <li><strong>短号</strong>：会话内序号 T1 / T2 / T3.1，用于口头指代与卡片；</li>
+          <li><strong>组名</strong>：一次 Query 派生的多任务共享（组「3 图 + 视频」）；</li>
+          <li><strong>稳定性</strong>：title 创建时定死，仅 steer 改目标时允许改名 —— 保证指代解析与展示稳定；</li>
+          <li><strong>消费方只有三个</strong>：指代解析、卡片/收件箱展示、审计日志。</li>
+        </ul>
+      </div>
+      <div class="panel" style="margin-top:.6em;">
+        <h2><span class="tag warn">回复时机三分</span>由工具返回契约决定（v1.3 修正"立即回复"）</h2>
+        <table>
+          <tr><th>形态</th><th>行为</th><th>决定者</th></tr>
+          <tr><td><strong>纯语言即答</strong></td><td>"你好"直接回</td><td>—</td></tr>
+          <tr><td><strong>同步等待后答</strong></td><td>查天气：阻塞等结果，拿到再回答</td><td>工具契约 <code>latency=instant/short</code></td></tr>
+          <tr><td><strong>异步 ack</strong></td><td>生图："好的，开始生成" + 插卡，<strong>不等结束</strong></td><td>工具契约 <code>latency=long</code> / async job</td></tr>
+        </table>
+        <p style="margin-top:.35em;">用户意图可覆盖（"慢慢弄好了发我"→ 任务化）；声明 short 实际超时 → 溢出升格兜底。</p>
+      </div>
+    </div>
+  </div>
+  <span class="pageno">2 / 10</span>
+</section>
+
+<!-- ═══════════ P3 意图路由六分类 ═══════════ -->
+<section class="slide">
+  <div class="header">
+    <h1>意图路由<span class="hl">六分类</span>：对齐 steer / followup / multitask</h1>
+    <p class="subtitle">每条 user_query 先分类再动手；卡片按钮与口头指令<strong>走同一条路由</strong></p>
+  </div>
+  <div class="panel" style="margin-bottom:.6em;">
+    <h2><span class="tag">六分类</span>chat 是默认路径，其余五类才碰任务系统</h2>
+    <table>
+      <tr><th>类别</th><th>语义</th><th>例子</th><th>动作</th></tr>
+      <tr><td><strong>chat</strong></td><td>聊天 / 问答 / 轻工具，就地完成</td><td>"你好""心情不好""北京天气?"</td><td>响应层直接回复，<strong>零任务</strong></td></tr>
+      <tr><td><strong>new_task</strong></td><td>新委托（含定时/事件/监视触发）</td><td>"生成一张图""每天 7 点半早报""到家提醒我"</td><td>建任务（可 fan-out 成组）+ 插卡 + 秒回</td></tr>
+      <tr><td><strong>followup</strong></td><td><strong>任务问我答</strong>，或补充信息，<strong>不改目标</strong></td><td>任务问"12 张存疑?"→"先保留"；"顺便说下我靠窗"</td><td>答复路由回 blocked(user) 任务，唤醒继续</td></tr>
+      <tr><td><strong>steer</strong></td><td><strong>我要求改</strong>：动目标或约束</td><td>"不对，要小女孩"（替换级）；"光线再亮点"（约束级）</td><td>替换级：新任务 + 旧任务 superseded；约束级：阶段边界应用</td></tr>
+      <tr><td><strong>control</strong></td><td>停 / 暂停 / 恢复 / 调优先级</td><td>"都停了""先暂停，晚上再跑"</td><td>控制面 API（支持组级批量）</td></tr>
+      <tr><td><strong>query</strong></td><td>问进度 / 问定义</td><td>"图好了吗""早报下次几点跑?"</td><td>读任务表/注册表口头汇总，零新任务</td></tr>
+    </table>
+  </div>
+  <div class="cols" style="flex:0 0 auto;">
+    <div class="panel" style="flex:1.15;">
+      <h2><span class="tag warn">分界线</span>followup vs steer —— 最易混的一对</h2>
+      <p><strong>followup = 任务问我答 / 我补充信息，目标不变</strong>（答澄清、给验证码、补偏好）；<strong>steer = 我主动要求改</strong>，动了 Goal 或约束（换主体、改风格、改范围）。判不准时按 steer 处理并口头回读（"我把要求改成 XX，对吗？"）——回读成本低于改错方向的成本。</p>
+    </div>
+    <div class="panel" style="flex:1;">
+      <h2><span class="tag green">指代解析</span>落到具体任务</h2>
+      <ul>
+        <li>在<strong>活跃任务摘要表</strong>上做（每任务一行：短号/title/状态/进度）；</li>
+        <li>"那个视频""第二张""刚才那批"→ task_id / group_id；</li>
+        <li>歧义先问再动："替换男孩那张，还是再加一张？"</li>
+      </ul>
+    </div>
+  </div>
+  <div class="callout" style="margin-top:.55em;">
+    <b>与现有概念对齐：</b>multitask = new_task 的 fan-out + 多任务并存（组管理）；followup = blocked(user) 答复路由；steer = 运行中任务的目标/约束变更。六分类是这三个概念在<b>入口路由层</b>的统一表达。
+  </div>
+  <span class="pageno">3 / 10</span>
+</section>
+
+<!-- ═══════════ P4 架构：player-coach ═══════════ -->
+<section class="slide">
+  <div class="header">
+    <h1>核心 loop 是谁：<span class="hl">主 Agent loop = player-coach</span></h1>
+    <p class="subtitle">回答"会话 Agent 是不是在拉皮条" —— <strong>不是</strong>：短活亲手干，长活才派发，没有空心转发器</p>
+  </div>
+  <div style="display:flex; flex-direction:column; gap:.45em; flex:1; min-height:0;">
+    <div class="panel" style="border-color: rgba(47,111,237,.5);">
+      <h2><span class="tag">核心</span>主 Agent loop（唯一的"大脑"，被消息唤起，永不阻塞）</h2>
+      <div class="flow">
+        <div class="node hl"><strong>对话与响应</strong>chat / 轻工具就地干完 —— 这部分活它<strong>亲手做</strong>，不外包</div>
+        <div class="node hl"><strong>路由与编译</strong>六分类；够格委托编译为 Task（Trigger/Goal/Policy + 命名 + 依赖建图）</div>
+        <div class="node hl"><strong>事件处置</strong>L2 事件入箱后决策：编排任务链 / 重试 / 找用户</div>
+        <div class="node hl"><strong>穿透对话</strong>代表后台任务向用户澄清、汇报；答复路由回任务</div>
+      </div>
+    </div>
+    <div class="down">↓ 只有"够格任务"才向下派发　　▲ 摘要卡片 / L2 事件 / 澄清请求向上穿透</div>
+    <div class="panel" style="border-color: rgba(124,92,214,.5);">
+      <h2><span class="tag purple">中枢</span>任务中枢（非 LLM，系统级常驻 —— 状态与触发的唯一权威）</h2>
+      <div class="flow">
+        <div class="node"><strong>任务表 + 依赖 DAG</strong>持久化、join 计数、产物句柄</div>
+        <div class="node"><strong>触发器引擎 + 订阅表</strong>cron / OS 事件 / on_tasks_done / watch 计划</div>
+        <div class="node"><strong>事件总线 + 三级分流</strong>L0 直驱卡片、L1 规则派发、L2 入收件箱</div>
+        <div class="node"><strong>调度与控制面</strong>并发额度、组操作、cancel 信号、错过补偿</div>
+      </div>
+    </div>
+    <div class="down">↓ 派发 TaskRun　　▲ 进度 / 终态 / 需澄清事件</div>
+    <div class="panel" style="border-color: rgba(14,165,120,.5);">
+      <h2><span class="tag green">支线</span>异构执行体（v1.3 修正：不是统一的"执行 loop"，统一的只是任务外壳）</h2>
+      <div class="flow">
+        <div class="node"><strong>① 长时工具（无 loop）</strong>生图 / 生视频 / 修图：submit job + 状态回调；steer 能力：基本只能 stop 重来</div>
+        <div class="node"><strong>② subAgent（内层 agent loop）</strong>深度研究 / App 操控：plan→act + checkpoint；可真 steer / pause / 中途澄清</div>
+        <div class="node"><strong>③ A2A 三方 Agent（对端黑盒 loop）</strong>委托 = 影子任务 + 超时监护；steer 看对端协议支持</div>
+        <div class="node green"><strong>统一外壳</strong>TaskRun 生命周期 + 状态事件回调 + 产物句柄 —— 中枢只看事件，不关心内部形态</div>
+      </div>
+    </div>
+  </div>
+  <div class="callout" style="margin-top:.5em;">
+    <b>分工一句话：</b>主 loop 干轻活 + 编排 + 处置（每次唤起一轮推理）；中枢管状态与触发（零 token）；对端执行体干重活（长时工具 / subAgent / A2A 三形态，支线上下文不进主会话）。"拉皮条"感来自 v1.1 把主 loop 削成纯路由 —— 修正：<b>响应层的活全部由主 loop 亲手完成</b>。
+  </div>
+  <span class="pageno">4 / 10</span>
+</section>
+
+<!-- ═══════════ P5 loop × 事件 × 双层上下文 ═══════════ -->
+<section class="slide">
+  <div class="header">
+    <h1>loop × 事件系统 × <span class="hl">双层上下文（主转录 / 任务线程）</span></h1>
+    <p class="subtitle">OS 事件的订阅 / 阻塞 / 唤醒三段式；<strong>loop 永不阻塞，等待是数据不是线程</strong></p>
+  </div>
+  <div class="panel" style="margin-bottom:.55em;">
+    <h2><span class="tag">三段式</span>以"到家提醒取快递"（OS geofence）与"订票等验证码"为例</h2>
+    <div class="flow">
+      <div class="node hl"><strong>① 订阅（loop 的一个动作）</strong>loop 调工具写订阅表 <span class="mono">Sub{geofence.enter(home), L1, 派发提醒}</span>，当轮即结束 —— OS 事件经系统事件管理器 → 事件网关 → 总线</div>
+      <div class="arr">→</div>
+      <div class="node purpleb"><strong>② 阻塞（物化为数据）</strong>"等待"= 一条订阅 + 一个挂起任务 <span class="mono">blocked{reason, wake_condition, timeout}</span>；checkpoint 落盘、执行器释放 —— <strong>没有任何线程在等</strong></div>
+      <div class="arr">→</div>
+      <div class="node green"><strong>③ 唤醒（按分流路由）</strong>L1：中枢从 checkpoint <strong>文本重建</strong>执行器上下文，事件 payload 作为新输入 append（KV cache 已失效是常态）；需决策的走 L2 入主 loop 收件箱</div>
+    </div>
+  </div>
+  <div class="ctx">
+    <div class="thread uat">
+      <h3>主干：主会话转录<small>用户所见唯一对话流，UAT 消息结构承载（见 P6）</small></h3>
+      <ul>
+        <li>承载：用户消息、助手回复、<strong>任务卡片</strong>、任务的<strong>澄清问答</strong> —— 用户永远只面对一个会话；</li>
+        <li>主 loop 每轮上下文 = <strong>主转录近期窗口 + 活跃任务摘要表（每任务一行）+ 本轮触发消息 + 记忆摘要</strong>；</li>
+        <li>摘要表让"图好了吗"不用翻支线全文就能答；</li>
+        <li>冷任务折叠为计数，控制常驻 token 规模。</li>
+      </ul>
+    </div>
+    <div class="meet">
+      <div class="m"><strong>交汇一</strong>摘要卡片（几十 token/任务，常驻）</div>
+      <div class="m"><strong>交汇二</strong>澄清请求穿透 ↑ 答复路由回 ↓</div>
+      <div class="m"><strong>交汇三</strong>最终结果 / 失败报告</div>
+    </div>
+    <div class="thread trun">
+      <h3>支线：TaskRun 线程<small>每个够格任务一条，不进主转录</small></h3>
+      <ul>
+        <li>持有：目标、计划、<strong>完整工具轨迹</strong>、中间产物、checkpoint —— 支线的脏活不污染主会话；</li>
+        <li>阻塞唤醒后<strong>恢复自己的线程</strong>接着跑，与主转录无耦合；</li>
+        <li>checkpoint 必须<strong>文本可重建</strong>（目标 + 阶段摘要 + 产物句柄），不依赖驻留内存；</li>
+        <li>subagent 再分叉时挂在本支线下，树形汇报。</li>
+      </ul>
+    </div>
+  </div>
+  <div class="callout blue" style="margin-top:.55em;">
+    <b>为什么双层是必需：</b>成本 —— 主干不被支线工具轨迹撑爆（研究任务动辄数万 token）；体验 —— 支线不被闲聊污染、多任务互不串味；正确性 —— 澄清答复凭 <span class="mono">task_ref</span> 精确路由回支线，不靠语义猜。
+  </div>
+  <span class="pageno">5 / 10</span>
+</section>
+
+<!-- ═══════════ P6 UAT 接口设计 ═══════════ -->
+<section class="slide">
+  <div class="header">
+    <h1>UAT 接口设计：<span class="hl">事件怎么进转录，LLM 输出什么</span></h1>
+    <p class="subtitle">UAT = <strong>user / assistant / tool</strong> 消息结构；硬约束：<strong>tool 消息必须配对前置 tool call</strong></p>
+  </div>
+  <div class="cols" style="margin-bottom:.55em;">
+    <div class="col" style="flex:1;">
+      <div class="panel" style="flex:1;">
+        <h2><span class="tag">主 loop</span>事件 = user 角色 + 结构化信封</h2>
+        <p style="margin-bottom:.35em;">事件不是任何 tool call 的响应，<strong>不能走 tool 角色</strong>；以 user 角色注入，信封与真人发言严格区分：</p>
+        <p class="mono" style="font-size:.78em; background:var(--code-bg); border:1px solid #e4eaf3; border-radius:6px; padding:.45em .6em; line-height:1.5;">&lt;event source="os.geofence.enter" task_ref="T6"<br>&nbsp;&nbsp;trust="system" ts="18:42"&gt;进入围栏：家&lt;/event&gt;</p>
+        <ul style="margin-top:.4em;">
+          <li>信封带<strong>来源与信任标记</strong>；外部内容（通知全文 / 三方回调）转义处理，防提示注入；</li>
+          <li>与 system-reminder 模式同构（见 reminder-discussion）。</li>
+        </ul>
+      </div>
+      <div class="panel" style="flex:1; margin-top:.7em;">
+        <h2><span class="tag purple">支线</span>阻塞 = 一次未返回的 tool call</h2>
+        <ul>
+          <li>subAgent 发起 <code>wait_event(pattern)</code> / <code>ask_user(question)</code> 的 tool call → 事件 / 用户答复到达时作为<strong>该 call 的 tool result</strong> 返回——天然满足 UAT 配对约束；</li>
+          <li>"阻塞"在转录上就是"call 还没有 result"；checkpoint 重建 = 重放已完成的 call/result 对 + 追加新到的 result。</li>
+        </ul>
+      </div>
+    </div>
+    <div class="col" style="flex:1.15;">
+      <div class="panel">
+        <h2><span class="tag green">上下文组织</span>&lt;active_tasks&gt; 每轮动态注入</h2>
+        <ul>
+          <li>位置：<strong>转录尾部、最新消息之前</strong>——靠近末尾保注意力；不污染前缀、KV cache 友好（接 kv-cache-discussion 分层排布结论）；每轮<strong>替换</strong>旧快照只留最新；</li>
+          <li>行格式：<span class="mono">T2 | 生成小女孩玩耍图 | running 60% | —</span>；blocked 任务附待决问题；终态折叠为计数；</li>
+          <li>查询进度<strong>不需要工具调用</strong>：直接读表回答。</li>
+        </ul>
+      </div>
+      <div class="panel" style="margin-top:.7em; flex:1;">
+        <h2><span class="tag warn">LLM 输出空间</span>工具三层区分</h2>
+        <table>
+          <tr><th>层</th><th>内容</th><th>说明</th></tr>
+          <tr><td><strong>业务工具</strong></td><td>openClaw 现有工具：查天气 / 修图 / 生图 / 日历…</td><td><strong>原样复用</strong>，只补注册契约 <code>latency_class</code>（决定同步等待 or 异步 ack，见 P2）</td></tr>
+          <tr><td><strong>任务管理工具</strong>（新增框架层）</td><td><code>create_task</code> <code>create_task_group</code> <code>steer_task</code> <code>stop_task/group</code> <code>pause/resume</code> <code>subscribe_event</code> <code>forward_user_reply</code> <code>delegate_external</code></td><td>八件套，仅主 loop 可调</td></tr>
+          <tr><td><strong>finalAnswer</strong></td><td>直接回复（自然语言 + 卡片引用）</td><td><strong>对用户说话的唯一通道</strong>，loop 的终结动作</td></tr>
+        </table>
+      </div>
+    </div>
+  </div>
+  <div class="callout warn">
+    <b>澄清：</b><code>forward_user_reply(task_id, content)</code>（原名 answer_task，已更名避歧义）<b>不是回复用户的通道</b>——方向是「用户 → 任务」：把用户对某个后台任务澄清问题的答复转发回支线。「助手 → 用户」的所有回复<b>只走 finalAnswer</b>，与现有对话形态完全一致。
+  </div>
+  <span class="pageno">6 / 10</span>
+</section>
+
+<!-- ═══════════ P7 场景走查（三轮对话时序） ═══════════ -->
+<section class="slide">
+  <div class="header">
+    <h1>场景走查：<span class="hl">三轮对话的系统内部时序</span></h1>
+    <p class="subtitle">重点：Q2 steer 替换级的旧任务处置、Q3 的 fan-out + join 编排</p>
+  </div>
+  <div class="timeline">
+    <div class="trow">
+      <div class="qcol"><b>Q1</b>生成小男孩玩耍图片</div>
+      <div class="steps">
+        <div class="node"><strong>路由 = new_task</strong>够格（耗时不可预估）→ 编译 T1「生成小男孩玩耍图」<span class="mono">immediate</span></div>
+        <div class="arr">→</div>
+        <div class="node"><strong>秒回 + 插卡</strong>"已经开始生成" + T1 卡片[排队]</div>
+        <div class="arr">→</div>
+        <div class="node"><strong>调度执行</strong>生图 worker 跑 T1，进度 L0 直写卡片，主 loop 不再被打扰</div>
+      </div>
+    </div>
+    <div class="trow">
+      <div class="qcol"><b>Q2</b>"不对"，要小女孩玩耍</div>
+      <div class="steps">
+        <div class="node"><strong>路由 = steer（替换级）</strong>指代解析 → T1（唯一活跃且刚创建）</div>
+        <div class="arr">→</div>
+        <div class="node"><strong>创建 T2</strong>Goal 继承 T1 上下文 + 替换主体；插 T2 卡片</div>
+        <div class="arr">→</div>
+        <div class="node decision"><strong>决策点：T1 处置</strong>按进度分档：默认立即取消；&gt;80% 跑完标记 superseded、产物静默入库，卡片可一键找回</div>
+      </div>
+    </div>
+    <div class="trow">
+      <div class="qcol"><b>Q3</b>再生成 3 张，完成后生成视频</div>
+      <div class="steps">
+        <div class="node"><strong>路由 = new_task（批量）</strong>编译组「3 图 + 视频」：T3.1–3.3 <span class="mono">immediate</span> 并行 + T4 <span class="mono">on_tasks_done[T3.*]</span>，Goal 引用三图产物句柄</div>
+        <div class="arr">→</div>
+        <div class="node"><strong>一次性插 4 张卡</strong>T3.x [生成中]、T4 [等待依赖 0/3] —— 创建时即可见全链路</div>
+        <div class="arr">→</div>
+        <div class="node"><strong>事件驱动 join</strong>每图完成 → 总线 → 中枢计数 3/3 → <strong>L1 自动启动 T4</strong>（不进主 loop），卡片翻[生成中]，全程无需用户催</div>
+      </div>
+    </div>
+    <div class="trow">
+      <div class="qcol"><b>Q4</b>"今天心情不太好…"</div>
+      <div class="steps">
+        <div class="node"><strong>路由 = chat</strong>响应层就地回复，<strong>零任务对象</strong></div>
+        <div class="arr">→</div>
+        <div class="node"><strong>会话与任务并行</strong>六个任务后台照跑，进度更新不打断聊天</div>
+        <div class="arr">→</div>
+        <div class="node"><strong>择机汇报</strong>任务完成事件按打扰门控在话轮间隙轻插入或积压 digest</div>
+      </div>
+    </div>
+  </div>
+  <div class="callout" style="margin-top:.5em;">
+    <b>token 账：</b>四轮里 LLM 唤起 = 4 次 user_query + 完成汇报的 L2 各 1 次；进度刷新、join、T4 启动共 <b>0 次</b> —— 规模化成本被 L0/L1 挡在 loop 外。
+  </div>
+  <span class="pageno">7 / 10</span>
+</section>
+
+<!-- ═══════════ P8 场景全表 ═══════════ -->
+<section class="slide">
+  <div class="header">
+    <h1>场景全表：<span class="hl">16 个场景 × 六分类 × 机制</span></h1>
+    <p class="subtitle">作为 v1.3 的<strong>验收基准</strong>：每一行都必须能在 P4/P5/P6 架构与接口上走通</p>
+  </div>
+  <div class="panel" style="flex:1; padding:.5em .7em;">
+    <table style="font-size:.76em;">
+      <tr><th>#</th><th style="width:23%;">输入 / 触发</th><th>意图类别</th><th>链路</th><th>建任务?</th><th>对应概念</th></tr>
+      <tr><td>1</td><td>"你好""今天心情不好"</td><td><strong>chat</strong></td><td>响应层就地回复</td><td>否</td><td>—</td></tr>
+      <tr><td>2</td><td>"北京明天天气?"</td><td><strong>chat</strong>+轻工具</td><td>loop 内调工具即答</td><td>否</td><td>—</td></tr>
+      <tr><td>3</td><td>轻查询意外变慢（&gt;5s）</td><td>chat→<strong>溢出升格</strong></td><td>自动转后台任务 + 插卡 + 一句话安抚</td><td>补建</td><td>—</td></tr>
+      <tr><td>4</td><td>"生成一张小男孩玩耍图"</td><td><strong>new_task</strong></td><td>T1 插卡，immediate 派发</td><td>是</td><td>multitask 起点</td></tr>
+      <tr><td>5</td><td>"不对，要小女孩"</td><td><strong>steer</strong>（替换级）</td><td>T2 新建 + T1 superseded（进度分档处置）</td><td>是</td><td>steer</td></tr>
+      <tr><td>6</td><td>"光线再亮一点"（生成中）</td><td><strong>steer</strong>（约束级）</td><td>阶段边界应用 / 轻任务直接重跑</td><td>复用</td><td>steer</td></tr>
+      <tr><td>7</td><td>任务问"12 张存疑?"→"先保留"</td><td><strong>followup</strong></td><td>答复按 task_ref 路由回 blocked(user)，唤醒</td><td>否</td><td>followup</td></tr>
+      <tr><td>8</td><td>"再生成 3 张，完了做视频"</td><td><strong>new_task</strong> ×4</td><td>fan-out 成组 + join + 链式（on_tasks_done）</td><td>是</td><td>multitask</td></tr>
+      <tr><td>9</td><td>"图好了吗"</td><td><strong>query</strong></td><td>读活跃任务摘要表口头汇总</td><td>否</td><td>—</td></tr>
+      <tr><td>10</td><td>"刚才那批都停了"</td><td><strong>control</strong></td><td>指代→group_id→group_stop；下游依赖不可满足→询问</td><td>否</td><td>multitask 管理</td></tr>
+      <tr><td>11</td><td>"每天 7 点半给我早报"</td><td><strong>new_task</strong>(cron)</td><td>定时注册表；next_fire 可查；错过补偿策略</td><td>是</td><td>—</td></tr>
+      <tr><td>12</td><td>"到家提醒我取快递"</td><td><strong>new_task</strong>(OS 事件)</td><td>订阅 geofence.enter(home)，命中 L1 直发提醒</td><td>是</td><td>—</td></tr>
+      <tr><td>13</td><td>"盯苹果发布会→整理邮件"</td><td><strong>new_task</strong>(watch)</td><td>轮询+判定；命中 L2 → loop 编排任务链</td><td>是</td><td>—</td></tr>
+      <tr><td>14</td><td>研究跑着，用户闲聊新话题</td><td><strong>chat</strong></td><td>会话与支线并行互不阻塞；完成按门控择机汇报</td><td>否</td><td>multitask 共存</td></tr>
+      <tr><td>15</td><td>订票任务等验证码短信</td><td>（系统内部）</td><td>运行中动态订阅→blocked(event)→短信到→L1 唤醒，不进主 loop</td><td>—</td><td>—</td></tr>
+      <tr><td>16</td><td>外部 Agent 委托后失联</td><td>（L2 事件）</td><td>监护定时器到期→失败事件入箱→loop 决策重试/本地降级</td><td>—</td><td>—</td></tr>
+    </table>
+  </div>
+  <span class="pageno">8 / 10</span>
+</section>
+
+<!-- ═══════════ P9 附录：v1.1 机制压缩 ═══════════ -->
+<section class="slide">
+  <div class="header">
+    <h1>附录：<span class="hl">机制细化速览</span>（源自 v1.1，作本版补充）</h1>
+    <p class="subtitle">三级分流 / 订阅表 / 控制面 / blocked 家族与定时注册表 —— 详版见 history/ v1.1</p>
+  </div>
+  <div class="cols" style="flex:1;">
+    <div class="col" style="flex:1;">
+      <div class="panel" style="flex:1;">
+        <h2><span class="tag">事件三级分流</span>能不进 LLM 就不进</h2>
+        <table>
+          <tr><th>级</th><th>去向</th><th>例子</th><th>成本</th></tr>
+          <tr><td><strong>L0</strong></td><td>直写卡片/任务表</td><td>进度 30%→60%</td><td>0 token</td></tr>
+          <tr><td><strong>L1</strong></td><td>触发器引擎直接派发/唤醒</td><td>cron 到点、join 3/3、geofence、验证码到达</td><td>0 token</td></tr>
+          <tr><td><strong>L2</strong></td><td>入主 loop 收件箱</td><td>watch 命中、失败处置、外部异常</td><td>1 次 loop</td></tr>
+        </table>
+        <p style="margin-top:.4em;">分流边界：创建期由主 loop 声明（"到点直接执行"=L1，"到点叫我看看"=L2）；兜底：<strong>失败与需开口的必 L2</strong>。</p>
+      </div>
+      <div class="panel" style="flex:1; margin-top:.7em;">
+        <h2><span class="tag purple">订阅表</span><span class="mono">Sub{pattern, subscriber, route, action, ttl}</span></h2>
+        <ul>
+          <li>订阅者四类：触发器引擎（注册期）/ 运行中任务（动态）/ 主 Agent（常驻+按需）/ UI 卡片；</li>
+          <li>生命周期：一次性命中即失效；任务终态<strong>自动退订</strong>；无主订阅定期 GC —— 订阅泄漏 = 幽灵触发。</li>
+        </ul>
+      </div>
+    </div>
+    <div class="col" style="flex:1;">
+      <div class="panel" style="flex:1;">
+        <h2><span class="tag green">TaskControl 控制面</span>幂等，对话与卡片按钮同路由</h2>
+        <table>
+          <tr><th>操作</th><th>要点</th></tr>
+          <tr><td><code>start / stop</code></td><td>stop 级联：下游取消不上溯，上游取消询问下游</td></tr>
+          <tr><td><code>pause / resume</code></td><td>阶段边界挂起 / checkpoint 恢复；App 会话态任务声明不支持 pause</td></tr>
+          <tr><td><code>steer</code></td><td>未启动零成本改 Goal；运行中阶段边界增量重规划</td></tr>
+          <tr><td><code>query / list / group_*</code></td><td>组级批量操作；排队卡片显示"第 k 位"</td></tr>
+        </table>
+      </div>
+      <div class="panel" style="flex:1; margin-top:.7em;">
+        <h2><span class="tag warn">blocked 家族 + 定时注册表</span></h2>
+        <ul>
+          <li><span class="mono">blocked{reason: deps|event|user|timer, wake_condition, timeout_policy}</span> —— 阻塞即释放执行器，<strong>强制带超时策略</strong>，不允许无限期悬挂；等的事件可能永不来（短信被拦）→ 唤醒条件须可人工替代；</li>
+          <li>定时注册表：CRUD 全走对话；<code>next_fire_time</code> 可查；错过补偿 <code>skip / catch_up / ask</code>，默认 skip；</li>
+          <li>外部 Agent：委托 = 影子任务 + 超时监护；回调统一封装为事件；敏感动作不随委托下放。</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+  <span class="pageno">9 / 10</span>
+</section>
+
+<!-- ═══════════ P10 已定主张与开放问题 ═══════════ -->
+<section class="slide">
+  <div class="header">
+    <h1>v1.3 已定主张与<span class="hl">开放问题</span></h1>
+    <p class="subtitle">六条主张对齐后即可落地；开放问题附倾向待拍板</p>
+  </div>
+  <div class="cols">
+    <div class="col" style="flex:1;">
+      <div class="panel" style="flex:1;">
+        <h2><span class="tag green">已定主张</span></h2>
+        <ul>
+          <li><strong>双入口</strong>：Query 驱动 + 自动化触发（cron / OS 事件 / watch），殊途同归于同一消息模型；</li>
+          <li><strong>三层模型</strong>：消息 → 响应（含同步等待后答）→ 任务要够格（升格判据 + 溢出升格，只升不降）；</li>
+          <li><strong>回复时机由工具契约定</strong>：latency_class 决定同步等待还是异步 ack，用户意图可覆盖、超时升格；</li>
+          <li><strong>意图路由六分类</strong> + 主 loop = player-coach，loop 永不阻塞（等待是数据不是线程）；</li>
+          <li><strong>对端三形态</strong>：长时工具 / subAgent / A2A 三方 Agent，统一 TaskRun 外壳，steer 能力分级；</li>
+          <li><strong>UAT 接口</strong>：事件 = user 角色信封；支线阻塞 = 未返回的 tool call；&lt;active_tasks&gt; 尾部注入；<strong>回复只走 finalAnswer</strong>；</li>
+          <li><strong>工具三层</strong>：openClaw 业务工具原样复用（补 latency 契约）+ 任务管理八件套 + finalAnswer；</li>
+          <li><strong>中枢非 LLM 常驻</strong>：任务表 / 订阅表 / 触发器引擎独立于 LLM 存活。</li>
+        </ul>
+      </div>
+    </div>
+    <div class="col" style="flex:1.25;">
+      <div class="panel" style="flex:1;">
+        <h2><span class="tag warn">开放问题</span></h2>
+        <table>
+          <tr><th>#</th><th>问题</th><th>倾向</th></tr>
+          <tr><td>1</td><td><strong>溢出升格阈值</strong>：5s 拍的，体感待验证</td><td>按工具类型分阈值，上线后看打断率调</td></tr>
+          <tr><td>2</td><td><strong>followup/steer 误判兜底</strong></td><td>判不准按 steer 处理 + 口头回读，一句话可纠错</td></tr>
+          <tr><td>3</td><td><strong>steer 替换级的旧任务处置阈值</strong></td><td>进度 &lt;80% 取消，≥80% 跑完标 superseded，可找回</td></tr>
+          <tr><td>4</td><td><strong>活跃任务摘要表规模</strong>：几十任务时主转录上下文</td><td>活跃度分层：进行中逐行、blocked 简行、终态折叠计数</td></tr>
+          <tr><td>5</td><td><strong>L1/L2 分流边界</strong>的声明语法与兜底规则</td><td>创建期声明 + 失败/需开口必 L2；按误分流案例迭代</td></tr>
+          <tr><td>6</td><td><strong>主会话多前端一致性</strong>：手机/手表/车机共享一条主干?</td><td>单主干多视图渲染；冲突以最后交互端为准</td></tr>
+          <tr><td>7</td><td><strong>openClaw 存量工具契约补齐</strong>：latency_class 谁标、标错怎么办</td><td>平台批量预标 + 运行时实测校准；标错由溢出升格兜底</td></tr>
+        </table>
+      </div>
+      <div class="callout" style="margin-top:.6em;">
+        <b>下一步：</b>① 按 P7 场景全表逐行做架构走查评审；② 落最小闭环（中枢 + 六分类路由 + 生图/生视频 worker + L0/L1）；③ blocked 家族与 followup 路由实测；④ v2 接 omni 前台 —— 中枢与支线设计不变，只改应答义务与打扰门控。
+      </div>
+    </div>
+  </div>
+  <span class="pageno">10 / 10</span>
+</section>
+
+</body>
+</html>
