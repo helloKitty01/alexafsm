@@ -1,0 +1,16 @@
+{
+  "name": "AI 文档库",
+  "install": "pip install -r requirements.txt",
+  "terminals": [
+    {
+      "name": "docs-preview",
+      "command": "python3 -m http.server 8000"
+    }
+  ],
+  "ports": [
+    {
+      "name": "docs-preview",
+      "port": 8000
+    }
+  ]
+}

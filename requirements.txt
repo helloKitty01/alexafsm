@@ -1,0 +1,2 @@
+# 生成 PPTX 幻灯片所需依赖（docs/*/make_pptx.py 使用）
+python-pptx==1.0.2
