@@ -170,7 +170,7 @@
 <section class="slide">
   <div class="header">
     <h1>全双工<span class="hl">输出状态</span>：业界盘点、洞察与建议<span class="ver">v1</span></h1>
-    <p class="subtitle">素材：Sacks 1974 / Skantze 2021 / VAP · Moshi / Freeze‑Omni / BayLing‑Duplex 等<br>Full‑Duplex‑Bench · <strong>Instruct‑FD（Boson AI, 2026）</strong> · GPT‑Live / Realtime API / Flux / Easy Turn</p>
+    <p class="subtitle">素材：Sacks 1974 / Skantze 2021 / VAP · Moshi / Freeze‑Omni / BayLing‑Duplex / Fun‑Audio‑Chat / Qwen3‑Omni<br>Full‑Duplex‑Bench · <strong>Instruct‑FD（Boson AI, 2026）</strong> · GPT‑Live / OpenAI &amp; Qwen Realtime API / Flux / Easy Turn</p>
   </div>
   <div class="cols">
     <div class="col" style="flex: 0 0 46%;">
@@ -190,7 +190,7 @@
     </div>
     <div class="col" style="flex: 1;">
       <div class="panel" style="flex:1;">
-        <h2><span class="tag green">目录</span>10 页</h2>
+        <h2><span class="tag green">目录</span>11 页</h2>
         <table>
           <tr><th>#</th><th>主题</th><th>回答的问题</th></tr>
           <tr><td class="num">2</td><td><strong>会话现象层</strong></td><td>人类对话里到底有哪些轮次事件</td></tr>
@@ -202,6 +202,7 @@
           <tr><td class="num">8</td><td><strong>转移守卫</strong></td><td>五个关键判定与各家做法</td></tr>
           <tr><td class="num">9</td><td><strong>总结分析</strong></td><td>六条跨来源的结论</td></tr>
           <tr><td class="num">10</td><td><strong>对我们的建议</strong></td><td>架构、策略、评测、接口、路线</td></tr>
+          <tr><td class="num">11</td><td><strong>附录：来源 Top 10</strong></td><td>各来源对"状态"问题的贡献排序与 Qwen 系定位</td></tr>
         </table>
         <div class="kpis" style="margin-top:auto; grid-template-columns: repeat(2,1fr);">
           <div class="kpi"><div class="v">10</div><div class="k">统一模型给出的输出状态数（按发言权分列）</div></div>
@@ -212,7 +213,7 @@
       </div>
     </div>
   </div>
-  <div class="pageno">1 / 10</div>
+  <div class="pageno">1 / 11</div>
 </section>
 
 <!-- ═══════════ P2 会话现象层 ═══════════ -->
@@ -282,7 +283,7 @@
       </div>
     </div>
   </div>
-  <div class="pageno">2 / 10</div>
+  <div class="pageno">2 / 11</div>
 </section>
 
 <!-- ═══════════ P3 模型表示层 ═══════════ -->
@@ -292,26 +293,28 @@
     <p class="subtitle">隐式涌现（Moshi / SyncLLM）→ 分类头（Freeze‑Omni）→ 显式状态 token（SALMONN‑omni / BayLing‑Duplex）→ 把沉默变成思考（FLM‑Audio / Chronological Thinking）</p>
   </div>
   <div class="cols">
-    <div class="col" style="flex: 0 0 60%;">
+    <div class="col" style="flex: 0 0 63%;">
       <div class="panel" style="flex:1;">
         <h2><span class="tag">对照表</span>状态载体 × 状态集合 × 时间粒度</h2>
-        <table>
+        <table style="font-size:.74em;">
           <tr><th>模型</th><th>载体</th><th>状态集合</th><th>粒度</th></tr>
-          <tr><td><strong>Moshi</strong> 2024</td><td>文本流 <code>PAD</code>/<code>EPAD</code> + 音频"自然静音"</td><td>隐式；<code>EPAD</code>=即将开口，可强制采样让它立刻说</td><td class="num">80 ms</td></tr>
-          <tr><td><strong>SyncLLM</strong> 2024</td><td>周期同步 token + 双方 chunk 交错</td><td>隐式；靠序列建模涌现附和 / 重叠 / 打断</td><td class="num">chunk</td></tr>
+          <tr><td><strong>Moshi</strong> 2024</td><td>文本流 <code>PAD</code>/<code>EPAD</code> + 音频"自然静音"</td><td>隐式；<code>EPAD</code>=即将开口，可强制采样令其开口</td><td class="num">80 ms</td></tr>
+          <tr><td><strong>SyncLLM</strong> 2024</td><td>周期同步 token + 双方 chunk 交错</td><td>隐式；序列建模涌现附和 / 重叠 / 打断</td><td class="num">chunk</td></tr>
           <tr><td><strong>LSLM</strong> 2024</td><td><code>IRQ</code> 中断 token</td><td>说 / 被打断停</td><td class="num">帧</td></tr>
-          <tr><td><strong>Freeze‑Omni</strong> 2024</td><td>LLM 末层分类头，按 chunk</td><td><code>0</code> 继续收音 / <code>1</code> 用户打断→新生成 / <code>2</code> 说完无需打断</td><td class="num">chunk 末帧</td></tr>
-          <tr><td><strong>SALMONN‑omni</strong> 2024</td><td><code>&lt;start_speak&gt;</code> / <code>&lt;end_speak&gt;</code> + thinking</td><td>speaking / non‑speaking 两态</td><td class="num">时间块</td></tr>
-          <tr><td><strong>BayLing‑Duplex</strong> 2026</td><td>文本通道 4 个状态 token</td><td><code>[SILENCE]</code> / <code>[ASSISTANT]</code> 开口 / <code>[PAD]</code> 文本完语音未完 / <code>[EPAD]</code> 全完</td><td class="num">0.8 s 块</td></tr>
+          <tr><td><strong>Freeze‑Omni</strong> 2024</td><td>LLM 末层分类头</td><td><code>0</code> 继续收音 / <code>1</code> 打断→新生成 / <code>2</code> 说完</td><td class="num">chunk 末帧</td></tr>
+          <tr><td><strong>SALMONN‑omni</strong> 2024</td><td><code>start_speak</code> / <code>end_speak</code> + thinking</td><td>speaking / non‑speaking 两态</td><td class="num">时间块</td></tr>
+          <tr><td><strong>BayLing‑Duplex</strong> 2026</td><td>文本通道 4 个状态 token</td><td><code>[SILENCE]</code> / <code>[ASSISTANT]</code> / <code>[PAD]</code> 文本完语音未完 / <code>[EPAD]</code></td><td class="num">0.8 s 块</td></tr>
           <tr><td><strong>FLM‑Audio</strong> 2025</td><td>连续独白 + <code>&lt;wait&gt;</code></td><td>说 / 等 / 被有意义语音打断</td><td class="num">句级</td></tr>
-          <tr><td><strong>Chronological Thinking</strong> StepFun 2025</td><td>思考链替换沉默 token</td><td>沉默 = 边听边想</td><td class="num">帧</td></tr>
+          <tr><td><strong>Chrono. Thinking</strong> StepFun 2025</td><td>思考链替换沉默 token</td><td>沉默 = 边听边想</td><td class="num">帧</td></tr>
+          <tr><td><strong>Fun‑Audio‑Chat‑Duplex</strong> 通义·Qwen3 2025</td><td>并行 speech‑text 输入流 + <code>&lt;|SIL|&gt;</code></td><td>隐式；重叠为附和→继续、新指令→停；自报 turn‑taking 100%</td><td class="num">5 / 25 Hz</td></tr>
+          <tr><td><strong>Qwen3‑Omni</strong> Thinker‑Talker 2025</td><td>不定义输出状态</td><td>轮次制，发言权交外部 VAD；解耦"想/说"而非"听/说"</td><td class="num">12.5 Hz</td></tr>
           <tr><td><strong>Unit‑based agent</strong> 2026</td><td>MLLM 输出动作</td><td>状态 listen/speak × 动作 continue/switch</td><td class="num">单元</td></tr>
           <tr><td><strong>GPT‑Live</strong> 2026</td><td>未公开</td><td>speak / continue listening / pause / interrupt / invoke tool</td><td class="num">—</td></tr>
         </table>
       </div>
     </div>
     <div class="col" style="flex: 1;">
-      <div class="panel" style="flex:1;">
+      <div class="panel" style="flex:1; font-size:.88em;">
         <h2><span class="tag warn">洞察</span>四条设计脉络</h2>
         <ul>
           <li><strong>"要不要说"与"说什么"是两步。</strong> Moshi 把 <code>EPAD</code>（结束填充）与下一个词分开预测，论文明说是"拆成两步"；BayLing 用 <code>[ASSISTANT]</code> 单独标记"开口"事件。</li>
@@ -320,10 +323,11 @@
           <li><strong>显式 token 的代价是极度不平衡。</strong> Moshi 报告 PAD 占英语对话 65%；BayLing 指出 <code>[SILENCE]</code> 占绝对多数、<code>[ASSISTANT]</code> 每轮一次，必须逐 token 加权 + DPO 单独调"时机"。</li>
         </ul>
         <div class="callout red" style="margin-top:.4em;"><b>粒度是架构参数</b>：Moshi 80 ms 帧 → 160 ms 理论时延；BayLing 0.8 s 块——论文承认块太小则轮次抖动、太大则最小时延超阈值。状态粒度直接决定最小响应时延。</div>
+        <div class="callout warn" style="margin-top:.4em;"><b>Qwen 系的位置</b>：Qwen3‑Omni 的 Thinker‑Talker 解决的是 THINKING 态首包时延（单路 234 ms，6 并发 1172 ms），不管发言权；原生全双工是 Fun‑Audio‑Chat‑Duplex——<strong>自报 turn‑taking 100%，Instruct‑FD 却只有 46.2%</strong>（Backchannel 0%、Acknowledge 5.4%）："轮次成功率"不够，必须测状态判定本身。</div>
       </div>
     </div>
   </div>
-  <div class="pageno">3 / 10</div>
+  <div class="pageno">3 / 11</div>
 </section>
 
 <!-- ═══════════ P4 系统事件层 ═══════════ -->
@@ -346,6 +350,7 @@
         </table>
         <div class="callout blue" style="margin-top:.6em;"><b>洞察</b>：Flux 的 <code>Eager / Resumed</code> 一对事件把"<strong>投机开口、发现没说完再撤回</strong>"做成一等公民——换 150–250 ms 提前，付 50–70% 更多 LLM 调用。这是 GPT‑Live"先应答、后实质"两时钟在级联系统里的落地。</div>
         <div class="callout warn" style="margin-top:.5em;"><b>洞察</b>：Easy Turn 与 TEN 都把 <code>wait</code>（用户要求闭嘴）单列为一态——"被禁言"不是普通的沉默，它需要一个<strong>显式解除条件</strong>，否则模型会在下一个 TRP 自动开口。这就是统一模型里 MUTED 单列的依据。</div>
+      <div class="callout red" style="margin-top:.5em;"><b>关键对照</b>：Instruct‑FD 把 <strong>GPT‑Realtime 排除在评测之外</strong>——理由是其 API"要求用户显式发出打断信号，不允许模型自主管理发言权"。OpenAI 与 Qwen 的第二代 API 状态都是<strong>外部驱动</strong>的；第三代才把决策交回模型。</div>
       </div>
     </div>
     <div class="col" style="flex: 1;">
@@ -361,20 +366,20 @@
         <p>系统层另有三个<strong>影子状态</strong>约束模型能做什么：<strong>委托中</strong>（只能打圆场，不能给实质答案）、<strong>切换中</strong>（实例迁移 / 压缩，媒体不断）、<strong>分轮暂定</strong>（谁持有发言权尚未定稿，最新消息可回改）。</p>
       </div>
       <div class="panel">
-        <h2><span class="tag green">Realtime API（第二代表面）</span>状态以事件形式暴露</h2>
-        <table>
+        <h2><span class="tag green">Realtime API（OpenAI / Qwen，第二代表面）</span>状态以事件形式暴露</h2>
+        <table style="font-size:.76em;">
           <tr><th>事件 / 配置</th><th>对应输出状态变化</th></tr>
           <tr><td><code>speech_started</code></td><td>用户开口；若在说 → <code>response.cancelled</code> + <code>truncate</code>（让出 + 截断）</td></tr>
           <tr><td><code>response.created → delta → done</code></td><td>进入说话 → 持续说 → 说完</td></tr>
           <tr><td><code>create_response=false</code></td><td>听到了但不自动开口</td></tr>
           <tr><td><code>conversation="none"</code></td><td>旁路推理不进主对话——"边想边说"雏形</td></tr>
           <tr><td><code>semantic_vad.eagerness</code></td><td>hold / yield 判定做成单一可配旋钮</td></tr>
+          <tr><td><strong>Qwen Realtime</strong> <code>server_vad / semantic_vad</code> + <code>interrupt_response</code>；Qwen‑Audio 3.0 <code>smart_turn</code></td><td>与 OpenAI 同构；<code>smart_turn</code> 声学 + 语义判轮，"嗯 / 呃"不打断——Easy Turn 四态的 API 落地</td></tr>
         </table>
       </div>
-      <div class="callout red" style="flex:0 0 auto;"><b>关键对照</b>：Instruct‑FD 把 <strong>GPT‑Realtime 排除在评测之外</strong>——理由是其 API"要求用户显式发出打断信号，而不允许模型自主管理发言权"。第二代 API 的状态是<strong>外部驱动</strong>的；第三代才把状态决策交回模型。这正是两代的分水岭。</div>
     </div>
   </div>
-  <div class="pageno">4 / 10</div>
+  <div class="pageno">4 / 11</div>
 </section>
 
 <!-- ═══════════ P5 评测定义正确状态 ═══════════ -->
@@ -434,7 +439,7 @@
       </div>
     </div>
   </div>
-  <div class="pageno">5 / 10</div>
+  <div class="pageno">5 / 11</div>
 </section>
 
 <!-- ═══════════ P6 Instruct-FD ═══════════ -->
@@ -493,7 +498,7 @@
       </div>
     </div>
   </div>
-  <div class="pageno">6 / 10</div>
+  <div class="pageno">6 / 11</div>
 </section>
 
 <!-- ═══════════ P7 统一状态模型 ═══════════ -->
@@ -639,7 +644,7 @@
       </div>
     </div>
   </div>
-  <div class="pageno">7 / 10</div>
+  <div class="pageno">7 / 11</div>
 </section>
 
 <!-- ═══════════ P8 转移守卫 ═══════════ -->
@@ -691,7 +696,7 @@
     <div class="callout warn" style="flex:1;"><b>洞察 A</b>：①②③ 是<strong>响应性</strong>判定，业界已有多条可用路线；④⑤ 是<strong>主动性</strong>判定，学术基线接近于零，产品上只有 GPT‑Live 声称做到、且未公开机制。</div>
     <div class="callout blue" style="flex:1;"><b>洞察 B</b>：Instruct‑FD 证明<strong>同一段对话在不同指令下应有不同正确状态</strong>——转移守卫不能是常量，必须是<strong>可被策略参数化</strong>的函数。</div>
   </div>
-  <div class="pageno">8 / 10</div>
+  <div class="pageno">8 / 11</div>
 </section>
 
 <!-- ═══════════ P9 总结分析 ═══════════ -->
@@ -713,8 +718,8 @@
     </div>
     <div class="rec">
       <h3><span class="no">3</span>响应性成熟，主动性是全行业断层</h3>
-      <p>Continue 40–97.5%、Acknowledge 最高 86.3%；而 <strong>Backchannel 0–50%、Interrupt 1.7–11.7%</strong>（Instruct‑FD）。语义合规常伴随时序不合规——"说了对的话，在错的时刻"。</p>
-      <p class="ev"><b>依据</b> Instruct‑FD Table 3 / §4"语义合规 ≠ 时序合规" · Gemini 隐式触发 0%（子句边界）</p>
+      <p>Continue 40–97.5%、Acknowledge 最高 86.3%；而 <strong>Backchannel 0–50%、Interrupt 1.7–11.7%</strong>（Instruct‑FD）。语义合规常伴随时序不合规——"说了对的话，在错的时刻"。Qwen 系 Fun‑Audio‑Chat‑Duplex 自报 turn‑taking 100% 却 IAS 46.2%：<strong>轮次成功率 ≠ 状态判定正确</strong>。</p>
+      <p class="ev"><b>依据</b> Instruct‑FD Table 3 / §4 · Gemini 隐式触发 0% · Fun‑Audio‑Chat 技术报告 Table 7 vs Instruct‑FD Table 3</p>
     </div>
     <div class="rec">
       <h3><span class="no">4</span>没有全局最优策略，状态阈值是产品决策</h3>
@@ -733,7 +738,7 @@
     </div>
   </div>
   <div class="callout" style="margin-top:.6em;"><b>一句话</b>：全双工输出状态 = <strong>按发言权归属分列的 10 态</strong> + <strong>五个可参数化的转移守卫</strong> + <strong>一组系统影子状态</strong>；其中主动性状态（附和 / 插话）的<strong>时序正确性</strong>是当前最大的技术缺口，也是评测应当最先覆盖的地方。</div>
-  <div class="pageno">9 / 10</div>
+  <div class="pageno">9 / 11</div>
 </section>
 
 <!-- ═══════════ P10 对我们的建议 ═══════════ -->
@@ -772,7 +777,39 @@
     <div class="callout red" style="flex:1;"><b>最大风险</b>：我们的双脑架构依赖前台"主动播报 / 插话"，而这正是业界 IAS 最低（≤ 11.7%）的能力。若不先在评测集上验证，打扰管理器的 <code>speak_now</code> 决策会落在一个模型做不到的动作上——<strong>要么做成"等用户停顿再说"（speak_at_pause 优先），要么专项训练</strong>。</div>
     <div class="callout blue" style="flex:1;"><b>下一步</b>：① 定稿 10 态枚举与事件 schema；② 搭 FDB + Instruct‑FD 中文评测子集；③ 在现有 S2S 前台上实现 Easy Turn 四态 + 投机开口，跑出基线；④ 按基线决定主动性状态是训练还是绕开。</div>
   </div>
-  <div class="pageno">10 / 10</div>
+  <div class="pageno">10 / 11</div>
+</section>
+
+<!-- ═══════════ P11 附录：来源 Top 10 ═══════════ -->
+<section class="slide">
+  <div class="header">
+    <h1>附录：来源 <span class="hl">Top 10</span>——各自对"输出状态"问题的贡献与排序理由</h1>
+    <p class="subtitle">GPT‑Live 定目标 · Instruct‑FD / FDB 定量尺 · BayLing / Moshi / Freeze‑Omni 定实现路线<br>Sacks–Skantze 定边界 · 第二代实践层定短期可用件 · Qwen 系给反例与时延旁证</p>
+  </div>
+  <div class="cols">
+    <div class="col" style="flex:1;">
+      <div class="panel" style="flex:1;">
+        <table style="font-size:.72em;">
+          <tr><th>#</th><th>来源</th><th>贡献的核心洞察</th><th>排序理由（含扣分项）</th><th>①</th><th>②</th><th>③</th><th>④</th></tr>
+          <tr><td class="num">1</td><td><strong>GPT‑Live</strong>（公告 + 六个月工程文）</td><td>五动作 + 三个系统影子状态；"说 / 想"两时钟</td><td>唯一生产级第三代，即双脑架构的业界样本；扣分：机制不公开</td><td>◐</td><td>◐</td><td>●</td><td>●</td></tr>
+          <tr><td class="num">2</td><td><strong>Instruct‑FD</strong></td><td>状态从"有没有"变成"可不可控"；按 floor 分五策略；量化主动性短板</td><td>命中我们最大风险（主动插话）；排除 GPT‑Realtime 的理由说清两代分水岭</td><td>●</td><td>●</td><td>○</td><td>●</td></tr>
+          <tr><td class="num">3</td><td><strong>Full‑Duplex‑Bench</strong> v1.0 / v1.5</td><td>用期望行为反向定义正确状态；repair‑first vs continuity‑first</td><td>给出指标口径（TOR、stop / response latency）；不测可控性</td><td>●</td><td>●</td><td>○</td><td>◐</td></tr>
+          <tr><td class="num">4</td><td><strong>BayLing‑Duplex</strong></td><td>4 个状态 token、零新增模块、40 万样本 + DPO 调时机</td><td>"接口层显式、模型可读出"的最直接工程依据；可复制</td><td>●</td><td>●</td><td>○</td><td>●</td></tr>
+          <tr><td class="num">5</td><td><strong>Moshi</strong></td><td>全双工内生范式原型；PAD / EPAD 两步决策；PAD 占 65%</td><td>理论价值最高；IAS 21.1%、停顿接管率 1.0——涌现路线可控性差</td><td>◐</td><td>●</td><td>◐</td><td>◐</td></tr>
+          <tr><td class="num">6</td><td><strong>Sacks 1974 / Skantze 2021 / VAP</strong></td><td>hold / yield / abandon；四事件；重叠 10–20%</td><td>状态枚举的语言学锚点，防止发明伪状态；不给工程答案</td><td>●</td><td>●</td><td>—</td><td>◐</td></tr>
+          <tr><td class="num">7</td><td><strong>Freeze‑Omni</strong></td><td>分类头三态 + frozen LLM + "model as server"</td><td>最易落地的显式路线；IAS 10.7% 说明三态过粗——显式 ≠ 够用</td><td>●</td><td>●</td><td>◐</td><td>◐</td></tr>
+          <tr><td class="num">8</td><td><strong>第二代实践层</strong>：OpenAI Realtime · <strong>Qwen Realtime</strong>（<code>semantic_vad</code> / <code>smart_turn</code>）· Flux · Easy Turn / TEN</td><td>状态以事件暴露、外部驱动；投机开口再撤回；<code>wait</code> 单列</td><td>短期可用件；MUTED 与投机 SPEAKING 的来源；Qwen 在这一层</td><td>●</td><td>◐</td><td>●</td><td>●</td></tr>
+          <tr><td class="num">9</td><td><strong>Fun‑Audio‑Chat‑Duplex</strong>（通义，Qwen3 底座）</td><td>并行输入流 + <code>&lt;|SIL|&gt;</code>；Continue‑default 坍缩典型</td><td>反例：自报 turn‑taking 100% vs IAS 46.2%——评测必须含 Acknowledge / Backchannel</td><td>○</td><td>●</td><td>◐</td><td>◐</td></tr>
+          <tr><td class="num">10</td><td><strong>Qwen3‑Omni</strong>（Thinker‑Talker）</td><td>模型内想 / 说解耦；6 并发首包 234 → 1172 ms</td><td>对 THINKING 态时延预算有价值；对发言权状态无直接贡献</td><td>○</td><td>●</td><td>●</td><td>○</td></tr>
+        </table>
+      </div>
+    </div>
+  </div>
+  <div class="cols" style="flex:0 0 auto; margin-top:.5em; gap:.6em;">
+    <div class="callout blue" style="flex:1; font-size:.76em;"><b>Qwen 系为何拆成三条线</b>：Qwen3‑Omni 是轮次制 S2S（架构层，01 章谱系二）；Qwen Realtime API 是第二代表面（系统事件层）；Fun‑Audio‑Chat‑Duplex 才是原生全双工（模型表示层）。三者回答的是不同层的问题，不应合并成"Qwen 一行"。</div>
+    <div class="callout warn" style="flex:1; font-size:.76em;"><b>图例</b>：● 充分 · ◐ 部分 · ○ 弱 · — 不适用。①状态集合可枚举 ②数据可复现 ③生产 / 规模验证 ④与双脑架构相关度。排序是对"输出状态"这一问题的贡献，不是模型整体优劣。</div>
+  </div>
+  <div class="pageno">11 / 11</div>
 </section>
 
 </body>
