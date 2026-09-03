@@ -25,6 +25,7 @@ GPT‑Live 正是"omni 全双工前台 + 异步深度后台"这条路线在业�
 | [03-GPT-Live实时系统工程.md](./03-GPT-Live实时系统工程.md) | "the voice must flow"：有状态流式推理、Go 媒体快路径、实例切换与压缩即切换、委托预算、双视图分轮、WARP + Instant Connect、relay + transceiver 地基、静默灰度的教训 |
 | [04-Realtime-API会话模型.md](./04-Realtime-API会话模型.md) | Session / Conversation / Response 对象模型；client/server 事件；VAD 三姿态；打断与截断；out‑of‑band 响应；function calling / MCP / SIP；模型阵容与定价；API 概念到系统架构的映射；面向 GPT‑Live API 的迁移准备 |
 | [05-对我们系统的启示.md](./05-对我们系统的启示.md) | 被验证的判断、需补进双脑架构的设计（两时钟三度量、后台预热、分轮器、打断三形态、压缩即切换、会话建立预算）、要避的坑、待讨论 |
+| [06-全双工输出状态盘点.md](./06-全双工输出状态盘点.md) | 全双工输出状态的三层视角（会话现象 / 模型表示 / 系统事件）：Sacks–Skantze–VAP 基础；Moshi / Freeze‑Omni / SALMONN‑omni / BayLing‑Duplex / FLM‑Audio 等状态编码对照；Easy Turn / TEN / Flux 用户侧状态；Full‑Duplex‑Bench 行为标签；统一 10 态输出状态模型（讨论稿）与待决问题 |
 
 ## 一句话共识
 
