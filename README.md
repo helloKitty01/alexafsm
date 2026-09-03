@@ -23,3 +23,4 @@
 | [docs/thinking-tool-calls/](./docs/thinking-tool-calls/) | 思考模式（Thought）与 Function Call 的时序机制（先想后调、三层"出不出 thought"原因） |
 | [docs/skill-tool-rom-versioning/](./docs/skill-tool-rom-versioning/) | Skill 与工具的 ROM 配套管理（双速发布、版本感知、工具治理、单 skill 可行性、重组情形，含单页与 8 页详解 HTML 幻灯片） |
 | [docs/phone-assistant-automation/](./docs/phone-assistant-automation/) | 手机智慧助手需求与方案（统一任务模型：定时/事件/自定义监视/长时异步任务，双脑架构 + 打扰管理器；含多任务管理 Agent v1.3 幻灯片：双入口 × 三层模型 × UAT 接口 × 异构执行体，v1.0–v1.2 留档 history/） |
+| [docs/omni-realtime-voice/](./docs/omni-realtime-voice/) | omni 实时语音架构洞察（三代架构演进与业界谱系、GPT‑Live 全双工 + 说/想分离、OpenAI 六个月实时系统工程：流式推理/实例切换/压缩即切换/WARP/relay+transceiver、Realtime API 会话与事件模型、对双脑架构的启示） |
