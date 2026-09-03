@@ -189,3 +189,8 @@ OpenAI 的建议很明确：面向终端设备用 WebRTC，服务端集成用 We
 4. **用三时钟度量**（应答起点 / 实质答案起点 / 完成），并在真实网络损伤下测。
 5. **`eagerness` 是产品决策**，按业务场景调，不用默认值。
 6. **引用可核实的数字**：不要把 sub‑300 ms 这类未证实数字当官方口径。
+
+业界把这套事件接到 WebRTC 房间的开源实现，见
+[07-LiveKit-OpenAI实现洞察.md](./07-LiveKit-OpenAI实现洞察.md)：LiveKit 用
+`speech_started → response.cancel → item.truncate` 做打断，并用 capabilities
+比特在"模型做主 / 客户端做主"之间显式互斥。

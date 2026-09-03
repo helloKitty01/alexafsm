@@ -27,6 +27,8 @@ GPT‑Live 正是"omni 全双工前台 + 异步深度后台"这条路线在业�
 | [05-对我们系统的启示.md](./05-对我们系统的启示.md) | 被验证的判断、需补进双脑架构的设计（两时钟三度量、后台预热、分轮器、打断三形态、压缩即切换、会话建立预算）、要避的坑、待讨论 |
 | [06-全双工输出状态盘点.md](./06-全双工输出状态盘点.md) | 全双工输出状态的三层视角（会话现象 / 模型表示 / 系统事件）：Sacks–Skantze–VAP 基础；Moshi / Freeze‑Omni / SALMONN‑omni / BayLing‑Duplex / FLM‑Audio / Fun‑Audio‑Chat‑Duplex 等状态编码对照；Easy Turn / TEN / Flux / Qwen `smart_turn` 用户侧状态；Full‑Duplex‑Bench 行为标签；Instruct‑FD 五策略指令遵循；Qwen 系三条线定位；统一 10 态输出状态模型（讨论稿）、待决问题与来源 Top 10 附录 |
 | [全双工输出状态.slides.html](./全双工输出状态.slides.html) | 11 页幻灯片 v1（浅色系）：三层视角盘点 → 评测定义正确状态 → Instruct‑FD 可控性 → 10 态状态图 → 五个转移守卫 → 六条总结 → 六条对我们的建议 → 附录：来源 Top 10 与 Qwen 系定位 |
+| [07-LiveKit-OpenAI实现洞察.md](./07-LiveKit-OpenAI实现洞察.md) | LiveKit Agents × OpenAI 集成实现：WebRTC↔Realtime WS 适配器；三种管道共用 AgentSession；插件协议翻译（24 kHz / 100 ms / 打断 truncate / 重连重放）；轮次所有权互斥；对照 10 态的系统事件层映射 |
+| [LiveKit-OpenAI实现.slides.html](./LiveKit-OpenAI实现.slides.html) | 9 页幻灯片 v1：定性 → 三管道 → 运行时 → 插件 → cancel+truncate → 单主人轮次 → 10 态对照 → 做对了/没做 → 七条建议 |
 
 ## 一句话共识
 
