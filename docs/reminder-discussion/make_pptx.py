@@ -320,6 +320,6 @@ text_box(s2, RX + Inches(0.2), TOP2 + Inches(4.35), CW - Inches(0.4), Inches(1.5
 ])
 add_pageno(s2, "2 / 2")
 
-out = "/workspace/reminder-discussion/reminder机制.pptx"
+out = "/workspace/docs/reminder-discussion/reminder机制.pptx"
 prs.save(out)
 print("saved:", out)
