@@ -1,0 +1,802 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Full-Duplex Voice Interaction State Model v3.1 (全双工语音交互状态模型)</title>
+<style>
+  :root {
+    --bg: #e9eef6;
+    --slide-bg: linear-gradient(135deg, #ffffff 0%, #f8fbfe 55%, #f2f7fd 100%);
+    --card: #ffffff;
+    --card-border: #dfe6f0;
+    --text: #1e2a3d;
+    --muted: #5a6b84;
+    --accent: #2f6fed;
+    --accent2: #0ea578;
+    --warn: #d97a06;
+    --danger: #d0453c;
+    --purple: #7c5cd6;
+    --code-bg: #f3f6fb;
+    --code-text: #24405f;
+    --mono: "SF Mono", "JetBrains Mono", Consolas, "Courier New", monospace;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { background: var(--bg); }
+  body {
+    font-family: "Inter", "Helvetica Neue", "PingFang SC", "Microsoft YaHei", "Noto Sans SC", -apple-system, sans-serif;
+    color: var(--text);
+    display: flex; flex-direction: column; align-items: center;
+    padding: 28px 16px; gap: 28px; min-height: 100vh;
+  }
+  .slide {
+    width: min(1280px, 96vw);
+    aspect-ratio: 16 / 9;
+    background: var(--slide-bg);
+    border: 1px solid var(--card-border);
+    border-radius: 18px;
+    box-shadow: 0 18px 44px rgba(30,42,61,.14);
+    padding: 2.2% 3%;
+    display: flex; flex-direction: column;
+    overflow: hidden; position: relative;
+    font-size: clamp(10.5px, 1.12vw, 15px);
+  }
+  .slide::before {
+    content: ""; position: absolute; inset: 0 0 auto 0; height: 5px;
+    background: linear-gradient(90deg, var(--accent), var(--accent2));
+    border-radius: 18px 18px 0 0;
+  }
+  .pageno { position: absolute; right: 1.8em; bottom: 1.1em; font-family: var(--mono); font-size: .78em; color: var(--muted); }
+  .footer-note { position: absolute; left: 3%; bottom: 1.1em; font-size: .72em; color: #8b9ab0; }
+
+  .header { display: flex; align-items: baseline; justify-content: space-between; gap: 1.4em; margin-bottom: .8em; }
+  h1 { font-size: 1.6em; font-weight: 700; white-space: nowrap; letter-spacing: -.01em; }
+  h1 .hl { color: var(--accent); }
+  h1 .zh { color: var(--muted); font-weight: 500; font-size: .7em; margin-left: .5em; }
+  .subtitle { color: var(--muted); font-size: .9em; line-height: 1.4; text-align: right; }
+  .subtitle strong { color: var(--text); }
+  .zh { color: var(--muted); font-weight: 400; }
+
+  code, .mono { font-family: var(--mono); font-size: .9em; background: var(--code-bg); color: var(--code-text); border: 1px solid #e4eaf3; padding: 0 .3em; border-radius: 4px; }
+
+  .cols { display: flex; gap: 1em; flex: 1; min-height: 0; }
+  .col { display: flex; flex-direction: column; gap: .8em; min-width: 0; min-height: 0; }
+
+  .panel { background: var(--card); border: 1px solid var(--card-border); border-radius: 14px; padding: .9em 1.1em; box-shadow: 0 2px 8px rgba(30,42,61,.04); display: flex; flex-direction: column; min-height: 0; }
+  .panel > h2 { font-size: 1.02em; font-weight: 700; margin-bottom: .55em; display: flex; align-items: baseline; gap: .55em; }
+  .panel > h2 .tag { flex: none; font-size: .7em; font-weight: 700; color: var(--accent); background: rgba(47,111,237,.08); border: 1px solid rgba(47,111,237,.3); border-radius: 99px; padding: .12em .7em; }
+  .panel > h2 .tag.green { color: var(--accent2); background: rgba(14,165,120,.08); border-color: rgba(14,165,120,.3); }
+  .panel > h2 .tag.warn { color: var(--warn); background: rgba(217,122,6,.08); border-color: rgba(217,122,6,.3); }
+  .panel > h2 .tag.purple { color: var(--purple); background: rgba(124,92,214,.08); border-color: rgba(124,92,214,.3); }
+  .panel > h2 .tag.danger { color: var(--danger); background: rgba(208,69,60,.08); border-color: rgba(208,69,60,.3); }
+  .panel ul { list-style: none; }
+  .panel li { color: var(--muted); font-size: .9em; line-height: 1.5; padding-left: 1em; position: relative; margin-bottom: .38em; }
+  .panel li::before { content: "•"; color: var(--accent); position: absolute; left: 0; }
+  .panel li strong { color: var(--text); font-weight: 600; }
+  .panel p { color: var(--muted); font-size: .9em; line-height: 1.5; }
+  .panel p strong { color: var(--text); }
+
+  table { border-collapse: collapse; width: 100%; font-size: .86em; }
+  th { text-align: left; color: var(--text); font-weight: 700; padding: .38em .6em; border-bottom: 2px solid var(--card-border); white-space: nowrap; }
+  td { color: var(--muted); padding: .36em .6em; border-bottom: 1px solid #edf1f7; line-height: 1.45; vertical-align: top; }
+  td strong { color: var(--text); }
+
+  .callout { background: rgba(47,111,237,.06); border: 1px solid rgba(47,111,237,.25); border-left: 4px solid var(--accent); border-radius: 10px; padding: .6em .95em; font-size: .9em; color: var(--muted); line-height: 1.5; }
+  .callout b { color: var(--text); }
+  .callout.green { background: rgba(14,165,120,.06); border-color: rgba(14,165,120,.25); border-left-color: var(--accent2); }
+  .callout.warn { background: rgba(217,122,6,.06); border-color: rgba(217,122,6,.25); border-left-color: var(--warn); }
+  .callout.danger { background: rgba(208,69,60,.06); border-color: rgba(208,69,60,.25); border-left-color: var(--danger); }
+
+  .cards { display: grid; gap: .7em; flex: 1; min-height: 0; }
+  .card { background: var(--card); border: 1px solid var(--card-border); border-radius: 12px; padding: .75em .95em; min-width: 0; box-shadow: 0 2px 8px rgba(30,42,61,.04); }
+  .card h3 { font-size: .98em; font-weight: 700; margin-bottom: .3em; line-height: 1.3; }
+  .card h3 .no { color: var(--accent); font-family: var(--mono); margin-right: .45em; }
+  .card p { color: var(--muted); font-size: .86em; line-height: 1.5; }
+  .card p strong { color: var(--text); }
+  .card.key { border: 2px solid var(--danger); background: rgba(208,69,60,.03); }
+  .card.key h3::after { content: "  KEY"; font-family: var(--mono); font-size: .7em; color: var(--danger); }
+
+  .pri { font-family: var(--mono); font-size: .7em; font-weight: 700; border-radius: 4px; padding: .05em .4em; margin-right: .35em; vertical-align: .08em; }
+  .pri0 { color: #fff; background: var(--danger); }
+  .pri1 { color: #fff; background: var(--warn); }
+  .pri2 { color: var(--muted); background: #e8edf4; }
+
+  .chip { font-family: var(--mono); font-size: .8em; font-weight: 700; border-radius: 7px; padding: .2em .6em; border: 1.5px solid; white-space: nowrap; display: inline-block; }
+  .chip.base { color: var(--accent); border-color: rgba(47,111,237,.45); background: rgba(47,111,237,.07); }
+  .chip.new { color: var(--accent2); border-color: rgba(14,165,120,.5); background: rgba(14,165,120,.07); }
+  .chip.ext { color: var(--purple); border-color: rgba(124,92,214,.45); background: rgba(124,92,214,.07); border-style: dashed; }
+  .chip.edge { color: var(--muted); border-color: #c6d0de; background: #f2f5fa; border-style: dotted; }
+  .chip.win { color: var(--warn); border-color: rgba(217,122,6,.5); background: rgba(217,122,6,.08); border-radius: 99px; }
+
+  /* Hero cover */
+  .hero { flex: 1; display: flex; flex-direction: column; justify-content: center; gap: 1.2em; padding: 0 2%; }
+  .hero .kicker { font-family: var(--mono); color: var(--accent2); font-size: .95em; letter-spacing: .12em; text-transform: uppercase; }
+  .hero h1 { font-size: 3em; line-height: 1.12; white-space: normal; }
+  .hero h1 .zh { display: block; font-size: .5em; margin: .3em 0 0; color: var(--muted); }
+  .hero .thesis { font-size: 1.25em; color: var(--text); line-height: 1.5; max-width: 30em; border-left: 5px solid var(--accent); padding-left: 1em; }
+  .hero .thesis .zh { display: block; font-size: .8em; margin-top: .3em; }
+  .hero .meta { display: flex; gap: 2.5em; color: var(--muted); font-size: .9em; }
+  .hero .meta b { color: var(--text); display: block; font-size: 1.5em; }
+
+  /* Timeline phases */
+  .phases { display: flex; gap: .5em; align-items: stretch; }
+  .phase { flex: 1; border-radius: 12px; border: 1px solid var(--card-border); background: var(--card); padding: .8em .9em; position: relative; }
+  .phase .letter { font-family: var(--mono); font-size: 1.6em; font-weight: 800; color: var(--accent); line-height: 1; }
+  .phase h3 { font-size: 1em; font-weight: 700; margin: .3em 0 .2em; }
+  .phase p { color: var(--muted); font-size: .84em; line-height: 1.45; }
+  .phase .q { color: var(--text); font-weight: 600; font-size: .88em; margin-top: .5em; padding-top: .45em; border-top: 1px dashed var(--card-border); }
+  .phase.c { border-top: 4px solid var(--accent2); }
+  .phase.x { border-top: 4px solid var(--purple); }
+  .phase.ab, .phase.d { border-top: 4px solid var(--accent); }
+
+  /* Latency tiers bar */
+  .tiers { display: flex; align-items: stretch; margin: .4em 0 .6em; font-size: .86em; text-align: center; }
+  .tier { padding: .7em .5em; border: 1px solid; }
+  .tier strong { display: block; font-size: 1.05em; margin-bottom: .2em; }
+  .tier span { color: var(--muted); }
+  .tier.t0 { flex: 2; background: rgba(14,165,120,.12); border-color: rgba(14,165,120,.4); border-radius: 10px 0 0 10px; }
+  .tier.t1 { flex: 3; background: rgba(217,122,6,.1); border-color: rgba(217,122,6,.4); border-left: none; }
+  .tier.t2 { flex: 3; background: rgba(208,69,60,.08); border-color: rgba(208,69,60,.35); border-left: none; }
+  .tier.tp { flex: 2; background: rgba(47,111,237,.1); border-color: rgba(47,111,237,.4); border-left: none; border-radius: 0 10px 10px 0; }
+
+  /* Layer bands */
+  .band { border-radius: 10px; padding: .6em .95em; font-size: .88em; line-height: 1.5; color: var(--muted); border: 1px solid var(--card-border); background: var(--card); }
+  .band strong { color: var(--text); }
+  .band.l4 { border-left: 5px solid var(--accent); }
+  .band.l3 { border-left: 5px solid var(--accent2); }
+  .band.l2 { border-left: 5px solid var(--warn); }
+  .band.l1 { border-left: 5px solid var(--purple); }
+  .down { text-align: center; color: var(--muted); font-size: .8em; line-height: 1.1; }
+
+  .ok { color: var(--accent2); font-weight: 700; }
+  .bad { color: var(--danger); font-weight: 700; }
+  .mid { color: var(--warn); font-weight: 700; }
+
+  svg text { font-family: "Inter", "Helvetica Neue", "PingFang SC", sans-serif; }
+  svg .mono-t { font-family: var(--mono); }
+</style>
+</head>
+<body>
+
+<!-- ═══════════ P1 Cover ═══════════ -->
+<section class="slide">
+  <div class="hero">
+    <div class="kicker">Omni Realtime Voice · Design Review</div>
+    <h1>Full-Duplex Voice Interaction<br><span class="hl">State Model</span> v3.1
+      <span class="zh">全双工语音交互状态模型（汇报版）</span></h1>
+    <p class="thesis">Full-duplex is not about a smarter model. It is about a system that, at every instant, knows whether it should <b>listen, wait, or speak</b> — and can prove it from what the user actually hears.
+      <span class="zh">全双工的本质不是模型更聪明，而是系统在任何时刻都知道自己该听、该等还是该说，并且能从用户实际听到的内容推导出来。</span></p>
+    <div class="meta">
+      <div><b>6 + 3 + 2</b>system states <span class="zh">(系统侧状态)</span></div>
+      <div><b>34</b>interaction scenarios, prioritised P0 / P1 / P2 <span class="zh">(交互场景)</span></div>
+      <div><b>4</b>protocol layers <span class="zh">(协议分层)</span></div>
+      <div><b>3</b>decisions pending <span class="zh">(待拍板决策)</span></div>
+    </div>
+  </div>
+  <span class="footer-note">Source of truth: docs/omni-realtime-voice/08-场景全集与状态交互分层.md · Discussion draft: slides v3</span>
+  <span class="pageno">1 / 16</span>
+</section>
+
+<!-- ═══════════ P2 Agenda ═══════════ -->
+<section class="slide">
+  <div class="header">
+    <h1>Agenda <span class="zh">(议程)</span></h1>
+    <p class="subtitle">Three questions this deck answers: <strong>which states exist, why, and how they are decided</strong> <span class="zh">(有哪些状态、为什么、怎么判定)</span></p>
+  </div>
+  <div class="cards" style="grid-template-columns: 1fr 1fr 1fr;">
+    <div class="card"><h3><span class="no">01</span>Why explicit states <span class="zh">(为什么)</span></h3><p>Human–machine dialogue differs from human–human in six ways; each difference forces one mechanism. <span class="zh">(六条差异逼出六个机制)</span></p></div>
+    <div class="card"><h3><span class="no">02</span>The model at a glance <span class="zh">(全貌)</span></h3><p>One diagram: 6 core states, 3 extended, 2 edge; the user-side machine; the floor variable. <span class="zh">(一张图 + 完整状态清单)</span></p></div>
+    <div class="card"><h3><span class="no">03</span>Three design principles <span class="zh">(三原则)</span></h3><p>Anchor on playback facts; latency is a timer, not a state; tools and delegation add no states. <span class="zh">(锚定播放事实 / 时延不是状态 / 工具不建态)</span></p></div>
+    <div class="card"><h3><span class="no">04</span>Scenarios, complete <span class="zh">(场景全集)</span></h3><p>One turn in five phases; all 34 scenarios by priority — 9 must-have, 15 experience-defining, 10 deferred. <span class="zh">(9 必做 / 15 分水岭 / 10 暂缓)</span></p></div>
+    <div class="card"><h3><span class="no">05</span>Two hardest mechanisms <span class="zh">(两个最难点)</span></h3><p>Three-way interruption judgement; latency tiers with tools and delegation inside PREPARING / HOLDING. <span class="zh">(打断三分判定 / 时延分档)</span></p></div>
+    <div class="card"><h3><span class="no">06</span>Protocol &amp; comparison <span class="zh">(协议与对比)</span></h3><p>Four-layer architecture, control-plane vocabulary, external ASR trigger; detailed comparison with the externally proposed 7-event vocabulary. <span class="zh">(四层协议 / 与外部词表逐项对比)</span></p></div>
+    <div class="card" style="grid-column: span 3; display:flex; gap:2em; align-items:center;"><h3 style="margin:0;"><span class="no">07</span>Decisions, acceptance, next steps <span class="zh">(决策 · 验收 · 下一步)</span></h3><p style="margin:0;">Three decisions with recommended options; five model requirements; two acceptance criteria; full transition table as appendix. <span class="zh">(三项待拍板决策 / 五条模型需求 / 两条验收标准 / 附录转换表)</span></p></div>
+  </div>
+  <span class="pageno">2 / 16</span>
+</section>
+
+<!-- ═══════════ P3 Why ═══════════ -->
+<section class="slide">
+  <div class="header">
+    <h1>Why Full-Duplex Needs Explicit States <span class="zh">(为什么需要显式状态)</span></h1>
+    <p class="subtitle">Humans do turn-taking for free. Machines must model it — <strong>each difference below forces one mechanism</strong> <span class="zh">(每条差异逼出一个机制)</span></p>
+  </div>
+  <div class="panel" style="flex:1;">
+    <table style="font-size:.92em;">
+      <tr><th style="width:3%;">#</th><th style="width:27%;">Human–human <span class="zh">(人人对话)</span></th><th style="width:28%;">Human–machine <span class="zh">(人机对话)</span></th><th>Mechanism this forces <span class="zh">(逼出的机制)</span></th></tr>
+      <tr><td>1</td><td>The listener always responds somehow; there is no "not for me". </td><td>False wake-ups, side conversations, several people in the room.</td><td><strong>Rejection decision</strong> — respond / reject / defer — as a <em>continuous</em> judgement, not a one-off <span class="zh">(拒识三分，持续判定)</span></td></tr>
+      <tr><td>2</td><td>Turn ends are <em>predicted</em> from syntax and prosody; gaps are often negative.</td><td>Waits for a silence threshold; too slow, and cuts in at breathing pauses.</td><td>User state <strong>PAUSED ≠ finished</strong>; semantic endpoint; speculative pre-generation during the pause <span class="zh">(停顿≠说完 / 语义端点 / 预提交)</span></td></tr>
+      <tr><td>3</td><td>"Mm-hmm" from the listener is natural and harmless.</td><td>Every "mm-hmm" may trigger barge-in.</td><td><strong>Interruption window</strong> with a three-way outcome: real interruption / backchannel / noise <span class="zh">(打断判定窗三分)</span></td></tr>
+      <tr><td>4</td><td>When interrupted, one finishes the clause and yields gracefully.</td><td>Either stops abruptly or ignores the user.</td><td>Explicit <strong>YIELDING</strong> transition + truncation reconciled to what was actually heard <span class="zh">(让出态 + 截断对账)</span></td></tr>
+      <tr><td>5</td><td>People never "hang" waiting for a subsystem.</td><td>Tools, retrieval and large-model delegation take seconds.</td><td><strong>PREPARING / HOLDING</strong> with latency tiers T0 / T1 / T2: silent → filler → fallback <span class="zh">(备答 / 持轮等待 + 三档时延)</span></td></tr>
+      <tr><td>6</td><td>Gaze, mouth opening and breathing are visible cues.</td><td>Audio only (or very limited vision).</td><td><strong>Onset-confirmation and endpoint windows</strong> cannot be skipped; their length is a product parameter <span class="zh">(起音确认窗 / 端点窗不可省)</span></td></tr>
+    </table>
+    <div class="callout" style="margin-top:.8em;">
+      <b>Industry check:</b> differences 2 / 3 / 4 are exactly the four dimensions of Full-Duplex-Bench (pause handling, backchannel, turn-taking, interruption); difference 1 is its v1.5 "talking to others / background speech"; difference 5 is what Agora's three-clock latency measurement captures. Our scenario set aligns with public benchmarks. <span class="zh">(与业界评测口径对齐)</span>
+    </div>
+  </div>
+  <span class="pageno">3 / 16</span>
+</section>
+
+<!-- ═══════════ P4 State diagram ═══════════ -->
+<section class="slide">
+  <div class="header">
+    <h1>The Model at a Glance <span class="zh">(一张图看全貌)</span></h1>
+    <p class="subtitle">Bold path = the everyday turn: <strong>LISTENING → PREPARING → SPEAKING → LISTENING</strong>. Everything else is a branch off this path. <span class="zh">(粗线为主干，其余是岔路)</span></p>
+  </div>
+  <div style="flex:1; min-height:0; display:flex; flex-direction:column;">
+    <svg viewBox="0 0 1200 520" style="width:100%; flex:1; min-height:0;" preserveAspectRatio="xMidYMid meet">
+      <defs>
+        <marker id="a" markerWidth="10" markerHeight="8" refX="9" refY="4" orient="auto"><polygon points="0 0, 10 4, 0 8" fill="#33507a"/></marker>
+        <marker id="aP" markerWidth="10" markerHeight="8" refX="9" refY="4" orient="auto"><polygon points="0 0, 10 4, 0 8" fill="#7c5cd6"/></marker>
+        <marker id="aG" markerWidth="10" markerHeight="8" refX="9" refY="4" orient="auto"><polygon points="0 0, 10 4, 0 8" fill="#8b9ab0"/></marker>
+      </defs>
+
+      <!-- Edge states -->
+      <rect x="40" y="30" rx="9" width="150" height="34" fill="#f2f5fa" stroke="#8b9ab0" stroke-width="1.4" stroke-dasharray="5 4"/>
+      <text x="115" y="52" font-size="13" fill="#5a6b84" text-anchor="middle" class="mono-t">INITIALIZING</text>
+      <path d="M 190 47 L 232 47" fill="none" stroke="#8b9ab0" stroke-width="1.6" marker-end="url(#aG)"/>
+      <rect x="234" y="30" rx="9" width="90" height="34" fill="#f2f5fa" stroke="#8b9ab0" stroke-width="1.4" stroke-dasharray="5 4"/>
+      <text x="279" y="52" font-size="13" fill="#5a6b84" text-anchor="middle" class="mono-t">IDLE</text>
+      <path d="M 200 64 Q 170 140 158 212" fill="none" stroke="#8b9ab0" stroke-width="1.6" marker-end="url(#aG)"/>
+      <text x="40" y="84" font-size="11.5" fill="#8b9ab0">edge states (边缘态): session start / both silent</text>
+
+      <!-- Main path -->
+      <path d="M 272 232 Q 360 150 484 100" fill="none" stroke="#33507a" stroke-width="4" marker-end="url(#a)"/>
+      <path d="M 716 100 Q 840 150 928 232" fill="none" stroke="#33507a" stroke-width="4" marker-end="url(#a)"/>
+      <path d="M 928 285 L 272 285" fill="none" stroke="#33507a" stroke-width="4" marker-end="url(#a)"/>
+
+      <!-- PREPARING -> LISTENING (dashed) -->
+      <path d="M 500 132 Q 400 200 262 218" fill="none" stroke="#7c5cd6" stroke-width="2" stroke-dasharray="7 5" marker-end="url(#aP)"/>
+      <!-- PREPARING self loop -->
+      <path d="M 565 40 C 550 6 650 6 635 38" fill="none" stroke="#7c5cd6" stroke-width="2" stroke-dasharray="7 5" marker-end="url(#aP)"/>
+
+      <!-- SPEAKING <-> HOLDING -->
+      <path d="M 1010 218 L 1010 132" fill="none" stroke="#33507a" stroke-width="2.4" marker-end="url(#a)"/>
+      <path d="M 1080 132 L 1080 216" fill="none" stroke="#33507a" stroke-width="2.4" marker-end="url(#a)"/>
+
+      <!-- SPEAKING self loop (user backchannel) -->
+      <path d="M 1160 236 C 1200 220 1200 282 1160 268" fill="none" stroke="#7c5cd6" stroke-width="2" stroke-dasharray="7 5" marker-end="url(#aP)"/>
+
+      <!-- SPEAKING -> YIELDING -->
+      <path d="M 980 308 Q 920 380 872 418" fill="none" stroke="#33507a" stroke-width="2.6" marker-end="url(#a)"/>
+      <!-- YIELDING -> SPEAKING (resume) -->
+      <path d="M 850 400 Q 950 350 1030 310" fill="none" stroke="#7c5cd6" stroke-width="2" stroke-dasharray="7 5" marker-end="url(#aP)"/>
+      <!-- YIELDING -> LISTENING -->
+      <path d="M 640 445 Q 420 440 215 310" fill="none" stroke="#33507a" stroke-width="2.6" marker-end="url(#a)"/>
+
+      <!-- LISTENING <-> BACKCHANNEL -->
+      <path d="M 120 308 L 120 400" fill="none" stroke="#7c5cd6" stroke-width="2" stroke-dasharray="7 5" marker-end="url(#aP)"/>
+      <path d="M 190 400 L 190 308" fill="none" stroke="#7c5cd6" stroke-width="2" stroke-dasharray="7 5" marker-end="url(#aP)"/>
+
+      <!-- LISTENING -> SPEAKING via INTERJECTING -->
+      <path d="M 272 300 Q 600 400 928 300" fill="none" stroke="#7c5cd6" stroke-width="1.8" stroke-dasharray="4 5" marker-end="url(#aP)"/>
+
+      <!-- Edge labels -->
+      <text x="300" y="150" font-size="13" fill="#33507a" font-weight="700">user finished → floor to system</text>
+      <text x="300" y="167" font-size="12" fill="#8b9ab0">committed ∧ respond (用户说完，话轮交系统)</text>
+      <text x="760" y="150" font-size="13" fill="#33507a" font-weight="700">first audio frame played</text>
+      <text x="760" y="167" font-size="12" fill="#8b9ab0">playout_started (首帧播出)</text>
+      <text x="600" y="272" font-size="13" fill="#33507a" font-weight="700" text-anchor="middle">finished speaking → release floor, or keep it while expecting an answer</text>
+      <text x="600" y="303" font-size="12" fill="#8b9ab0" text-anchor="middle">playout_done (播完：释放话轮 / 提问等答)</text>
+      <text x="345" y="200" font-size="12" fill="#7c5cd6">rejected · user spoke again (拒识 / 用户又开口)</text>
+      <text x="600" y="18" font-size="12" fill="#7c5cd6" text-anchor="middle">tool call · delegation · filler · fallback (工具 · 委托 · 垫话 · 兜底)</text>
+      <text x="1000" y="182" font-size="12" fill="#5a6b84" text-anchor="end">announced, waiting</text>
+      <text x="1000" y="197" font-size="11" fill="#8b9ab0" text-anchor="end">(说完等结果)</text>
+      <text x="1090" y="182" font-size="12" fill="#5a6b84">result back, continue</text>
+      <text x="1090" y="197" font-size="11" fill="#8b9ab0">(结果到，续说)</text>
+      <text x="1120" y="312" font-size="12" fill="#7c5cd6">user says "mm-hmm"</text>
+      <text x="1120" y="327" font-size="11" fill="#8b9ab0">→ keep talking (用户附和，继续说)</text>
+      <text x="900" y="372" font-size="13" fill="#33507a" font-weight="700">real interruption</text>
+      <text x="900" y="388" font-size="12" fill="#8b9ab0">(真打断 → 让出)</text>
+      <text x="905" y="345" font-size="12" fill="#7c5cd6" text-anchor="end">false alarm → resume (误报 → 恢复)</text>
+      <text x="400" y="480" font-size="13" fill="#33507a" font-weight="700">stopped and truncated to what was heard</text>
+      <text x="400" y="496" font-size="12" fill="#8b9ab0">(停播并截断到用户实际听到的位置)</text>
+      <text x="205" y="360" font-size="12" fill="#7c5cd6">brief "mm-hmm", floor unchanged</text>
+      <text x="205" y="375" font-size="11" fill="#8b9ab0">(系统附和，不改话轮)</text>
+      <text x="600" y="368" font-size="12" fill="#7c5cd6" text-anchor="middle">proactive interjection, gated by interruption manager (主动插话，经打扰管理)</text>
+
+      <!-- Nodes -->
+      <rect x="40" y="218" rx="14" width="232" height="90" fill="rgba(47,111,237,.08)" stroke="#2f6fed" stroke-width="2.6"/>
+      <text x="156" y="256" font-size="21" font-weight="800" fill="#1d4fc4" text-anchor="middle" class="mono-t">LISTENING</text>
+      <text x="156" y="280" font-size="13" fill="#5a6b84" text-anchor="middle">聆听 · silent, floor with user</text>
+
+      <rect x="484" y="44" rx="14" width="232" height="90" fill="rgba(14,165,120,.09)" stroke="#0ea578" stroke-width="2.6"/>
+      <text x="600" y="82" font-size="21" font-weight="800" fill="#0b7d5c" text-anchor="middle" class="mono-t">PREPARING</text>
+      <text x="600" y="106" font-size="13" fill="#5a6b84" text-anchor="middle">备答 · floor taken, not yet audible</text>
+
+      <rect x="928" y="218" rx="14" width="232" height="90" fill="rgba(47,111,237,.08)" stroke="#2f6fed" stroke-width="2.6"/>
+      <text x="1044" y="256" font-size="21" font-weight="800" fill="#1d4fc4" text-anchor="middle" class="mono-t">SPEAKING</text>
+      <text x="1044" y="280" font-size="13" fill="#5a6b84" text-anchor="middle">说话 · anchored on playback</text>
+
+      <rect x="928" y="44" rx="14" width="232" height="88" fill="rgba(14,165,120,.09)" stroke="#0ea578" stroke-width="2.6"/>
+      <text x="1044" y="82" font-size="21" font-weight="800" fill="#0b7d5c" text-anchor="middle" class="mono-t">HOLDING</text>
+      <text x="1044" y="106" font-size="13" fill="#5a6b84" text-anchor="middle">持轮等待 · has spoken, keeps floor</text>
+
+      <rect x="40" y="400" rx="14" width="232" height="80" fill="rgba(14,165,120,.09)" stroke="#0ea578" stroke-width="2.4"/>
+      <text x="156" y="434" font-size="19" font-weight="800" fill="#0b7d5c" text-anchor="middle" class="mono-t">BACKCHANNEL</text>
+      <text x="156" y="458" font-size="13" fill="#5a6b84" text-anchor="middle">附和 · audible, does not take floor</text>
+
+      <rect x="640" y="400" rx="14" width="232" height="80" fill="rgba(14,165,120,.09)" stroke="#0ea578" stroke-width="2.4"/>
+      <text x="756" y="434" font-size="19" font-weight="800" fill="#0b7d5c" text-anchor="middle" class="mono-t">YIELDING</text>
+      <text x="756" y="458" font-size="13" fill="#5a6b84" text-anchor="middle">让出 · stopping + reconciling</text>
+
+      <rect x="928" y="400" rx="12" width="232" height="80" fill="rgba(124,92,214,.06)" stroke="#7c5cd6" stroke-width="1.8" stroke-dasharray="7 5"/>
+      <text x="1044" y="428" font-size="13" font-weight="700" fill="#6a4cc0" text-anchor="middle">Extended states (扩展态)</text>
+      <text x="1044" y="448" font-size="12.5" fill="#6a4cc0" text-anchor="middle" class="mono-t">INTERJECTING · MUTED · REPAIR</text>
+      <text x="1044" y="467" font-size="11.5" fill="#5a6b84" text-anchor="middle">主动插话 · 禁言 · 澄清「是在跟我说吗」</text>
+    </svg>
+  </div>
+  <span class="pageno">4 / 16</span>
+</section>
+
+<!-- ═══════════ P5 Full state inventory ═══════════ -->
+<section class="slide">
+  <div class="header">
+    <h1>Complete State Inventory <span class="zh">(完整状态清单)</span></h1>
+    <p class="subtitle">System side 6 + 3 + 2 · User side 4 · one independent variable <strong>floor</strong> (who holds the turn) <span class="zh">(话轮归属不进状态机，单独记)</span></p>
+  </div>
+  <div class="cols">
+    <div class="col" style="flex:1.35;">
+      <div class="panel" style="flex:1;">
+        <h2><span class="tag">System side</span>11 states <span class="zh">(系统侧)</span></h2>
+        <table style="font-size:.84em;">
+          <tr><th>State</th><th>Definition</th><th>Perceived by user</th><th>Kind</th></tr>
+          <tr><td><strong>LISTENING</strong> <span class="zh">聆听</span></td><td>Silent; floor with the user or open; consuming input</td><td>Quiet</td><td><span class="chip base">core</span></td></tr>
+          <tr><td><strong>PREPARING</strong> <span class="zh">备答</span></td><td>Floor taken, <strong>not yet audible</strong>; generation, tools, delegation happen here</td><td>Quiet (≤ T0) or a filler</td><td><span class="chip new">core</span></td></tr>
+          <tr><td><strong>SPEAKING</strong> <span class="zh">说话</span></td><td>Audio is playing; anchored on first frame in the playout channel</td><td>Normal speech</td><td><span class="chip base">core</span></td></tr>
+          <tr><td><strong>HOLDING</strong> <span class="zh">持轮等待</span></td><td><strong>Has spoken</strong>, keeps the floor, no new content yet (waiting for a tool, in-turn pause, tail)</td><td>Short pause that does not sound finished</td><td><span class="chip new">core</span></td></tr>
+          <tr><td><strong>BACKCHANNEL</strong> <span class="zh">附和</span></td><td>Brief audible feedback that does not take the floor</td><td>"mm-hmm", "right"</td><td><span class="chip new">core</span></td></tr>
+          <tr><td><strong>YIELDING</strong> <span class="zh">让出</span></td><td>Real interruption judged; stopping playback and truncating unheard content</td><td>Goes quiet immediately</td><td><span class="chip new">core</span></td></tr>
+          <tr><td><strong>INTERJECTING</strong> <span class="zh">主动插话</span></td><td>System initiates substantive speech (reminder, alert); gated by the interruption manager</td><td>Being interjected</td><td><span class="chip ext">extended</span></td></tr>
+          <tr><td><strong>MUTED</strong> <span class="zh">禁言</span></td><td>User explicitly asked the system to stay silent until released</td><td>Long silence</td><td><span class="chip ext">extended</span></td></tr>
+          <tr><td><strong>REPAIR</strong> <span class="zh">澄清</span></td><td>Meta-dialogue: "Were you talking to me?"</td><td>A clarifying question</td><td><span class="chip ext">extended</span></td></tr>
+          <tr><td><strong>INITIALIZING / IDLE</strong> <span class="zh">建立 / 待机</span></td><td>Session warm-up (buffering early speech) / both sides silent</td><td>—</td><td><span class="chip edge">edge</span></td></tr>
+        </table>
+      </div>
+    </div>
+    <div class="col" style="flex:.85;">
+      <div class="panel">
+        <h2><span class="tag purple">User side</span>4 states <span class="zh">(用户侧)</span></h2>
+        <table style="font-size:.86em;">
+          <tr><td><strong>SPEAKING</strong> <span class="zh">说话中</span></td><td>Confirmed speech onset</td></tr>
+          <tr><td><strong>PAUSED</strong> <span class="zh">持轮停顿</span></td><td>Stopped speaking but <strong>not finished</strong> — still owns the floor</td></tr>
+          <tr><td><strong>SILENT</strong> <span class="zh">已释放</span></td><td>Turn released (committed)</td></tr>
+          <tr><td><strong>AWAY</strong> <span class="zh">离开</span></td><td>Long mutual silence</td></tr>
+        </table>
+      </div>
+      <div class="panel" style="flex:1;">
+        <h2><span class="tag warn">floor</span>who holds the turn <span class="zh">(话轮归属)</span></h2>
+        <p><span class="mono">user</span> · <span class="mono">agent</span> · <span class="mono">open</span> · <span class="mono">contested</span> · <span class="mono">agent-expecting-user</span></p>
+        <div class="callout green" style="margin-top:.6em;">
+          <b>Why a separate variable:</b> after "Which day do you want to leave?" the system is back in LISTENING, but the floor is marked <b>expecting an answer</b> — so it knows to follow up rather than wait forever. Without floor this would need extra states. <span class="zh">(提问等答靠 floor 表达，不另设状态)</span>
+        </div>
+      </div>
+    </div>
+  </div>
+  <span class="pageno">5 / 16</span>
+</section>
+
+<!-- ═══════════ P6 Three principles ═══════════ -->
+<section class="slide">
+  <div class="header">
+    <h1>Three Design Principles <span class="zh">(三条设计原则)</span></h1>
+    <p class="subtitle">These keep the state machine <strong>small, verifiable and stable</strong> as features are added <span class="zh">(保证状态机小、可验证、可扩展)</span></p>
+  </div>
+  <div class="cards" style="grid-template-columns: 1fr 1fr 1fr;">
+    <div class="card" style="display:flex; flex-direction:column;">
+      <h3><span class="no">P1</span>Anchor states on what the user hears <span class="zh">(以用户听到的为准)</span></h3>
+      <p style="flex:1;">SPEAKING begins when the <strong>first audio frame enters the playout channel</strong>, not when the model starts generating. Subtitles follow playback progress. After an interruption, conversation history is truncated to the <strong>millisecond the user actually heard</strong>.</p>
+      <div class="callout" style="margin-top:.7em; font-size:.84em;"><b>Verified in practice:</b> LiveKit Agents × OpenAI Realtime does exactly this (truncate by played milliseconds). Anchoring on generation progress mis-aligns subtitles and truncation. <span class="zh">(LiveKit 源码验证)</span></div>
+    </div>
+    <div class="card" style="display:flex; flex-direction:column;">
+      <h3><span class="no">P2</span>Latency is a timer, not a state <span class="zh">(时延不是状态)</span></h3>
+      <p style="flex:1;">Whether the system is generating, calling a tool or waiting for a large model, it is simply <strong>PREPARING or HOLDING for longer</strong>. Inside those states three thresholds shape the experience: <strong>T0 ≈ 0.5 s</strong> silent and unnoticed · <strong>T1 ≈ 1.5 s</strong> play a filler ("let me check") · <strong>T2 ≈ 8 s</strong> apologise and fall back.</p>
+      <div class="callout green" style="margin-top:.7em; font-size:.84em;"><b>Result:</b> continuous latency becomes three designable segments; thresholds are configured per state and tuned from interruption and abandonment rates. <span class="zh">(三档阈值按状态分别配置)</span></div>
+    </div>
+    <div class="card" style="display:flex; flex-direction:column;">
+      <h3><span class="no">P3</span>Tools and delegation add no states <span class="zh">(工具与委托不建态)</span></h3>
+      <p style="flex:1;">The interaction layer cares about two things only: <strong>who holds the floor</strong> and <strong>what is in the user's ear</strong>. A running tool is PREPARING if nothing was said yet, HOLDING if the system announced it. Tool start / done / failed are <strong>events</strong>, not nodes. Delegation to a large model is identical, plus one step: the result is <strong>spoken on its behalf</strong> by the full-duplex model.</p>
+      <div class="callout warn" style="margin-top:.7em; font-size:.84em;"><b>Payoff:</b> retrieval, device control, any future async action — the diagram does not grow. <span class="zh">(异步动作再多，节点数不变)</span></div>
+    </div>
+  </div>
+  <div class="callout danger" style="margin-top:.8em;">
+    <b>One classification rule underneath all three:</b> only <b>interaction states</b> become nodes. <b>Judgement windows</b> (short, timed, collapse to a state) live on edges; <b>decision events</b> (instantaneous) are edge labels. Most state diagrams explode because windows and events were drawn as nodes. <span class="zh">(三分类：交互态 / 判定窗口 / 决策事件——只有交互态画成节点)</span>
+  </div>
+  <span class="pageno">6 / 16</span>
+</section>
+
+<!-- ═══════════ P7 One turn, five phases ═══════════ -->
+<section class="slide">
+  <div class="header">
+    <h1>One Turn in Five Phases <span class="zh">(一轮对话的五段)</span></h1>
+    <p class="subtitle">Scenarios are derived from this timeline, not brainstormed. <strong>Each phase has one thing it tests.</strong> <span class="zh">(场景从时间线推导，每段一个核心考点)</span></p>
+  </div>
+  <div class="phases" style="flex:1;">
+    <div class="phase ab"><div class="letter">A</div><h3>Silence &amp; session boundary <span class="zh">(静默与边界)</span></h3><p>Session start, both silent, long silence, system-initiated speech, session end and reconnect.</p><p class="q">Tests: when to open the mouth, when to stay quiet. <span class="zh">(何时开口、何时闭嘴)</span></p><p style="margin-top:.4em;"><span class="mono">A1–A5</span> · 5 scenarios</p></div>
+    <div class="phase ab"><div class="letter">B</div><h3>User speaking <span class="zh">(用户输入期)</span></h3><p>Onset confirmation, backchannel, pause vs finish, endpoint, rejection, very long speech, multi-party, mute.</p><p class="q">Tests: <b>a pause is not the end</b> — never cut in at a breath. <span class="zh">(停顿≠说完，不抢话)</span></p><p style="margin-top:.4em;"><span class="mono">B1–B8</span> · 8 scenarios</p></div>
+    <div class="phase c"><div class="letter">C</div><h3>System preparing <span class="zh">(响应准备期)</span></h3><p>From the user's last word to the system's first audible frame: fast path, slow generation, tool first, delegation, user speaks again, timeout, speculative pre-generation.</p><p class="q">Tests: silence must not last too long; fill it well. <span class="zh">(沉默别太久，超时要垫话)</span></p><p style="margin-top:.4em;"><span class="mono">C1–C7</span> · 7 scenarios</p></div>
+    <div class="phase d"><div class="letter">D</div><h3>System speaking <span class="zh">(系统输出期)</span></h3><p>Subtitles, user backchannel, real interruption, false interruption, speak-while-calling, announce-and-wait, user speaks while waiting, wait timeout, hand back vs ask a question, clarifying question.</p><p class="q">Tests: <b>tell a real interruption from "mm-hmm"</b>. <span class="zh">(分清真打断和附和)</span></p><p style="margin-top:.4em;"><span class="mono">D1–D10</span> · 10 scenarios</p></div>
+    <div class="phase x"><div class="letter">X</div><h3>Concurrent, any time <span class="zh">(贯穿并发)</span></h3><p>Both start at once, external event arrives mid-speech, system must interrupt the user (alarm), non-voice input in parallel.</p><p class="q">Tests: collisions and external events. <span class="zh">(碰撞与外部事件)</span></p><p style="margin-top:.4em;"><span class="mono">X1–X4</span> · 4 scenarios</p></div>
+  </div>
+  <div class="callout" style="margin-top:.8em;">
+    <b>34 scenarios in total</b>, prioritised: <span class="pri pri0">P0</span><b>9 must-have</b> — without them it is not a usable voice assistant · <span class="pri pri1">P1</span><b>15 experience-defining</b> — what separates full-duplex from a walkie-talkie · <span class="pri pri2">P2</span><b>10 deferred</b> — depend on model capability not yet mature, or low frequency. <span class="zh">(9 必做 / 15 体验分水岭 / 10 有意暂缓)</span>
+  </div>
+  <span class="pageno">7 / 16</span>
+</section>
+
+<!-- ═══════════ P8 P0 scenarios ═══════════ -->
+<section class="slide">
+  <div class="header">
+    <h1><span class="pri pri0" style="font-size:.6em; vertical-align:middle;">P0</span> Nine Must-Have Scenarios <span class="zh">(九个必做场景)</span></h1>
+    <p class="subtitle">The minimum viable loop. Two of them are <strong>make-or-break</strong> (red). <span class="zh">(最小可用闭环，红框为命门)</span></p>
+  </div>
+  <div class="cols">
+    <div class="col" style="flex:1;">
+      <div class="panel" style="flex:1;">
+        <h2><span class="tag">A · Opening</span>2 <span class="zh">(开场)</span></h2>
+        <ul>
+          <li><strong>A1 Session start.</strong> User puts on earbuds and hears "I'm here" within 1 s; the half-sentence spoken during warm-up is buffered, not lost. <span class="zh">(1 秒内应答，不丢先说的半句)</span></li>
+          <li><strong>A2 Both silent.</strong> Nobody speaks for 5 s after opening; the system stays quiet, does not nag. <span class="zh">(安静不催促)</span></li>
+        </ul>
+      </div>
+      <div class="panel" style="flex:1.5;">
+        <h2><span class="tag">B · Listening</span>3 <span class="zh">(听用户说)</span></h2>
+        <ul>
+          <li><strong>B1 Onset confirmation.</strong> A 0.3 s cough is not speech; "Oh, by the way…" is confirmed within ~200 ms — and this is where the <strong>external ASR trigger</strong> fires. <span class="zh">(起音确认，外挂 ASR 触发点)</span></li>
+          <li style="border:2px solid var(--danger); border-radius:8px; padding:.4em .6em .4em 1.4em; background:rgba(208,69,60,.04);"><strong>B3 Pause ≠ finished.</strong> "Book me a ticket… (1.2 s thinking about the date) …to Shanghai on Friday." The system must not answer at the breath. Judged by <strong>silence length AND semantic completeness</strong> together. <span class="zh">(换气处绝不抢答 — 全场最重要)</span></li>
+          <li><strong>B4 Endpoint.</strong> 600 ms of silence and a complete utterance → <span class="mono">committed</span>, floor passes to the system. <span class="zh">(端点确认，话轮交接)</span></li>
+        </ul>
+      </div>
+    </div>
+    <div class="col" style="flex:1.1;">
+      <div class="panel" style="flex:1;">
+        <h2><span class="tag">C + D · Answering</span>4 <span class="zh">(系统回答)</span></h2>
+        <ul>
+          <li><strong>C1 Fast path.</strong> "What time is it?" → "Ten twenty" within 0.4 s; everything in between is invisible to the user. <span class="zh">(半秒内出声，用户无感)</span></li>
+          <li><strong>D1 Subtitles follow playback.</strong> On-screen text tracks what has actually been <strong>played</strong>, not what has been generated. <span class="zh">(字幕跟播放进度)</span></li>
+          <li style="border:2px solid var(--danger); border-radius:8px; padding:.4em .6em .4em 1.4em; background:rgba(208,69,60,.04);"><strong>D3 Real interruption.</strong> Reading the news, user says "Stop — international instead." System is silent within <strong>300 ms</strong>, and history keeps only the half-sentence the user actually heard. <span class="zh">(300 毫秒闭嘴，只留听到的半句 — 打断体验底线)</span></li>
+          <li><strong>D9 Ask and hold.</strong> "Which day do you want to leave?" — after speaking, the system does not release the floor; it is marked <em>expecting an answer</em>. <span class="zh">(提问后不撒手)</span></li>
+        </ul>
+      </div>
+      <div class="callout danger">
+        <b>If B3 and D3 fail, nothing else matters.</b> One is the cost of cutting the user off; the other is the cost of not stopping when told to. <span class="zh">(这两个做砸了，其他都白搭)</span>
+      </div>
+    </div>
+  </div>
+  <span class="pageno">8 / 16</span>
+</section>
+
+<!-- ═══════════ P9 P1 scenarios ═══════════ -->
+<section class="slide">
+  <div class="header">
+    <h1><span class="pri pri1" style="font-size:.6em; vertical-align:middle;">P1</span> Fifteen Experience-Defining Scenarios <span class="zh">(十五个体验分水岭场景)</span></h1>
+    <p class="subtitle">What makes it feel like a person rather than a walkie-talkie. <strong>Six representative ones on the left</strong>, the other nine on the right. <span class="zh">(左侧六个代表性场景，右侧其余九个)</span></p>
+  </div>
+  <div class="cols">
+    <div class="col" style="flex:1.15;">
+      <div class="cards" style="grid-template-columns: 1fr 1fr;">
+        <div class="card"><h3><span class="no">D4</span>False interruption <span class="zh">(假打断)</span></h3><p>A bang in the background while the system speaks → pause 0.5 s, no valid transcript → resume from the pause point.</p></div>
+        <div class="card"><h3><span class="no">D6</span>"Let me check" <span class="zh">(我查一下哈)</span></h3><p>Announce, call the API, wait 2 s, then "There are three trains on Friday…" — the floor was never released.</p></div>
+        <div class="card"><h3><span class="no">D7</span>Cancelled while waiting <span class="zh">(等待中被叫停)</span></h3><p>"Never mind, don't check." → cancel the tool, reply "Okay, cancelled."</p></div>
+        <div class="card"><h3><span class="no">C2</span>Filler for slow answers <span class="zh">(慢回答垫话)</span></h3><p>Translation takes 3 s; at 1.5 s with no audio yet, say "Hmm…" so the user does not think the line dropped.</p></div>
+        <div class="card"><h3><span class="no">C5</span>User revises mid-preparation <span class="zh">(备答中改口)</span></h3><p>"Check the weather" then "Oh — for the day after tomorrow." → merge and regenerate; the old answer is discarded server-side.</p></div>
+        <div class="card"><h3><span class="no">B5</span>Not talking to me <span class="zh">(别人的话不上钩)</span></h3><p>A colleague asks the user "What's for lunch?" → judged not addressed to the system; stays quiet, logs a deferral.</p></div>
+      </div>
+    </div>
+    <div class="col" style="flex:.85;">
+      <div class="panel" style="flex:1;">
+        <h2><span class="tag warn">The other nine</span> <span class="zh">(其余九个)</span></h2>
+        <ul style="font-size:.95em;">
+          <li><strong>A5</strong> Clean ending ("That's all, bye") and Bluetooth reconnect with context intact. <span class="zh">(收尾与断线重连)</span></li>
+          <li><strong>B8</strong> Explicit mute: "Don't talk, let me finish" → MUTED; "Okay, go ahead" → released. <span class="zh">(禁言与解除)</span></li>
+          <li><strong>C3</strong> Tool before speaking: weather API 0.8 s, then the answer. <span class="zh">(先查再答)</span></li>
+          <li><strong>C4</strong> Delegation: "Plan a 3-day trip" → "Let me think" → large model runs 6 s → spoken on its behalf. <span class="zh">(委托大模型，代言播出)</span></li>
+          <li><strong>C6</strong> Preparation timeout: 8 s with no result → "I'll tell you as soon as it's ready", converts to an async task. <span class="zh">(超时兜底转异步)</span></li>
+          <li><strong>D2</strong> User says "mm-hmm / right" while the system speaks → keep talking. <span class="zh">(用户附和不让出)</span></li>
+          <li><strong>D8</strong> Waiting timeout: over 8 s → "Still checking, one moment" or degrade. <span class="zh">(等待超时道歉/降级)</span></li>
+          <li><strong>D10</strong> Clarifying question with a 15 s wait, then re-ask or give up. <span class="zh">(缺参数追问)</span></li>
+          <li><strong>X1</strong> Both start at once → system yields; user first. <span class="zh">(同时开口，系统让)</span></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+  <span class="pageno">9 / 16</span>
+</section>
+
+<!-- ═══════════ P10 P2 deferred ═══════════ -->
+<section class="slide">
+  <div class="header">
+    <h1><span class="pri pri2" style="font-size:.6em; vertical-align:middle;">P2</span> Ten Deliberately Deferred Scenarios <span class="zh">(十个有意暂缓的场景)</span></h1>
+    <p class="subtitle">Deferred for one of two reasons: <strong>the industry cannot do it well yet</strong>, or <strong>it is low-frequency</strong>. Deferring is a decision, not an omission. <span class="zh">(业界做不好 / 低频；暂缓是决策不是遗漏)</span></p>
+  </div>
+  <div class="cols">
+    <div class="col" style="flex:1;">
+      <div class="panel" style="flex:1;">
+        <h2><span class="tag danger">Capability-limited</span>4 <span class="zh">(受模型能力限制)</span></h2>
+        <ul>
+          <li><strong>B2 System backchannel.</strong> "Mm, got it" at a semantic boundary while the user talks for 20 s. Instruct-FD shows industry compliance of <strong>0–50 %</strong> — the weakest capability across all systems. <span class="zh">(系统主动附和，全行业最弱)</span></li>
+          <li><strong>B7 Multi-party.</strong> Two people chatting in a car with commands mixed in; "Were you talking to me?" when unsure. Needs external ASR and speaker identity. <span class="zh">(多人在场，依赖声纹)</span></li>
+          <li><strong>D5 Speak while calling.</strong> "I'll read the news while checking traffic" — tool call and audio in the same frame (model requirement R1). <span class="zh">(边说边调，依赖模型能力)</span></li>
+          <li><strong>C7 Speculative pre-generation.</strong> Generate during the user's 1.2 s pause; play instantly on commit. Negative latency; correctness depends on B3 being solid first. <span class="zh">(预提交，先把 B3 做稳)</span></li>
+        </ul>
+      </div>
+    </div>
+    <div class="col" style="flex:1;">
+      <div class="panel" style="flex:1;">
+        <h2><span class="tag">Low-frequency</span>6 <span class="zh">(低频)</span></h2>
+        <ul>
+          <li><strong>A3 Away and check-in.</strong> 15 s silence → away; 30 s later a soft "Still there?" <span class="zh">(离开与关怀重启)</span></li>
+          <li><strong>A4 System-initiated.</strong> 19:00 reminder fires: "Time to call your mother." Gated by the interruption manager. <span class="zh">(主动提醒)</span></li>
+          <li><strong>B6 Very long speech.</strong> 60 s without an endpoint → forced segmentation, incremental understanding. <span class="zh">(超长说话强制分段)</span></li>
+          <li><strong>X2 External event mid-speech.</strong> Reminder arrives during navigation → wait for the sentence boundary, then insert. <span class="zh">(等句尾再插)</span></li>
+          <li><strong>X3 System interrupts the user.</strong> Gas alarm while the user is talking → hard interjection. Disabled by default; alerts only. <span class="zh">(硬插话，默认禁用)</span></li>
+          <li><strong>X4 Non-voice input in parallel.</strong> User taps "Cancel" on screen mid-conversation; must not corrupt floor semantics. <span class="zh">(屏幕操作并行)</span></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+  <div class="callout green" style="margin-top:.8em;">
+    <b>Completeness check:</b> all 34 scenarios are expressible with the 11 system states, 4 user states, 4 judgement windows, the event vocabulary and floor — <b>no additional state was needed</b>; and every state is exercised by at least one scenario — <b>no orphan state</b>. <span class="zh">(双向覆盖检查：场景无遗漏、状态无孤儿)</span>
+  </div>
+  <span class="pageno">10 / 16</span>
+</section>
+
+<!-- ═══════════ P11 Interruption ═══════════ -->
+<section class="slide">
+  <div class="header">
+    <h1>The Hardest Judgement: <span class="hl">Three-Way Interruption</span> <span class="zh">(最难的判定：打断三分)</span></h1>
+    <p class="subtitle">The user makes a sound while the system is speaking. One window, <strong>three outcomes</strong> — and the strategy is a product choice. <span class="zh">(一个窗口三种出口，策略是产品选择)</span></p>
+  </div>
+  <div class="cols">
+    <div class="col" style="flex:1.1;">
+      <div class="panel" style="flex:1;">
+        <h2><span class="tag warn">Interruption window</span>speech_started while SPEAKING <span class="zh">(打断判定窗)</span></h2>
+        <div class="cards" style="grid-template-columns: 1fr; gap:.55em;">
+          <div class="card" style="border-left:5px solid var(--danger);"><h3>Real interruption → YIELDING <span class="zh">(真打断 → 让出)</span></h3><p>"Stop — international instead." Contains a new intent. Stop playback ≤ 300 ms, truncate history to what was heard, open a new turn. Metric: <strong>stop latency</strong>.</p></div>
+          <div class="card" style="border-left:5px solid var(--accent2);"><h3>Backchannel → keep talking <span class="zh">(附和 → 继续)</span></h3><p>"Mm-hmm", "right", "okay". Short, no new intent. Floor unchanged, no new turn, speech continues uninterrupted.</p></div>
+          <div class="card" style="border-left:5px solid var(--warn);"><h3>Noise / not for me → pause, then resume <span class="zh">(噪声 → 暂停待判 → 恢复)</span></h3><p>A bang, background voices, someone else in the room. Pause up to 0.5 s; if no valid transcript, resume from the pause point. Metric: <strong>response latency</strong>.</p></div>
+        </div>
+      </div>
+    </div>
+    <div class="col" style="flex:.9;">
+      <div class="panel">
+        <h2><span class="tag">Strategy is a parameter</span> <span class="zh">(策略取向可配置)</span></h2>
+        <table style="font-size:.86em;">
+          <tr><th></th><th>Repair-first <span class="zh">(快让出)</span></th><th>Continuity-first <span class="zh">(重连贯)</span></th></tr>
+          <tr><td><strong>Bias</strong></td><td>Yield quickly; accept some false takeovers</td><td>Keep talking; accept slower yields</td></tr>
+          <tr><td><strong>Fits</strong></td><td>Customer service, task execution</td><td>Companionship, tutoring, reading aloud</td></tr>
+          <tr><td><strong>Evidence</strong></td><td>GPT-4o Realtime: responds to real interruptions 0.78, but also to bystanders 0.91</td><td>Gemini / Sonic: high resume, lower interruption response</td></tr>
+        </table>
+        <p style="margin-top:.5em; font-size:.86em;">Full-Duplex-Bench v1.5: <strong>no strategy wins all four overlap scenarios</strong>. The window's thresholds must be a configurable profile. <span class="zh">(没有全局最优，阈值做成 profile)</span></p>
+      </div>
+      <div class="callout danger">
+        <b>Where the industry stands:</b> GPT-Live judges this inside the model (yields ~500 ms slower, but rejected 30 / 30 background voices in Agora's test). Second-generation APIs (OpenAI / Qwen Realtime) still treat any user speech as an interruption unless configured. Our design keeps the judgement explicit so it can move from system heuristics to the model over time. <span class="zh">(判定显式化，产地可从系统迁移到模型)</span>
+      </div>
+    </div>
+  </div>
+  <span class="pageno">11 / 16</span>
+</section>
+
+<!-- ═══════════ P12 Latency, tools, delegation ═══════════ -->
+<section class="slide">
+  <div class="header">
+    <h1>Latency, Tools and Delegation Inside <span class="hl">PREPARING / HOLDING</span> <span class="zh">(时延、工具与委托的容器)</span></h1>
+    <p class="subtitle">Two waiting states, <strong>one before the first sound and one after</strong>; every async action lives inside them as events. <span class="zh">(出声前等 vs 出声后等)</span></p>
+  </div>
+  <div class="cols">
+    <div class="col" style="flex:1.2;">
+      <div class="panel">
+        <h2><span class="tag green">Latency tiers</span>from the user's last word to the system's first frame <span class="zh">(时延三档)</span></h2>
+        <div class="tiers">
+          <div class="tier t0"><strong>≤ T0 (~0.5 s)</strong><span>Silent. Unnoticed. Fast path (C1). <span class="zh">无感</span></span></div>
+          <div class="tier t1"><strong>> T1 (~1.5 s)</strong><span>Play a filler: "Hmm, let me check…" (C2 / C3 / C4). <span class="zh">出垫话</span></span></div>
+          <div class="tier t2"><strong>> T2 (~8 s)</strong><span>Fallback: apologise, degrade, or convert to an async task (C6 / D8). <span class="zh">兜底</span></span></div>
+          <div class="tier tp"><strong>playout_started</strong><span>First frame → SPEAKING <span class="zh">首帧</span></span></div>
+        </div>
+        <p>Thresholds are configured separately for PREPARING and HOLDING, by scenario type (chat / retrieval / delegation), and tuned from interruption and abandonment rates after launch. <span class="zh">(按状态、按场景类型分别配置)</span></p>
+      </div>
+      <div class="panel" style="flex:1;">
+        <h2><span class="tag">PREPARING vs HOLDING</span>same wait, two experiences <span class="zh">(同是等待，两种体验)</span></h2>
+        <table style="font-size:.86em;">
+          <tr><th></th><th>PREPARING <span class="zh">(备答)</span></th><th>HOLDING <span class="zh">(持轮等待)</span></th></tr>
+          <tr><td><strong>Definition</strong></td><td>Floor taken, <strong>nothing audible yet</strong></td><td><strong>Has spoken</strong>, keeps the floor, waiting</td></tr>
+          <tr><td><strong>Typical</strong></td><td>Generating; tool before speaking; delegation</td><td>"Let me check" then waiting; in-turn pause</td></tr>
+          <tr><td><strong>Filler goal</strong></td><td>Break the silence</td><td>Maintain presence — do not sound disconnected</td></tr>
+          <tr><td><strong>If user speaks</strong></td><td>Merge / discard / keep (C5)</td><td>Cancel / hurry / unrelated (D7)</td></tr>
+        </table>
+      </div>
+    </div>
+    <div class="col" style="flex:.85;">
+      <div class="panel" style="flex:1;">
+        <h2><span class="tag warn">Tools &amp; delegation</span>events, not states <span class="zh">(工具与委托是事件)</span></h2>
+        <ul>
+          <li><span class="mono">invoke_tool</span> (kind = tool / escalate) → <span class="mono">tool_done</span> / <span class="mono">tool_failed</span> drive entry and exit of PREPARING or HOLDING. They never change the state themselves.</li>
+          <li><strong>Delegation to a large model</strong> is structurally the same as a tool, plus one step: the result text is <strong>voiced by the full-duplex model</strong> ("spoken on its behalf"). The large model is invisible to the interaction layer. <span class="zh">(大模型对交互层透明)</span></li>
+          <li>Every "announce → wait → continue" case — filler (C2), delegation (C4), speak-while-calling (D5), "let me check" (D6) — collapses to the <strong>same pattern</strong>: SPEAKING → HOLDING → SPEAKING. <span class="zh">(全部收敛为同一模式)</span></li>
+        </ul>
+        <div class="callout green" style="margin-top:.6em;">
+          <b>Mirror of GPT-Live's split:</b> the voice model decides <i>whether to speak</i>; the application server owns delegation, turn splitting and persistence — exactly our dual-brain architecture. <span class="zh">(与双脑架构分工一致)</span>
+        </div>
+      </div>
+    </div>
+  </div>
+  <span class="pageno">12 / 16</span>
+</section>
+
+<!-- ═══════════ P13 Four layers + vocabulary + ASR ═══════════ -->
+<section class="slide">
+  <div class="header">
+    <h1>Four-Layer Protocol and Control-Plane Vocabulary <span class="zh">(四层协议与控制面词表)</span></h1>
+    <p class="subtitle">Each layer depends only on the one below. States are a <strong>read-only projection</strong> computed from events. <span class="zh">(状态是事件的只读投影)</span></p>
+  </div>
+  <div class="cols">
+    <div class="col" style="flex:1.3;">
+      <div class="panel" style="flex:1; gap:.35em;">
+        <div class="band l4"><strong>④ Interaction states</strong> <span class="zh">(交互状态层)</span> — 11 system states, 4 user states, floor. Single writer (the orchestrator); UI and product docs read from here.</div>
+        <div class="down">↑ pure-function derivation (acceptance criterion)</div>
+        <div class="band l3"><strong>③ Events = control-plane vocabulary</strong> <span class="zh">(事件层)</span><br><b>Perception:</b> <span class="mono">speech_started</span> (prearm / confirmed) · <span class="mono">speech_stopped</span> · <span class="mono">speech_cancelled</span> · <span class="mono">playout_started</span> · <span class="mono">playout_done</span> · <span class="mono">tool_done / failed</span> · <span class="mono">away</span> · <span class="mono">session close / error</span><br><b>Decision:</b> <span class="mono">committed</span> · respond / reject / defer · <span class="mono">invoke_tool</span> · interrupt / pause / resume · backchannel · filler (T1) · timeout (T2) · floor transfer<br><b>Outbound:</b> <span class="mono">asr_prearm / asr_start / asr_stop / asr_cancel</span></div>
+        <div class="down">↑ windows collapse into events</div>
+        <div class="band l2"><strong>② Judgement windows</strong> <span class="zh">(判定窗口层)</span> — <span class="chip win">onset confirmation</span> <span class="chip win">endpoint (VAD hangover + semantics)</span> <span class="chip win">interruption</span> <span class="chip win">pause-and-judge</span> + latency tiers T0 / T1 / T2. Timers and classifiers in the orchestrator.</div>
+        <div class="down">↑ raw signals enter windows</div>
+        <div class="band l1"><strong>① Signal sources</strong> <span class="zh">(信号源层)</span> — device VAD energy · model control tokens (turn / intent heads) · playback callbacks (first frame / done) · tool and large-model callbacks · external events (reminders, alerts).</div>
+      </div>
+    </div>
+    <div class="col" style="flex:.85;">
+      <div class="panel" style="flex:1;">
+        <h2><span class="tag purple">External ASR trigger</span>new requirement <span class="zh">(外挂 ASR 外部标识)</span></h2>
+        <p>The system must emit a signal that starts an external ASR (which also serves other purposes). It hangs on the <strong>entry and exit edges of the judgement windows</strong> — proof that layer ② must be explicit.</p>
+        <table style="font-size:.84em; margin:.5em 0;">
+          <tr><td><span class="mono">asr_prearm</span></td><td>Suspected onset → ASR warms up its stream, absorbing start-up delay</td></tr>
+          <tr><td><span class="mono">asr_start</span></td><td>Onset confirmed → <span class="mono">segment_id</span> + timestamp <strong>back-dated to the onset</strong>, not the confirmation</td></tr>
+          <tr><td><span class="mono">asr_stop</span></td><td>Endpoint committed → end timestamp</td></tr>
+          <tr><td><span class="mono">asr_cancel</span></td><td>Window judged false alarm → withdraw prearm</td></tr>
+        </table>
+        <div class="callout" style="font-size:.84em;">
+          <b>Generalised</b> as a segment-level co-processing trigger: payload = segment id + time window + audio route. ASR is the first subscriber; rejection review, compliance recording and hot-word detection reuse the same signals. Producer may later move from system VAD to model tokens — <b>protocol unchanged</b>. <span class="zh">(泛化为 segment 级协处理触发，产地可迁移)</span>
+        </div>
+      </div>
+    </div>
+  </div>
+  <span class="pageno">13 / 16</span>
+</section>
+
+<!-- ═══════════ P14 Comparison with external vocabulary ═══════════ -->
+<section class="slide">
+  <div class="header">
+    <h1>Detailed Comparison with the Externally Proposed Vocabulary <span class="zh">(与外部提供词表的逐项对比)</span></h1>
+    <p class="subtitle">Their 7 items map almost one-to-one onto the OpenAI Realtime control plane — a <strong>usable event-layer skeleton</strong>, but a single layer. <span class="zh">(可用的事件层骨架，但只有一层)</span></p>
+  </div>
+  <div class="panel" style="flex:1;">
+    <table style="font-size:.82em;">
+      <tr><th style="width:11%;">Their item</th><th style="width:14%;">Their definition <span class="zh">(原定义)</span></th><th style="width:9%;">Verdict</th><th>Our treatment and why <span class="zh">(我们的处理与理由)</span></th><th style="width:9%;">Scenario</th></tr>
+      <tr><td><span class="mono">speech_started</span></td><td>User starts speaking <span class="zh">(感知用户开口)</span></td><td class="ok">Keep ✓</td><td>Perception event. <strong>Split into prearm (suspected) + confirmed</strong> so the external ASR and the interruption window can act early; add <span class="mono">speech_cancelled</span> to withdraw false alarms.</td><td>B1</td></tr>
+      <tr><td><span class="mono">speech_stopped</span></td><td>User finished <span class="zh">(感知用户说完)</span></td><td class="mid">Keep, rename meaning</td><td>Perception event = trailing edge of VAD. <strong>It does not mean "finished"</strong> — the gap between this and <span class="mono">committed</span> is exactly "pause vs done", the basis of user state PAUSED (B3).</td><td>B3</td></tr>
+      <tr><td><span class="mono">committed</span></td><td>Semantically complete <span class="zh">(语义完整)</span></td><td class="ok">Keep ✓</td><td>Decision event = endpoint confirmed + floor released. Payload should carry <strong>endpoint confidence</strong> to support speculative pre-generation (C7).</td><td>B4</td></tr>
+      <tr><td><span class="mono">listen</span></td><td>This turn is over <span class="zh">(本轮说完)</span></td><td class="bad">Misplaced ✗</td><td>This is a <strong>state, not an event</strong>. Replace with perception event <span class="mono">playout_done</span> + state LISTENING. "Turn over" must also distinguish <em>release</em> from <em>ask-and-wait</em> — that is the floor variable.</td><td>D9</td></tr>
+      <tr><td><span class="mono">speak</span></td><td>Decide to respond <span class="zh">(决定响应)</span></td><td class="mid">Keep, split</td><td>Decision event, but <strong>three-way: respond / reject / defer</strong>. Rejection must be explicit (logging, external ASR review). Payload carries <em>expect_reply</em> to set floor.</td><td>B5 / C</td></tr>
+      <tr><td><span class="mono">invoke_tool</span></td><td>Tool call and delegation <span class="zh">(工具调用与委托)</span></td><td class="ok">Keep ✓</td><td>Decision event with kind = tool / escalate; add lifecycle <span class="mono">done / failed</span>. <strong>Never changes the interaction state</strong>; only decides PREPARING vs HOLDING ownership.</td><td>C3 / C4 / D5 / D6</td></tr>
+      <tr><td><span class="mono">stop</span></td><td>New turn detected, stop playback <span class="zh">(判定新一轮，停止播报)</span></td><td class="bad">Overloaded ✗</td><td>Two meanings in one word. <strong>Split into interrupt / pause / resume</strong>: real interruption = stop + truncate + new turn; false alarm = pause-and-judge; backchannel opens no new turn. "Detect new turn" and "stop playback" must be decoupled.</td><td>D3 / D4</td></tr>
+    </table>
+    <div class="cols" style="margin-top:.7em; flex:0;">
+      <div class="callout danger" style="flex:1.2;">
+        <b>Structural gaps (not fixable item by item):</b> no judgement windows (layer ②) · no interaction states or user-side states (layer ④) · no floor variable · no latency tiers · no <span class="mono">playout_started</span> — without it SPEAKING can only be anchored on generation, mis-aligning subtitles and truncation · no backchannel, filler, timeout, away, session events · no outbound ASR signal. <span class="zh">(结构性缺口：缺窗口层、状态层、floor、时延分档、首帧事件、外发信号)</span>
+      </div>
+      <div class="callout green" style="flex:1;">
+        <b>What it gets right:</b> <span class="mono">speech_started / stopped</span> ↔ Realtime <span class="mono">input_audio_buffer.*</span>; <span class="mono">committed</span> ↔ commit; <span class="mono">speak</span> ↔ <span class="mono">response.create</span>; <span class="mono">stop</span> ↔ <span class="mono">response.cancel</span> + truncate. Adopt it as the <b>seed of layer ③</b>, then add the three missing layers around it. <span class="zh">(作为第 ③ 层的种子采纳，再补齐其余三层)</span>
+      </div>
+    </div>
+  </div>
+  <span class="pageno">14 / 16</span>
+</section>
+
+<!-- ═══════════ P15 Decisions, requirements, acceptance, next ═══════════ -->
+<section class="slide">
+  <div class="header">
+    <h1>Decisions Pending, Model Requirements, Acceptance, Next Steps <span class="zh">(待拍板决策 · 模型需求 · 验收 · 下一步)</span></h1>
+    <p class="subtitle">All three decisions share one root: <strong>when "anchor on playback" and "named states" conflict, playback wins; names serve readability.</strong> <span class="zh">(判定听播放事实，命名照顾可读性)</span></p>
+  </div>
+  <div class="cols">
+    <div class="col" style="flex:1.25;">
+      <div class="panel">
+        <h2><span class="tag danger">Three decisions</span>with recommended options <span class="zh">(三项待拍板)</span></h2>
+        <table style="font-size:.84em;">
+          <tr><th style="width:4%;">#</th><th style="width:36%;">Question</th><th>Recommended option</th></tr>
+          <tr><td>1</td><td>After <span class="mono">tool_done</span>, generation + TTS still take time before the system resumes speaking. Whose timer is it? <span class="zh">(续说时延归属)</span></td><td>Stay in HOLDING and <strong>reset its T1 / T2 timers</strong>; emit <span class="mono">resume_pending</span> for observability. No new state.</td></tr>
+          <tr><td>2</td><td>BACKCHANNEL and REPAIR are audible — by principle P1 they are SPEAKING. Their difference is only floor and record semantics. <span class="zh">(附和 / 澄清的存在理由)</span></td><td><strong>Keep the names externally</strong> (readability); <strong>derive them internally</strong> as SPEAKING × floor-unchanged × record-kind. Names become aliases of the derivation.</td></tr>
+          <tr><td>3</td><td>A T1 filler ("Hmm…") is audible. Is the system still PREPARING? <span class="zh">(垫话出声归属)</span></td><td>No — <strong>audible means SPEAKING</strong>; tag content with <span class="mono">speech_kind = filler / substantive</span>. Also gives Agora's three clocks (first sound / first substance / done) their measurement points.</td></tr>
+        </table>
+      </div>
+      <div class="panel" style="flex:1;">
+        <h2><span class="tag">Five requirements on the model</span> <span class="zh">(对模型输出的五条需求)</span></h2>
+        <ul style="font-size:.92em;">
+          <li><strong>R1</strong> Tool-call fields and audio in the same frame (speak while calling).</li>
+          <li><strong>R2</strong> Accept async results injected in any state; the model chooses when to continue.</li>
+          <li><strong>R3</strong> An "escalate" control signal; large-model text voiced on its behalf.</li>
+          <li><strong>R4</strong> Fine-grained intent fields: <span class="mono">voice_intent</span> (silence / speak / backchannel / yield), <span class="mono">floor_intent</span> (keep / release / take), rejection — beyond the industry's binary listen / speak.</li>
+          <li><strong>R5</strong> Shared time base: every output carries <span class="mono">segment_id</span> + intra-frame offset.</li>
+        </ul>
+      </div>
+    </div>
+    <div class="col" style="flex:.85;">
+      <div class="panel">
+        <h2><span class="tag green">Acceptance</span>two hard criteria <span class="zh">(两条验收标准)</span></h2>
+        <ul style="font-size:.92em;">
+          <li><strong>Pure-function derivation:</strong> given the model output stream and playback timestamps, any interaction state can be computed without extra heuristics. If not, a field is missing. <span class="zh">(状态可纯函数推导)</span></li>
+          <li><strong>Five scenarios must pass end-to-end:</strong> real interruption D3 · false interruption D4 · speak-while-calling D5 · wait timeout C6 / D8 · <strong>interrupted while the large model has taken over</strong> C4 × D3. <span class="zh">(五个必跑场景)</span></li>
+        </ul>
+      </div>
+      <div class="panel" style="flex:1;">
+        <h2><span class="tag warn">Next steps</span> <span class="zh">(下一步)</span></h2>
+        <ul style="font-size:.92em;">
+          <li>Close the three decisions; write results back to the design document (chapter 08). <span class="zh">(拍板并回写 08 章)</span></li>
+          <li>Write acceptance cases for the 9 P0 scenarios, including automated assertions on the state trace. <span class="zh">(P0 验收用例)</span></li>
+          <li>Integrate <span class="mono">asr_*</span> signals with device-side VAD; align the delegation / voice-on-behalf interface with the phone-assistant dual-brain design. <span class="zh">(ASR 信号联调，对齐双脑接口)</span></li>
+          <li>Build a Chinese evaluation subset covering Full-Duplex-Bench dimensions and Instruct-FD instruction-following. <span class="zh">(中文评测子集)</span></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+  <span class="pageno">15 / 16</span>
+</section>
+
+<!-- ═══════════ P16 Appendix: transition table ═══════════ -->
+<section class="slide">
+  <div class="header">
+    <h1>Appendix · Full Transition Table <span class="zh">(附录：完整转换表)</span></h1>
+    <p class="subtitle">● = observable system fact (VAD, playback, callback, timeout) · ○ = judgement or decision (window collapse or model intent). Every row traces to a scenario. <span class="zh">(每条转换可溯源到场景)</span></p>
+  </div>
+  <div class="cols">
+    <div class="col" style="flex:1.5;">
+      <div class="panel" style="flex:1;">
+        <h2><span class="tag">System side</span>16 transitions</h2>
+        <table style="font-size:.78em;">
+          <tr><th>#</th><th>Transition</th><th>Trigger</th><th>Window</th><th>Scenario</th></tr>
+          <tr><td>1</td><td>LISTENING → PREPARING</td><td>○ committed ∧ respond</td><td>endpoint</td><td>B4 / B5</td></tr>
+          <tr><td>2</td><td>PREPARING → SPEAKING</td><td>● playout_started (first frame)</td><td>—</td><td>C1</td></tr>
+          <tr><td>3</td><td>PREPARING → LISTENING</td><td>○ reject / user spoke again / yield in collision</td><td>—</td><td>B5 / C5 / X1</td></tr>
+          <tr><td>4</td><td>PREPARING (self)</td><td>○ invoke_tool / escalate; ● T1 filler; ● T2 fallback</td><td>latency tiers</td><td>C2–C6</td></tr>
+          <tr><td>5</td><td>SPEAKING → HOLDING</td><td>● playout_done ∧ ○ keep floor (tool pending / tail)</td><td>—</td><td>C2 / C4 / D5 / D6</td></tr>
+          <tr><td>6</td><td>HOLDING → SPEAKING</td><td>● tool_done → continue (timers reset, decision 1)</td><td>—</td><td>D6</td></tr>
+          <tr><td>7</td><td>HOLDING → LISTENING</td><td>○ cancel / ● T2 fallback then release</td><td>—</td><td>D7 / D8</td></tr>
+          <tr><td>8</td><td>SPEAKING → LISTENING</td><td>● playout_done ∧ ○ release (or floor = expecting)</td><td>—</td><td>D9 / D10</td></tr>
+          <tr><td>9</td><td>SPEAKING → YIELDING</td><td>● speech_started → ○ real interruption → interrupt</td><td>interruption</td><td>D3</td></tr>
+          <tr><td>10</td><td>YIELDING → LISTENING</td><td>● playback stopped + truncation reconciled</td><td>—</td><td>D3</td></tr>
+          <tr><td>11</td><td>YIELDING → SPEAKING</td><td>● pause-and-judge timeout → resume</td><td>pause-and-judge</td><td>D4</td></tr>
+          <tr><td>12</td><td>SPEAKING (self)</td><td>○ judged backchannel / bystander / noise → continue</td><td>interruption</td><td>D2</td></tr>
+          <tr><td>13</td><td>LISTENING ⇄ BACKCHANNEL</td><td>○ backchannel moment / finished (floor unchanged)</td><td>—</td><td>B2</td></tr>
+          <tr><td>14</td><td>LISTENING → SPEAKING (INTERJECTING)</td><td>○ high-value ∧ interruption manager allows</td><td>—</td><td>A3 / A4 / X2 / X3</td></tr>
+          <tr><td>15</td><td>any ⇄ MUTED</td><td>○ user mutes / releases</td><td>—</td><td>B8</td></tr>
+          <tr><td>16</td><td>any → REPAIR → LISTENING</td><td>○ unclear / not sure it was addressed to me</td><td>—</td><td>B7</td></tr>
+        </table>
+      </div>
+    </div>
+    <div class="col" style="flex:.9;">
+      <div class="panel">
+        <h2><span class="tag purple">User side</span>6 transitions</h2>
+        <table style="font-size:.8em;">
+          <tr><th>Transition</th><th>Trigger</th><th>Window</th><th>Scenario</th></tr>
+          <tr><td>SILENT → SPEAKING</td><td>● speech_started (confirmed)</td><td>onset</td><td>B1</td></tr>
+          <tr><td>SPEAKING → PAUSED</td><td>● speech_stopped ∧ ○ ¬committed</td><td>endpoint</td><td>B3</td></tr>
+          <tr><td>PAUSED → SPEAKING</td><td>● speaks again</td><td>—</td><td>B3</td></tr>
+          <tr><td>PAUSED / SPEAKING → SILENT</td><td>○ committed</td><td>endpoint</td><td>B4</td></tr>
+          <tr><td>SILENT → AWAY</td><td>● mutual silence timeout</td><td>—</td><td>A3</td></tr>
+          <tr><td>AWAY → SILENT</td><td>● any activity</td><td>—</td><td>A3</td></tr>
+        </table>
+      </div>
+      <div class="panel" style="flex:1;">
+        <h2><span class="tag warn">Reading notes</span> <span class="zh">(读表要点)</span></h2>
+        <ul style="font-size:.9em;">
+          <li>Only rows <strong>2, 5, 8, 10</strong> are pure playback facts — the anchors that keep states aligned with what the user perceives. No implementation may substitute model-side signals for them.</li>
+          <li>Rows <strong>9 and 12</strong> share the interruption window; the repair-first / continuity-first profile is that window's parameters.</li>
+          <li>Row <strong>6</strong> does not pass through PREPARING: the floor was never released. Its timer handling is decision 1.</li>
+          <li>Rows <strong>14–16</strong> are extended edges; the core diagram stays at six nodes.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+  <span class="pageno">16 / 16</span>
+</section>
+
+</body>
+</html>
