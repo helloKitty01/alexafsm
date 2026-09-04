@@ -29,8 +29,8 @@ GPT‑Live 正是"omni 全双工前台 + 异步深度后台"这条路线在业�
 | [07-LiveKit-OpenAI实现洞察.md](./07-LiveKit-OpenAI实现洞察.md) | LiveKit Agents × OpenAI 集成实现：WebRTC↔Realtime WS 适配器；三种管道共用 AgentSession；插件协议翻译（24 kHz / 100 ms / 打断 truncate / 重连重放）；轮次所有权互斥；对照 10 态的系统事件层映射 |
 | [LiveKit-OpenAI实现.slides.html](./LiveKit-OpenAI实现.slides.html) | 9 页幻灯片 v1：定性 → 三管道 → 运行时 → 插件 → cancel+truncate → 单主人轮次 → 10 态对照 → 做对了/没做 → 七条建议 |
 | [08-场景全集与状态交互分层.md](./08-场景全集与状态交互分层.md) | 统一状态模型 **v2**（场景驱动）：34 场景全集（每条带具体例子 + **P0/P1/P2 优先级**：P0 最小可用 9 / P1 体验分水岭 15 / P2 增强暂缓 10）；三分类原则；`THINKING/DELEGATING` 拆分为 `PREPARING` + `HOLDING`；工具 / 委托不建态、时延 T0/T1/T2 分段；四层分层；外部 7 项事件词表校订；外挂 ASR 外部标识；对模型输出五条需求与验收 |
-| [全双工输出状态.slides.v2.html](./全双工输出状态.slides.v2.html) | **汇报材料（当前版本 v2，12 页）**：结论摘要 → 方法论 → **34 场景全集（具体例子 + P0/P1/P2）** → 人机 vs 人人 → PREPARING/HOLDING → 四层分层 → **完整状态交互图** → 转换表 → 词表校订 → 外挂 ASR → 模型需求与验收 → v1→v2 变更 |
-| [history/](./history/) | 历史版本留档：全双工输出状态幻灯片 v1（11 页，10 态讨论稿版），已被 v2 取代 |
+| [全双工输出状态.slides.v3.html](./全双工输出状态.slides.v3.html) | **当前版本 v3（讨论底稿，11 页）**：34 场景**逐条细化到状态轨迹**（A/B/C/D/X 五组）+ 双向覆盖检查（状态↔场景）→ **完整状态交互图**（含入口链与议题标注）→ 两条泳道走查（B3 停顿不抢答、D3 真打断全链路）→ 转换表（16+6，议题挂行）→ **三个待讨论议题**（HOLDING 续说时延归属 / REPAIR·BACKCHANNEL 的存在理由 / T1 filler 出声归属）；结论收敛后回写 08 章 |
+| [history/](./history/) | 历史版本留档：全双工输出状态幻灯片 v1（11 页，10 态讨论稿版）、v2（12 页，场景全集 × 四层协议汇报版），已被 v3 取代 |
 
 ## 一句话共识
 
