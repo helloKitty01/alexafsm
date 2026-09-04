@@ -1,0 +1,600 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Skill 与工具集配套管理 v2.2 · 工具集对象与两条路线</title>
+<style>
+  :root {
+    --bg: #e9eef6;
+    --slide-bg: linear-gradient(135deg, #ffffff 0%, #f8fbfe 55%, #f2f7fd 100%);
+    --card: #ffffff;
+    --card-border: #dfe6f0;
+    --text: #1e2a3d;
+    --muted: #5a6b84;
+    --accent: #2f6fed;
+    --accent2: #0ea578;
+    --warn: #d97a06;
+    --err: #d6455d;
+    --purple: #7c5cd6;
+    --code-bg: #f3f6fb;
+    --code-text: #24405f;
+    --mono: "SF Mono", "JetBrains Mono", Consolas, "Courier New", monospace;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { background: var(--bg); }
+  body {
+    font-family: "PingFang SC", "Microsoft YaHei", "Noto Sans SC", -apple-system, sans-serif;
+    color: var(--text);
+    display: flex; flex-direction: column; align-items: center; gap: 28px;
+    padding: 28px 16px; min-height: 100vh;
+  }
+  .slide {
+    width: min(1280px, 96vw);
+    aspect-ratio: 16 / 9;
+    background: var(--slide-bg);
+    border: 1px solid var(--card-border);
+    border-radius: 18px;
+    box-shadow: 0 18px 44px rgba(30,42,61,.14);
+    padding: 2.2% 3.0%;
+    display: flex; flex-direction: column;
+    overflow: hidden; position: relative;
+    font-size: clamp(10px, 1.16vw, 15px);
+  }
+  .slide::before {
+    content: ""; position: absolute; inset: 0 0 auto 0; height: 4px;
+    background: linear-gradient(90deg, var(--accent), var(--accent2));
+    border-radius: 18px 18px 0 0;
+  }
+  .pageno { position: absolute; right: 1.6em; bottom: .9em; color: var(--muted); font-size: .8em; opacity: .75; }
+
+  .header { display: flex; align-items: center; justify-content: space-between; gap: 1.8em; margin-bottom: .8em; }
+  h1 { font-size: 1.55em; font-weight: 700; white-space: nowrap; }
+  h1 .hl { color: var(--accent); }
+  h1 small { display: block; font-size: .55em; font-weight: 400; color: var(--muted); margin-top: .15em; }
+  .headline {
+    display: flex; align-items: center; gap: 1.2em;
+    background: linear-gradient(90deg, rgba(47,111,237,.07), rgba(14,165,120,.06));
+    border: 1px solid rgba(47,111,237,.25);
+    border-radius: 10px; padding: .5em 1em; flex: 1; min-width: 0;
+  }
+  .headline p { color: var(--muted); font-size: .88em; line-height: 1.45; }
+  .headline p strong { color: var(--text); }
+  .headline p em { color: var(--accent2); font-style: normal; font-weight: 600; }
+
+  .grid { display: grid; gap: .9em; flex: 1; min-height: 0; }
+  .grid.two { grid-template-columns: 1fr 1fr; grid-template-rows: 1fr auto; }
+  .grid.two-even { grid-template-columns: 1fr 1fr; }
+  .grid.rows { grid-template-columns: 1fr; }
+  .card {
+    background: var(--card); border: 1px solid var(--card-border); border-radius: 12px;
+    padding: .85em 1.05em; min-height: 0; box-shadow: 0 2px 8px rgba(30,42,61,.04);
+  }
+  .card.band { grid-column: 1 / -1; }
+
+  h3 { font-size: .98em; font-weight: 700; margin-bottom: .45em; display: flex; align-items: center; gap: .5em; }
+  h3 .dot { width: .55em; height: .55em; border-radius: 50%; background: var(--accent); flex: none; }
+  h3.green .dot { background: var(--accent2); }
+  h3.warn .dot { background: var(--warn); }
+  h3.err .dot { background: var(--err); }
+  h3.purple .dot { background: var(--purple); }
+
+  .card ul { list-style: none; }
+  .card li { color: var(--muted); line-height: 1.48; padding-left: 1.05em; position: relative; margin-bottom: .3em; }
+  .card li::before { content: "•"; color: var(--accent); position: absolute; left: 0; }
+  .card li strong, .card p strong { color: var(--text); font-weight: 600; }
+  .card li em, .card p em { color: var(--warn); font-style: normal; font-weight: 600; }
+  .card p { color: var(--muted); line-height: 1.48; }
+
+  code {
+    font-family: var(--mono); font-size: .9em;
+    background: var(--code-bg); color: var(--code-text);
+    border: 1px solid #e4eaf3; padding: .06em .35em; border-radius: 5px;
+  }
+
+  table { width: 100%; border-collapse: collapse; font-size: .88em; }
+  th, td { text-align: left; padding: .36em .55em; line-height: 1.38; }
+  th { color: var(--accent); font-weight: 600; border-bottom: 1.5px solid #d8e2f0; white-space: nowrap; }
+  td { color: var(--muted); border-bottom: 1px dashed #e6ecf5; vertical-align: top; }
+  td strong { color: var(--text); }
+  tr:last-child td { border-bottom: none; }
+
+  .example {
+    font-family: var(--mono); font-size: .8em; color: var(--code-text);
+    background: var(--code-bg); border: 1px solid #e0e7f1;
+    border-radius: 8px; padding: .6em .85em; margin-top: .4em;
+    line-height: 1.5; white-space: pre-wrap; word-break: break-all;
+  }
+  .example .g { color: var(--accent2); font-weight: 600; }
+  .example .dim { color: #8b9ab0; }
+  .example .u { color: var(--accent); font-weight: 600; }
+  .example .w { color: var(--warn); font-weight: 600; }
+
+  .tag {
+    display: inline-block; font-size: .76em; font-weight: 600;
+    border-radius: 99px; padding: .14em .68em; margin-right: .35em;
+    background: rgba(47,111,237,.1); color: var(--accent);
+    border: 1px solid rgba(47,111,237,.3); white-space: nowrap;
+  }
+  .tag.green { background: rgba(14,165,120,.1); color: var(--accent2); border-color: rgba(14,165,120,.3); }
+  .tag.warn { background: rgba(217,122,6,.1); color: var(--warn); border-color: rgba(217,122,6,.3); }
+  .tag.err { background: rgba(214,69,93,.08); color: var(--err); border-color: rgba(214,69,93,.3); }
+  .tag.purple { background: rgba(124,92,214,.1); color: var(--purple); border-color: rgba(124,92,214,.3); }
+
+  .pillrow { display: flex; flex-wrap: wrap; gap: .4em .5em; align-items: center; margin-top: .3em; }
+  .pill {
+    background: #fff; border: 1px solid var(--card-border); border-radius: 99px;
+    padding: .22em .8em; font-size: .8em; color: var(--muted); white-space: nowrap;
+  }
+  .pill b { color: var(--text); }
+  .pill.g { border-color: rgba(14,165,120,.45); }
+  .pill.w { border-color: rgba(217,122,6,.45); }
+  .pill.e { border-color: rgba(214,69,93,.45); }
+
+  /* ---- 流程条 ---- */
+  .flow { display: flex; align-items: stretch; gap: .35em; }
+  .fnode {
+    flex: 1; min-width: 0; background: #fff; border: 1.4px solid var(--card-border);
+    border-radius: 9px; padding: .45em .6em;
+    display: flex; flex-direction: column; gap: .12em; justify-content: center;
+  }
+  .fnode b { font-size: .84em; color: var(--text); }
+  .fnode span { font-size: .73em; color: var(--muted); line-height: 1.4; }
+  .farrow { align-self: center; color: var(--accent); font-weight: 700; font-size: 1em; flex: none; }
+
+  /* ---- 逻辑结构图 ---- */
+  .arch { display: flex; flex-direction: column; gap: .25em; flex: 1; min-height: 0; }
+  .layer { display: flex; gap: .6em; align-items: stretch; flex: 1; min-height: 0; }
+  .llabel {
+    flex: 0 0 8.5em; border-radius: 10px; padding: .5em .7em;
+    display: flex; flex-direction: column; justify-content: center; gap: .1em;
+    background: rgba(47,111,237,.07); border: 1px solid rgba(47,111,237,.25);
+  }
+  .llabel b { font-size: .92em; color: var(--text); }
+  .llabel span { font-size: .72em; color: var(--muted); line-height: 1.35; }
+  .lbody { flex: 1; display: flex; gap: .5em; min-width: 0; }
+  .lnode {
+    flex: 1; min-width: 0; background: #fff; border: 1.3px solid var(--card-border);
+    border-radius: 9px; padding: .45em .6em;
+    display: flex; flex-direction: column; gap: .12em; justify-content: center;
+  }
+  .lnode b { font-size: .82em; color: var(--text); }
+  .lnode span { font-size: .72em; color: var(--muted); line-height: 1.35; }
+  .lnode.blue { border-color: var(--accent); }
+  .lnode.green { border-color: var(--accent2); }
+  .lnode.warnb { border-color: var(--warn); }
+  .lnode.errb { border-color: var(--err); }
+  .lnode.core {
+    border: 1.6px solid var(--accent2);
+    background: linear-gradient(90deg, rgba(14,165,120,.06), rgba(47,111,237,.05));
+  }
+  .layer.core-layer .llabel { background: rgba(14,165,120,.1); border-color: rgba(14,165,120,.45); }
+  .archsep {
+    display: flex; align-items: center; justify-content: center; gap: .8em;
+    color: var(--muted); font-size: .74em; padding: .05em 0;
+  }
+  .archsep .arr { color: var(--accent); font-weight: 700; font-size: 1.15em; }
+  .archsep em { color: var(--accent2); font-style: normal; font-weight: 600; }
+</style>
+</head>
+<body>
+
+<!-- ================= 第 1 页 · 本质与两条路线 ================= -->
+<div class="slide">
+  <div class="header">
+    <h1>本质：skill 与<span class="hl">工具集</span>强绑定<small>v2.2 · 工具集对象与两条管理路线 —— 方便地管理，结构性地不出错</small></h1>
+    <div class="headline"><p><strong>一份 skill 正文是写给一个确定的工具契约集合的。</strong>ROM 版本、API level、机型、组件版本 —— 都只是<em>定位工具集的代理变量</em>，本身不是兼容性的对象，<strong>别的都是浮云</strong>。</p></div>
+  </div>
+  <div class="grid two">
+    <div class="card" style="border-color: rgba(214,69,93,.35);">
+      <h3 class="err"><span class="dot"></span>现状卡点 · 工具集不是一个"第一类对象"</h3>
+      <ul>
+        <li>当前<strong>没有一个地方能权威回答</strong>："这台设备此刻的工具集是什么"</li>
+        <li>于是管理只能围绕代理变量打转：每条规则都要同时谈 ROM、机型、API level、组件版本 —— 规则复杂、彼此纠缠，且都在<em>间接描述同一个东西</em></li>
+        <li>版本感知"太多、太碎"的根源就在这里：碎的不是信息，是<strong>缺少收敛它们的对象</strong></li>
+      </ul>
+    </div>
+    <div class="card" style="border-color: rgba(14,165,120,.4);">
+      <h3 class="green"><span class="dot"></span>解法 · 把对象立起来，两条路线生产它</h3>
+      <ul>
+        <li><span class="tag green">路线 A · 构建</span><strong>端侧注册中心实报</strong>：各 provider 注册工具，会话时实报能力清单 —— 实然、准确，但要随 ROM 下场</li>
+        <li><span class="tag warn">路线 B · 推导</span><strong>云端登记表推导</strong>：用现有信息（工具管理记录 × ROM 版本 × 机型）查表拼出工具集 —— 应然、<em>立即可用</em></li>
+        <li><strong>上层机制面向对象设计、与来源解耦</strong>：skill 声明、分发、门禁、评估只见工具集对象，不见它怎么来的 —— 两条路线可共存、可切换，不推翻上层</li>
+      </ul>
+    </div>
+    <div class="card band">
+      <h3><span class="dot"></span>工具集对象 · 两条路线共享的唯一抽象</h3>
+      <div class="example">toolset: { <span class="u">toolset_id</span>: "ts-8-phone-a3f9",  <span class="u">tool_api_level</span>: 8,  <span class="u">tools</span>: [{name: send_msg, schema_ver: 3, tier: T1}, …],
+           <span class="w">produced_by</span>: device_report <span class="dim">(路线A)</span> | registry_derived <span class="dim">(路线B)</span>,  <span class="dim">source_inputs: {rom: "X.Y.Z", model_series: "P-series"}（B 路线审计用）</span> }</div>
+      <p style="margin-top:.4em; font-size:.88em;">skill 的兼容声明<strong>只对这个对象</strong>（<code>min_tool_api</code> + <code>required_tools</code>）；ROM / 机型 / 组件版本降级为生产对象时的<em>输入</em>，被封装在生产侧，消费侧永远不可见。</p>
+    </div>
+  </div>
+  <div class="pageno">1 / 10</div>
+</div>
+
+<!-- ================= 第 2 页 · 逻辑结构图 ================= -->
+<div class="slide">
+  <div class="header">
+    <h1><span class="hl">逻辑结构图</span> · 四层，一个核心对象<small>消费侧只见对象；生产侧封装全部碎片化</small></h1>
+    <div class="headline"><p>上两层是<strong>消费侧</strong>（skill 体系），下一层是<strong>生产侧</strong>（端侧 / 登记表）；中间的<em>工具集对象是两侧之间唯一的接口</em> —— 路线 A/B 切换只发生在最底层。</p></div>
+  </div>
+  <div class="arch">
+    <div class="layer">
+      <div class="llabel"><b>④ 会话运行面</b><span>每次会话 · 在线</span></div>
+      <div class="lbody">
+        <div class="lnode blue"><b>L0 拼装</b><span>真实工具 schema + 分通道 skill 索引（带版本号）</span></div>
+        <div class="lnode blue"><b>skill 解析 + 会话钉住</b><span>满足声明的最新版；(skill_version, toolset_id) 冻结并写日志</span></div>
+        <div class="lnode errb"><b>pre-call 安全网</b><span>调用不存在的工具 → 拦截 + 结构化错误 + 替代清单；触发率 ≈ 0 运营</span></div>
+        <div class="lnode"><b>运行日志</b><span>版本对全程可复盘；安全网触发聚合上报</span></div>
+      </div>
+    </div>
+    <div class="archsep"><span class="arr">▲</span> 消费：按工具集对象解析与校验 <span class="arr">▲</span></div>
+    <div class="layer">
+      <div class="llabel"><b>③ 云端管理面</b><span>发布态 · 离线</span></div>
+      <div class="lbody">
+        <div class="lnode blue"><b>skill 库</b><span>单源多渲染：一个源 → 按 level 渲染干净变体；版本门控为逃生通道</span></div>
+        <div class="lnode blue"><b>确定性分发函数</b><span>工具集 + 灰度桶 → 唯一 skill 版本</span></div>
+        <div class="lnode warnb"><b>依赖索引 + 双门禁 CI</b><span>tool→skills 反查；skill 上架静态校验（对 golden manifest）；工具变更"快通道先行"门禁</span></div>
+        <div class="lnode"><b>指标看板</b><span>安全网触发率 / 分支老路径占比 / 各 level 设备占比</span></div>
+      </div>
+    </div>
+    <div class="archsep"><span class="arr">▲</span> 消费：skill 声明、门禁、评估全部以工具集为口径 <span class="arr">▲</span></div>
+    <div class="layer core-layer">
+      <div class="llabel"><b>② 工具集对象</b><span>唯一接口 · 核心</span></div>
+      <div class="lbody">
+        <div class="lnode core"><b>toolset = { tool_api_level · tools[ name, schema_ver, tier ] · toolset_id(hash) }</b><span>skill 只声明 min_tool_api + required_tools；消费方不感知 produced_by —— 同一接口，两种实现。每个在役 level 冻结出 golden manifest 供开发态 / CI 使用</span></div>
+      </div>
+    </div>
+    <div class="archsep"><span class="arr">▲</span> 生产：<em>两条路线，可单设备内混合</em> <span class="arr">▲</span></div>
+    <div class="layer">
+      <div class="llabel"><b>① 生产侧</b><span>碎片化被封装在这里</span></div>
+      <div class="lbody">
+        <div class="lnode green"><b>路线 A · 端侧注册中心实报（目标态）</b><span>ROM / 系统应用 / 框架各 provider 注册 → 会话实报能力清单 —— 实然；随新 ROM 逐步覆盖</span></div>
+        <div class="lnode warnb"><b>路线 B · 云端登记表推导（立即可用）</b><span>(ROM 版本段 × 机型系列) → toolset 快照；端侧只上报 ROM 版本 + 机型 —— 应然；<b>登记即门禁</b>：工具发布必须同步登记，否则不放行</span></div>
+      </div>
+    </div>
+  </div>
+  <div class="pageno">2 / 10</div>
+</div>
+
+<!-- ================= 第 3 页 · 路线对比与演进 ================= -->
+<div class="slide">
+  <div class="header">
+    <h1>路线 <span class="hl">A / B</span> 对比与演进<small>不是替代关系，是长期并存</small></h1>
+    <div class="headline"><p><strong>关键结论：路线 B 不是临时方案，而是存量设备的终态方案。</strong>停更机型永远不会有注册中心，且它们的工具集已冻结 —— <em>恰好最适合查表</em>（登记一次，永久准确）。</p></div>
+  </div>
+  <div class="grid two">
+    <div class="card">
+      <h3><span class="dot"></span>对比 · 四个维度</h3>
+      <table>
+        <tr><th>维度</th><th>路线 B（登记推导）</th><th>路线 A（设备实报）</th></tr>
+        <tr><td><strong>准确性</strong></td><td>应然（有漂移风险，靠三补偿）</td><td><strong style="color:var(--accent2);">实然</strong>：天然覆盖机型 / 区域 / 独立升级 / 用户禁用</td></tr>
+        <tr><td><strong>建设成本</strong></td><td>云端一张表 + 发布流程改造</td><td>端侧注册中心，随 ROM 下场</td></tr>
+        <tr><td><strong>可用时间</strong></td><td><strong style="color:var(--accent2);">立即</strong></td><td>随新 ROM 逐步覆盖</td></tr>
+        <tr><td><strong>覆盖范围</strong></td><td><strong style="color:var(--accent2);">全机队（含停更机型）</strong></td><td>只有搭载注册中心的新设备</td></tr>
+      </table>
+      <h3 class="green" style="margin-top:.7em;"><span class="dot"></span>演进路径</h3>
+      <div class="example"><span class="dim">现在</span>   全机队查表（B）
+  <span class="u">↓ 注册中心随新 ROM 下场</span>
+<span class="dim">过渡</span>   新设备实报（A）+ 存量查表（B）<span class="g">同一对象接口</span>
+  <span class="u">↓ 存量自然淘汰</span>
+<span class="dim">远期</span>   A 为主，B 覆盖长尾 —— <span class="w">B 永不完全退役</span></div>
+    </div>
+    <div class="card">
+      <h3 class="warn"><span class="dot"></span>路线 B 的固有风险 · 应然 ≠ 实然</h3>
+      <p style="font-size:.9em;">登记表描述"这个 ROM × 机型<strong>应该</strong>有什么工具"，设备实况可能偏离：系统应用没升到位、区域裁剪、用户禁用组件。<strong>三个补偿机制</strong>：</p>
+      <ul style="margin-top:.4em;">
+        <li><strong>安全网升格为纠偏信号</strong>：B 阶段 <code>tool_not_available</code> 触发即说明表与实况漂移，按 (ROM × 机型 × 工具) 聚合上报，<em>直接驱动修表</em></li>
+        <li><strong>采样审计</strong>：抽样设备实测工具可用性与登记表比对，漂移率进看板</li>
+        <li><strong>混合模式</strong>:漂移高发载体（独立升级的系统应用）优先切设备实报，其余仍查表 —— 对象 schema 相同，单设备内可混合拼装</li>
+      </ul>
+      <h3 class="purple" style="margin-top:.6em;"><span class="dot"></span>为什么"登记即门禁"能守住表的质量</h3>
+      <p style="font-size:.9em;">登记表不靠自觉：<strong>工具的任何上线 / 变更必须同步更新登记条目，否则发布门禁不放行</strong>。"人工维护易漏"被转化为流程强制 —— 表的准确性与工具发布的准确性同源；且与 TMG 评审（2D API 规则）在同一流程节点，登记是评审产物的一部分，<em>不新增负担</em>。</p>
+    </div>
+    <div class="card band" style="border-color: rgba(14,165,120,.4);">
+      <h3 class="green"><span class="dot"></span>API level 与 ROM 的关系（常见误区）</h3>
+      <p><strong>API level 不能代表 ROM，设计上也不应让它代表</strong>：同一 ROM 不同机型工具集可能不同；多个 ROM 小版本共享同一契约；独立 OTA 组件可不升 ROM 改变工具集。API level 语义锚定的是<em>工具契约快照</em>（对能力清单的离散化编号），运营节奏可对齐 ROM 大版本，但 skill 声明永远针对 API level + required_tools。自检规则：若发现"必须用 ROM 版本号才能表达某差异"，说明有能力没被清单表达 —— 正确动作是<strong>补清单字段</strong>，不是引入 ROM 维度。</p>
+    </div>
+  </div>
+  <div class="pageno">3 / 10</div>
+</div>
+
+<!-- ================= 第 4 页 · skill 对端侧智慧助手 APP 版本的依赖 ================= -->
+<div class="slide">
+  <div class="header">
+    <h1>skill 何时依赖<span class="hl">端侧智慧助手 APP</span> 版本<small>判别总则、机制清单与设计约束</small></h1>
+    <div class="headline"><p><strong>一句话总结：端侧是纯工具执行 → skill 不依赖 APP 版本；端侧含 Agent harness（skill 运行框架）→ skill 依赖 APP 版本。</strong>另有第二条链路：APP 同时是<em>工具 provider</em>，其工具变更同样牵动 skill（左下）。</p></div>
+  </div>
+  <div class="grid two">
+    <div class="card">
+      <h3 class="green"><span class="dot"></span>两种端侧形态 · 依赖性由架构决定</h3>
+      <p style="font-size:.86em; margin-bottom:.3em;"><span class="tag green">形态一 · 纯执行器（目标形态）</span></p>
+      <div class="flow" style="margin-top:.2em;">
+        <div class="fnode blue" style="border-color:var(--accent);"><b>云端 harness</b><span>变量解析 · 结果信封 · pre-call 拦截 · 拒答结构 —— 协议全部云端解释</span></div>
+        <div class="farrow">→</div>
+        <div class="fnode g" style="border-color:var(--accent2);"><b>端侧 APP</b><span>收到的已是<b>解析完成的普通工具调用</b>，纯执行</span></div>
+      </div>
+      <p style="font-size:.84em; margin:.25em 0 .55em;">⇒ skill <strong style="color:var(--accent2);">零依赖</strong> APP 版本：机制升级随云端 skill 库同源发布，天然配套。</p>
+      <p style="font-size:.86em; margin-bottom:.3em;"><span class="tag warn">形态二 · 端侧含 Agent harness</span></p>
+      <div class="flow" style="margin-top:.2em;">
+        <div class="fnode blue" style="border-color:var(--accent);"><b>云端</b><span>下发含协议语法的调用 / skill 逻辑</span></div>
+        <div class="farrow">→</div>
+        <div class="fnode w" style="border-color:var(--warn);"><b>端侧 APP 内解释器</b><span>本地变量替换 / shell 转义 / 信封包装 / env 上报 / 多模态采集</span></div>
+      </div>
+      <p style="font-size:.84em; margin-top:.25em;">⇒ 解释器版本 = skill 的运行时依赖：老 APP 把 <code>${...}</code> 字面量原样传给工具、不上报 env —— <strong style="color:var(--err);">静默失败</strong>。此时 APP 版本必须<strong>收编进契约</strong>（右下）。</p>
+    </div>
+    <div class="card">
+      <h3><span class="dot"></span>机制清单 · 解释器落点决定依赖</h3>
+      <table>
+        <tr><th>skill 使用的机制</th><th>解释器落点</th><th>依赖 APP 版本？</th></tr>
+        <tr><td>变量语法 <code>${app.X.bundleName}</code> / <code>${resultId.字段}</code></td><td>云端 pre-call 替换 → 否；本地执行器替换 / 转义 → 是</td><td><strong style="color:var(--warn);">取决于落点</strong></td></tr>
+        <tr><td>子 skill 加载（load_skill / 路由 skill）</td><td>云端 harness 工具</td><td><strong style="color:var(--accent2);">否</strong></td></tr>
+        <tr><td>工具结果信封（resultId 包装）</td><td>云端包装 → 否；端侧包装 → 是</td><td><strong style="color:var(--warn);">取决于落点</strong></td></tr>
+        <tr><td>env_context 注入 / post-call 富化（前台应用回传）</td><td>端侧上报能力</td><td><strong style="color:var(--err);">是</strong></td></tr>
+        <tr><td>计划内拒答 / <code>tool_not_available</code> 结构化错误</td><td>云端 pre-call 拦截</td><td><strong style="color:var(--accent2);">否</strong></td></tr>
+        <tr><td>多模态上报（截图 / 无障碍树）</td><td>端侧能力</td><td><strong style="color:var(--err);">是</strong></td></tr>
+        <tr><td>本地 exec / CLI 转义与执行细节</td><td>端侧执行器</td><td><strong style="color:var(--err);">是</strong></td></tr>
+        <tr><td>cap 条件块渲染 / 分发 / 索引</td><td>云端编译期</td><td><strong style="color:var(--accent2);">否</strong></td></tr>
+      </table>
+    </div>
+    <div class="card" style="border-color: rgba(217,122,6,.4);">
+      <h3 class="warn"><span class="dot"></span>第二条链路 · 助手 APP 也是工具提供者</h3>
+      <p style="font-size:.88em;">APP 自身注册业务工具（内置备忘、搜索、会话管理…），<strong>APP 升级 = 工具契约变化，skill 随之联动</strong>。处理回到常规工具管理轨道：以 provider = 助手 APP 进登记表（查表键含 APP 版本段），同样受 <strong>T0/T1/T2</strong> 稳定性承诺与 S3/S4 流程约束，破坏性变更走"快通道先行"。特殊点只在发布通道：应用市场<em>周级</em>更新、可独立于 ROM、可产品内引导升级 —— 它是"最快的工具慢通道"，登记与灰度节奏按周管理。</p>
+    </div>
+    <div class="card" style="border-color: rgba(14,165,120,.4);">
+      <h3 class="green"><span class="dot"></span>设计约束与兜底（机制链路）</h3>
+      <p style="font-size:.88em;"><strong>① 端侧纯执行器原则</strong>：机制协议尽量云端解释，端侧只留纯执行 —— 依赖被<em>结构性消除</em>大半。
+      <strong>② 无法云端化的收编为机制契约</strong>：runtime 能力（<code>env_report</code>、<code>result_envelope: 2</code>…）进登记表，查表键扩展为 ROM × 机型 × <em>助手 APP 版本段</em>。
+      <strong>③ <code>required_runtime</code> 由 CI 自动推导</strong>（正文用了 <code>${}</code> 即要求对应 runtime）；机制降级与工具降级同一套能力分支写法（如"无 env_context 时改调 get_foreground_app"）。</p>
+    </div>
+  </div>
+  <div class="pageno">4 / 10</div>
+</div>
+
+<!-- ================= 第 5 页 · 日常操作手册 ================= -->
+<div class="slide">
+  <div class="header">
+    <h1>日常<span class="hl">操作手册</span> · 五类场景<small>与 TMG 管控策略对齐（场景 1 / 场景 2 建议已吸收）</small></h1>
+    <div class="headline"><p><strong>统一判据</strong>：凡是会改变老设备上<em>已有行为</em>的变更走重流程（TMG 评审 + 版本门控）；只增加<em>新能力可得性</em>的走轻流程（直接上架 + 计划内拒答 / 降级分支）。</p></div>
+  </div>
+  <div class="grid rows">
+    <div class="card">
+      <table>
+        <tr><th>场景</th><th>标准动作序列</th><th>门禁（CI 自动执行）</th></tr>
+        <tr>
+          <td><span class="tag green">S1 skill 纯体验优化</span><br>技能范围不变，不涉及工具变更</td>
+          <td>改单源 → 静态校验 → 灰度 → <strong>全量替换</strong>，旧版下线</td>
+          <td><strong>禁止引入新工具依赖</strong>：CI 检测正文新增工具引用即拦截（对应"原则上不允许在既有 SOP 加新工具分支"）；确需 ROM 配套修改 → 转 S4 走 TMG</td>
+        </tr>
+        <tr>
+          <td><span class="tag">S2 skill 新增子技能</span><br>依赖新工具 / 新 ROM</td>
+          <td>正文加能力分支 → 最新 skill 上架<strong>兼容新老 ROM</strong>：新设备走新路径；老设备<strong>计划内拒答</strong>（"该功能需系统升级"）或降级到老工具组合 —— 逐功能产品决策</td>
+          <td>新工具须已登记 / 注册；<strong>拒答 / 降级分支必须存在</strong>且判断依据是能力检测（工具列表 / tool_api），不是运行时撞墙报错</td>
+        </tr>
+        <tr>
+          <td><span class="tag warn">S3 工具新增</span></td>
+          <td>登记表更新（B）/ 注册中心注册（A）→ 默认 <strong>T2 experimental</strong> → 晋级 T1 后开放全量 skill 引用</td>
+          <td><strong>登记即门禁</strong>：未登记不能发；experimental 工具只许版本门控 skill 引用</td>
+        </tr>
+        <tr>
+          <td><span class="tag err">S4 工具破坏性变更 / 删除</span><br>2D API 规则：原则上不允许</td>
+          <td>TMG 评审 → 查依赖索引列受影响 skill → <strong>skill 先适配上架</strong>（快通道先行）→ alias 缓冲 ≥1 大版本 → 随 ROM 灰度 → 设备升级自动漂移</td>
+          <td>受影响 skill 未适配 / 引用未清零，<strong>工具发布不放行</strong>；"不允许变更"精确为"不允许<em>破坏性</em>变更"，兼容性增量（加可选参数 / 返回加字段）CI 判定后直接发</td>
+        </tr>
+        <tr>
+          <td><span class="tag purple">S5 skill 重组</span><br>拆 / 合 / 改名 / 分层</td>
+          <td>原子 changeset → 选择评估 + 描述互斥/覆盖检查 → 灰度 → alias 兜旧名（加载率衰减后摘除）</td>
+          <td>changeset 原子生效，无中间态；运行中会话用钉住的老结构</td>
+        </tr>
+      </table>
+    </div>
+    <div class="card band">
+      <h3 class="warn"><span class="dot"></span>为什么 S1 的禁令和 S2 的拒答是同一个逻辑</h3>
+      <p><strong>风险不对称</strong>：新增子技能的失败模式是"老设备得不到新东西"（可接受）；修改既有流程去依赖新工具的失败模式是"老设备上原来能用的功能坏了"（<strong style="color:var(--err);">功能回退，事故级</strong>）。前者轻流程，后者重流程 —— 判据不是"改了多少"，而是"是否触碰老设备的既有行为"。</p>
+    </div>
+  </div>
+  <div class="pageno">5 / 10</div>
+</div>
+
+<!-- ================= 第 6 页 · 工具什么时候变化及双轨治理 ================= -->
+<div class="slide">
+  <div class="header">
+    <h1>工具<span class="hl">什么时候变化</span> · 如何管理与评审<small>意图接口 / CLI / ArkTS / 助手 APP 内置 / 云端 / 三方</small></h1>
+    <div class="headline"><p><strong>治理手段匹配可控性：自有工具走事前门禁，三方工具走事后监测。</strong>兼容变更免评审自动放行，TMG 只审破坏性变更 —— 否则评审必成瓶颈。</p></div>
+  </div>
+  <div class="grid two">
+    <div class="card">
+      <h3><span class="dot"></span>工具形态 × 可控性（治理抓手因此不同）</h3>
+      <table>
+        <tr><th>形态</th><th>执行载体</th><th>发布通道</th><th>可控性</th></tr>
+        <tr><td><strong>ArkTS / 系统 API</strong></td><td>framework / 系统服务</td><td>ROM</td><td>完全可控 · 慢</td></tr>
+        <tr><td><strong>CLI 命令</strong></td><td>端侧执行器</td><td>ROM / 系统组件</td><td>完全可控 · 慢</td></tr>
+        <tr><td><strong>意图接口</strong></td><td>意图框架 + <strong style="color:var(--warn);">目标 app 响应</strong></td><td>框架随 ROM，响应方随 app</td><td><strong style="color:var(--warn);">半可控</strong></td></tr>
+        <tr><td><strong>助手 APP 内置</strong></td><td>智慧助手 APP</td><td>应用市场 · 周级</td><td>完全可控 · 快</td></tr>
+        <tr><td><strong>云端工具</strong></td><td>云侧服务</td><td>随时</td><td>完全可控 · 即时</td></tr>
+        <tr><td><strong>三方工具</strong></td><td>三方 app</td><td>三方自己的节奏</td><td><strong style="color:var(--err);">不可控</strong></td></tr>
+      </table>
+    </div>
+    <div class="card">
+      <h3 class="warn"><span class="dot"></span>六类变化触发源</h3>
+      <ul style="font-size:.9em;">
+        <li><strong>① 计划内功能演进</strong>：新场景要新工具 / 新参数 —— 应随 ROM / APP 大版本<em>成套</em>出现，对应 API level 推进</li>
+        <li><strong>② 架构重构</strong><span class="tag err">最高危</span>：意图框架升级、执行器换代 = 批量破坏性变更，必须整体立项、整体评审、整体出新 level，严禁零敲碎打</li>
+        <li><strong>③ 实现方变更</strong>：schema 没动、执行方（尤其意图工具的目标 app）行为变了 —— schema diff 抓不到</li>
+        <li><strong>④ 安全合规</strong>：权限收紧、接口强制下线 —— 被动、有 deadline，走紧急通道</li>
+        <li><strong>⑤ 三方生态变化</strong>：三方 app 升级 / 下架 / 改 deep link —— 是"漂移"不是"发布"</li>
+        <li><strong>⑥ bug 修复</strong>：行为修正，同样 schema 不变行为变</li>
+      </ul>
+    </div>
+    <div class="card" style="border-color: rgba(47,111,237,.4);">
+      <h3><span class="dot"></span>自有工具 · 事前治理（触发源 ①②④⑥）</h3>
+      <ul style="font-size:.88em;">
+        <li>CI 自动分类：<strong>兼容变更免评审</strong>，自动放行 + 登记 + 通知订阅方</li>
+        <li><strong>破坏性变更进 TMG</strong>，评审四件套自动生成：变更动机、schema diff、受影响 skill 清单（依赖索引反查）、迁移方案（alias / shim + skill 适配计划）</li>
+        <li>行为变更（③⑥）两道兜底：owner 强制申报 + 受影响 skill 回归评估准出</li>
+        <li>通过后走"快通道先行"发布；节奏 = 随 ROM 大版本<strong>成套批量评审</strong> + 安全合规紧急通道</li>
+      </ul>
+    </div>
+    <div class="card" style="border-color: rgba(214,69,93,.4);">
+      <h3 class="err"><span class="dot"></span>三方工具 · 事后治理（触发源 ⑤）</h3>
+      <ul style="font-size:.88em;">
+        <li><strong>准入评审替代变更评审</strong>：接入审 schema 质量、稳定性历史、owner 响应 SLA；默认 T2 不承诺，达标晋级 T1</li>
+        <li><strong>契约测试</strong>：定期自动化真实调用 + 返回校验，漂移即报警</li>
+        <li><strong>运行时监测</strong>：成功率按（工具 × 三方 app 版本）切看板，突降 = 三方变更信号</li>
+        <li><strong>响应预案 = 登记表开关</strong>：三方破坏时下线登记条目 → 设备契约立即反映 → 全体 skill 能力分支自动走降级 / 拒答，<em>一行 skill 不用改</em>；修复后恢复登记</li>
+      </ul>
+    </div>
+  </div>
+  <div class="pageno">6 / 10</div>
+</div>
+
+<!-- ================= 第 7 页 · skill 多版本管理 ================= -->
+<div class="slide">
+  <div class="header">
+    <h1>skill <span class="hl">多版本管理</span> · 触发、处理、收编<small>多版本是例外不是默认</small></h1>
+    <div class="headline"><p><strong>三类定义</strong>：<em>灰度</em> = 同一人群新旧短期共存（发布风控）；<em>门控</em> = 不同契约档位各用其版（兼容性 —— 按<strong>登记表推导的 API level</strong> 分发，落地≈按 ROM 版本段，无需自建工具集）；<em>实验</em> = 同一人群分桶 A/B（效果对比）。多版本是例外不是默认，<strong>开门控版本需 TMG 审批</strong>。</p></div>
+  </div>
+  <div class="grid two">
+    <div class="card">
+      <h3 class="warn"><span class="dot"></span>什么时候触发多版本</h3>
+      <table>
+        <tr><th>触发</th><th>类型</th><th>生命周期</th></tr>
+        <tr><td>任何内容变更发布（必经灰度）</td><td><span class="tag green">灰度</span></td><td>天级 · 必收敛</td></tr>
+        <tr><td>工具破坏性变更（老契约档位用老版）</td><td><span class="tag err">门控</span></td><td>月~年</td></tr>
+        <tr><td>既有流程改依赖新工具（S1 禁令例外，TMG 批准）</td><td><span class="tag err">门控</span></td><td>月~年</td></tr>
+        <tr><td>能力分支超预算（&gt;2~3 个）拆版本</td><td><span class="tag err">门控</span></td><td>月~年</td></tr>
+        <tr><td>引用 T2 实验工具</td><td><span class="tag err">门控</span></td><td>随工具晋级 / 下线</td></tr>
+        <tr><td>话术 / 流程 A/B</td><td><span class="tag purple">实验</span></td><td>实验周期 · 须有截止日</td></tr>
+        <tr><td>紧急回滚（旧版待命）</td><td><span class="tag">回退态</span></td><td>修复后重走灰度</td></tr>
+      </table>
+    </div>
+    <div class="card">
+      <h3><span class="dot"></span>并存期间如何处理 · 版本线模型</h3>
+      <div class="example"><span class="g">发送消息@3.x</span>（main · tool_api ≥ 8）      <span class="dim">← 功能演进只在主线</span>
+<span class="w">发送消息@2.7</span>（frozen · tool_api 6~7）  <span class="dim">← max_tool_api 封顶，只接安全回灌</span></div>
+      <ul style="font-size:.88em; margin-top:.45em;">
+        <li><strong>唯一解析 + 会话钉住</strong>：契约档位（API level）定版本线 → 实验桶 → 灰度桶，顺序固定函数确定；日志强制 (skill_version, toolset_id)</li>
+        <li><strong>每 skill 一条主线 + 至多 1~2 条冻结线</strong>；冻结线回灌前先看受影响设备占比是否值得</li>
+        <li><strong>单源纪律</strong>：门控版本优先由单源多渲染产出（cap 条件块），独立文本分支只留给破坏性场景</li>
+        <li><strong>评估</strong>：每条在役线对其档位的 golden manifest 快照回归；任何线发布都重跑<em>选择评估</em>（防索引描述互扰）</li>
+      </ul>
+    </div>
+    <div class="card band" style="border-color: rgba(14,165,120,.4);">
+      <h3 class="green"><span class="dot"></span>如何收编（按来源对号；门控最难，给阶梯）</h3>
+      <p style="font-size:.88em;"><strong>灰度</strong>：达标 → 全量 → 旧版 frozen 待命 → 归档；<em>硬时限</em>：超时未收敛 = 发布失败自动回滚。
+      <strong>实验</strong>：到期胜者合入主线、败者下线；禁止永久实验。
+      <strong>门控（三级阈值 + 结构性阶梯）</strong>：占比 &lt; X% → 停止回灌带病运行；&lt; Y% → EOL 评审（归档并移出老设备索引 / 保留末版零维护，按技能重要性 × 维护成本决策）；结构性手段 = <strong style="color:var(--accent2);">版本线 → 条件块 → 删块</strong>三步降维：差异被 ROM alias 磨平后合并回单源（cap 条件块），老路径占比衰减后删块回归单路径 —— 收编不必等设备死光。
+      <strong>回滚版本</strong>：修复后重走灰度。配<strong>收编看板</strong>：每条冻结线标注（设备占比 / 上次回灌 / 预计 EOL），进例行运营 review，防僵尸版本。</p>
+    </div>
+  </div>
+  <div class="pageno">7 / 10</div>
+</div>
+
+<!-- ================= 第 8 页 · 评审管理一页 ================= -->
+<div class="slide">
+  <div class="header">
+    <h1><span class="hl">评审管理</span>一页 · 什么要评、评什么、谁来评<small>工具 / skill 分支与版本 / 重组 —— 全量评审事项</small></h1>
+    <div class="headline"><p><strong>效率原则：CI 分流，人只评"破坏性 + 例外"。</strong>兼容变更零评审自动放行 + 登记；评审判据锚定两点：<em>是否影响老设备既有行为、是否增加长期在役版本</em>（即不可逆性）。</p></div>
+  </div>
+  <div class="grid two">
+    <div class="card" style="grid-row: 1 / 3;">
+      <h3><span class="dot"></span>评审事项清单</h3>
+      <table>
+        <tr><th>评审对象</th><th>触发</th><th>评审要点</th></tr>
+        <tr><td><strong>工具破坏性变更 / 删除</strong>（T1+）</td><td>CI schema diff 判定破坏</td><td>四件套：动机、diff、受影响 skill 清单（依赖索引自动出）、迁移方案（alias / shim + skill 适配计划）；批准后走快通道先行</td></tr>
+        <tr><td><strong>工具晋级 T2 → T1</strong></td><td>纳入稳定承诺前</td><td>schema 质量、命名规范、行为回归评估 → 进 golden manifest</td></tr>
+        <tr><td><strong>三方工具准入 / 退出</strong></td><td>接入时（变更审不到）</td><td>schema 质量、稳定性历史、owner 响应 SLA；默认 T2 登记</td></tr>
+        <tr><td><strong>架构级批量变更</strong>（意图框架升级、执行器换代）</td><td>立项时</td><td>整体专项评审，整体产出新 API level，严禁零敲碎打</td></tr>
+        <tr><td><strong>skill 开门控版本</strong></td><td>申请开版本线时</td><td>长期维护成本审批：为何能力分支 / 单源条件块解决不了</td></tr>
+        <tr><td><strong>skill 既有 SOP 引入新工具依赖</strong>（S1 例外）</td><td>舆情 / 强诉求驱动时</td><td>老设备既有行为影响评估 + 配套新版本方案</td></tr>
+        <tr><td><strong>skill 重组 changeset</strong></td><td>拆 / 合 / 改名 / 分层</td><td>选择评估报告 + 描述互斥 / 覆盖检查结果 + alias 计划</td></tr>
+      </table>
+    </div>
+    <div class="card" style="border-color: rgba(14,165,120,.4);">
+      <h3 class="green"><span class="dot"></span>免评审白名单（CI 自动放行 + 登记）</h3>
+      <p style="font-size:.88em;">兼容性工具变更（新增工具、加可选参数、返回加字段）· skill 纯体验优化（无新工具依赖，CI 扫描把关）· 能力分支的增删（含机制降级分支）· 灰度放量 / 回滚 · 实验开启（须带截止日）—— <strong>全部自动放行</strong>，只留登记与通知，不进人工评审。</p>
+    </div>
+    <div class="card">
+      <h3 class="purple"><span class="dot"></span>分工与节奏</h3>
+      <ul style="font-size:.88em;">
+        <li><strong>AI Agent TMG 统一归口契约类评审</strong>：schema、兼容性判定、API level 纳入、机制契约（runtime）、skill 门控版本与重组 changeset —— 契约的消费方是模型和 skill 体系</li>
+        <li><strong>垂域 TMG 管实现</strong>：工具实现质量、业务话术、skill 内容正确性</li>
+        <li><strong>节奏</strong>：随 ROM 大版本<em>成套批量评审</em>为主；助手 APP / 云端工具走周级例会；安全合规走紧急通道</li>
+        <li><strong>材料全部自动生成</strong>：依赖索引出影响面、CI 出 diff 分类、评估平台出回归报告 —— 评审会只做判断，不做考古</li>
+      </ul>
+    </div>
+  </div>
+  <div class="pageno">8 / 10</div>
+</div>
+
+<!-- ================= 第 9 页 · 防错清单 ================= -->
+<div class="slide">
+  <div class="header">
+    <h1>保证不出错 · <span class="hl">七类错误，七个结构性防错</span><small>不靠小心，靠让错误无法发生或立即暴露</small></h1>
+    <div class="headline"><p>每类错误对应一个<strong>机制</strong>而不是一条提醒 —— 机制的特征是：<em>违反它，流程走不下去；漏掉它，指标会报警。</em></p></div>
+  </div>
+  <div class="grid rows">
+    <div class="card">
+      <table>
+        <tr><th>#</th><th>错误类型</th><th>结构性防错</th><th>类型</th></tr>
+        <tr><td>1</td><td><strong>skill 让调不存在的工具</strong>（"让调 X 但列表没有 X"）</td><td>上架静态校验：正文引用逐一对 golden manifest 核对 + pre-call 拦截兜底</td><td><span class="tag warn">门禁 + 安全网</span></td></tr>
+        <tr><td>2</td><td><strong>设备拿到不匹配的 skill</strong></td><td>确定性分发函数（工具集 + 灰度桶 → 唯一版本）+ 会话钉住，中途不换版</td><td><span class="tag">机制</span></td></tr>
+        <tr><td>3</td><td><strong>工具变更漏通知 skill 侧</strong></td><td>依赖索引（tool→skills 反查，上架自动扫描建立）+ 变更门禁强制查表、通知精确到 owner</td><td><span class="tag warn">门禁</span></td></tr>
+        <tr><td>4</td><td><strong>破坏性变更先于 skill 适配触达设备</strong></td><td>"快通道先行"时序门禁：受影响 skill 新版未备好，工具发布不放行</td><td><span class="tag warn">门禁</span></td></tr>
+        <tr><td>5</td><td><strong>登记表与设备实况漂移</strong>（路线 B 特有）</td><td>安全网触发按 (ROM × 机型 × 工具) 聚合上报驱动修表 + 采样审计看板 + 高漂移载体切实报</td><td><span class="tag err">监控 + 纠偏</span></td></tr>
+        <tr><td>6</td><td><strong>多版本混乱、问题无法复盘</strong></td><td>在役门控版本硬上限 ≤2~3；日志强制携带 (skill_version, toolset_id)，缺字段不上线</td><td><span class="tag">纪律 + 机制</span></td></tr>
+        <tr><td>7</td><td><strong>重组出现中间态 / 旧名失效</strong></td><td>原子 changeset（无中间态，回滚整体回）+ skill alias 表（旧名永不硬失败）+ 选择评估门禁</td><td><span class="tag purple">机制 + 门禁</span></td></tr>
+      </table>
+    </div>
+    <div class="card band" style="border-color: rgba(14,165,120,.4);">
+      <h3 class="green"><span class="dot"></span>三个常态运营指标（把防错从发布时延伸到运行时）</h3>
+      <div class="pillrow">
+        <span class="pill e"><b>tool_not_available 触发率 ≈ 0</b> · &gt;0 即分发通道或登记表有 bug，按维度聚合定位</span>
+        <span class="pill w"><b>能力分支老路径使用占比</b> · 低于阈值 → 删分支，正文回归单路径</span>
+        <span class="pill g"><b>各 API level 设备占比</b> · 驱动老 skill 冻结 / EOL 归档节奏</span>
+      </div>
+    </div>
+  </div>
+  <div class="pageno">9 / 10</div>
+</div>
+
+<!-- ================= 第 10 页 · 落地优先级与速记 ================= -->
+<div class="slide">
+  <div class="header">
+    <h1><span class="hl">落地优先级</span>与速记<small>先立对象，再上门禁，路线 B 先行</small></h1>
+    <div class="headline"><p>重资产只有两个：<strong>工具集登记表（含流程改造）</strong>和<strong>依赖索引 + 双门禁 CI</strong>；其余都是建在对象之上的轻量规则。</p></div>
+  </div>
+  <div class="grid two">
+    <div class="card">
+      <h3><span class="dot"></span>建设顺序</h3>
+      <table>
+        <tr><th>优先级</th><th>建设项</th><th>说明</th></tr>
+        <tr><td><span class="tag err">P0</span></td><td><strong>定义工具集对象 schema + 登记表（路线 B）</strong></td><td>“登记即门禁”接入工具发布流程；端侧上报 ROM + 机型即可跑通 —— <em>立即可用，全机队覆盖</em></td></tr>
+        <tr><td><span class="tag err">P0</span></td><td><strong>golden manifest（每 level 快照）</strong></td><td>登记表的直接产物；开发态、静态校验、回归评估共用</td></tr>
+        <tr><td><span class="tag warn">P1</span></td><td><strong>依赖索引 + 双门禁 CI</strong></td><td>tool→skills 反查、schema diff 自动分类、skill 上架静态校验、快通道先行门禁</td></tr>
+        <tr><td><span class="tag">P2</span></td><td>API level 编号、skill 兼容声明、按能力解析分发、会话钉住 + 日志</td><td>对象之上的轻量规则</td></tr>
+        <tr><td><span class="tag">P3</span></td><td>单源多渲染流水线、changeset / alias、端侧注册中心（路线 A）</td><td>复杂度增长后启用；A 随新 ROM 下场，接口不变</td></tr>
+        <tr><td><span class="tag green">持续</span></td><td>三指标看板 + 采样审计</td><td>路线 B 阶段安全网兼任登记表纠偏信号</td></tr>
+      </table>
+    </div>
+    <div class="card">
+      <h3 class="green"><span class="dot"></span>速记 · 十条管理原则</h3>
+      <ul style="font-size:.9em;">
+        <li><strong>① 本质</strong>：skill 只与工具集绑定，ROM / 机型 / 组件版本都是生产侧输入</li>
+        <li><strong>② 对象先行</strong>：上层机制面向工具集对象设计，与来源（A / B）解耦</li>
+        <li><strong>③ 登记即门禁</strong>：不登记不能发，表的质量与发布同源</li>
+        <li><strong>④ 感知面 = 1 个整数</strong>：min_tool_api 必填，required_tools 兜碎片</li>
+        <li><strong>⑤ 老设备既有行为不可破</strong>：触碰即重流程，新增可得性走轻流程</li>
+        <li><strong>⑥ 拒答是计划内分支</strong>：能力检测驱动，绝不运行时撞墙</li>
+        <li><strong>⑦ 工具分层承诺</strong>：T0 冻结 / T1 走流程 / T2 只许门控 skill 引用</li>
+        <li><strong>⑧ 快通道先行</strong>：skill 先上架，工具再随 ROM 灰度，升级自动漂移</li>
+        <li><strong>⑨ 安全网 ≈ 0 运营</strong>：B 阶段兼任登记表纠偏信号</li>
+        <li><strong>⑩ B 永不退役</strong>：存量设备的终态就是查表，A / B 长期并存</li>
+      </ul>
+    </div>
+  </div>
+  <div class="pageno">10 / 10</div>
+</div>
+
+</body>
+</html>
