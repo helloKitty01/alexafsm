@@ -1,0 +1,812 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>全双工语音交互状态模型 v3.2（汇报版）</title>
+<style>
+  :root {
+    --bg: #e9eef6;
+    --slide-bg: linear-gradient(135deg, #ffffff 0%, #f8fbfe 55%, #f2f7fd 100%);
+    --card: #ffffff;
+    --card-border: #dfe6f0;
+    --text: #1e2a3d;
+    --muted: #5a6b84;
+    --accent: #2f6fed;
+    --accent2: #0ea578;
+    --warn: #d97a06;
+    --danger: #d0453c;
+    --purple: #7c5cd6;
+    --code-bg: #f3f6fb;
+    --code-text: #24405f;
+    --mono: "SF Mono", "JetBrains Mono", Consolas, "Courier New", monospace;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { background: var(--bg); }
+  body {
+    font-family: "PingFang SC", "Microsoft YaHei", "Noto Sans SC", -apple-system, sans-serif;
+    color: var(--text);
+    display: flex; flex-direction: column; align-items: center;
+    padding: 28px 16px; gap: 28px; min-height: 100vh;
+  }
+  .slide {
+    width: min(1280px, 96vw);
+    aspect-ratio: 16 / 9;
+    background: var(--slide-bg);
+    border: 1px solid var(--card-border);
+    border-radius: 18px;
+    box-shadow: 0 18px 44px rgba(30,42,61,.14);
+    padding: 1.8% 2.6%;
+    display: flex; flex-direction: column;
+    overflow: hidden; position: relative;
+    font-size: clamp(9.5px, 1.0vw, 14px);
+  }
+  .slide::before {
+    content: ""; position: absolute; inset: 0 0 auto 0; height: 5px;
+    background: linear-gradient(90deg, var(--accent), var(--accent2));
+    border-radius: 18px 18px 0 0;
+  }
+  .pageno { position: absolute; right: 1.6em; bottom: .9em; font-family: var(--mono); font-size: .78em; color: var(--muted); }
+  .footer-note { position: absolute; left: 2.6%; bottom: .9em; font-size: .72em; color: #8b9ab0; }
+
+  .header { display: flex; align-items: baseline; justify-content: space-between; gap: 1.4em; margin-bottom: .55em; }
+  h1 { font-size: 1.5em; font-weight: 700; white-space: nowrap; }
+  h1 .hl { color: var(--accent); }
+  .subtitle { color: var(--muted); font-size: .9em; line-height: 1.4; text-align: right; }
+  .subtitle strong { color: var(--text); }
+
+  code, .mono { font-family: var(--mono); font-size: .9em; background: var(--code-bg); color: var(--code-text); border: 1px solid #e4eaf3; padding: 0 .3em; border-radius: 4px; }
+  .st { font-family: var(--mono); font-weight: 700; color: var(--code-text); }
+  .st i { font-family: "PingFang SC", "Microsoft YaHei", sans-serif; font-style: normal; font-weight: 500; color: var(--muted); }
+  .tr { font-family: var(--mono); font-size: .9em; color: var(--code-text); white-space: nowrap; }
+  .tr i { font-style: normal; color: var(--warn); }
+  .tr u { text-decoration: none; color: var(--purple); }
+  .tr s { text-decoration: none; color: #8b9ab0; }
+
+  .cols { display: flex; gap: .8em; flex: 1; min-height: 0; }
+  .col { display: flex; flex-direction: column; gap: .65em; min-width: 0; min-height: 0; }
+
+  .panel { background: var(--card); border: 1px solid var(--card-border); border-radius: 12px; padding: .7em .9em; box-shadow: 0 2px 8px rgba(30,42,61,.04); display: flex; flex-direction: column; min-height: 0; }
+  .panel > h2 { font-size: 1em; font-weight: 700; margin-bottom: .45em; display: flex; align-items: baseline; gap: .5em; }
+  .panel > h2 .tag { flex: none; font-size: .72em; font-weight: 700; color: var(--accent); background: rgba(47,111,237,.08); border: 1px solid rgba(47,111,237,.3); border-radius: 99px; padding: .1em .65em; }
+  .panel > h2 .tag.green { color: var(--accent2); background: rgba(14,165,120,.08); border-color: rgba(14,165,120,.3); }
+  .panel > h2 .tag.warn { color: var(--warn); background: rgba(217,122,6,.08); border-color: rgba(217,122,6,.3); }
+  .panel > h2 .tag.purple { color: var(--purple); background: rgba(124,92,214,.08); border-color: rgba(124,92,214,.3); }
+  .panel > h2 .tag.danger { color: var(--danger); background: rgba(208,69,60,.08); border-color: rgba(208,69,60,.3); }
+  .panel ul { list-style: none; }
+  .panel li { color: var(--muted); font-size: .88em; line-height: 1.48; padding-left: .95em; position: relative; margin-bottom: .28em; }
+  .panel li::before { content: "•"; color: var(--accent); position: absolute; left: 0; }
+  .panel li strong { color: var(--text); font-weight: 600; }
+  .panel p { color: var(--muted); font-size: .88em; line-height: 1.48; }
+  .panel p strong { color: var(--text); }
+
+  table { border-collapse: collapse; width: 100%; font-size: .84em; }
+  th { text-align: left; color: var(--text); font-weight: 700; padding: .32em .5em; border-bottom: 2px solid var(--card-border); white-space: nowrap; }
+  td { color: var(--muted); padding: .3em .5em; border-bottom: 1px solid #edf1f7; line-height: 1.42; vertical-align: top; }
+  td strong { color: var(--text); }
+  tr.key td { background: rgba(208,69,60,.05); }
+  tr.key td:first-child { border-left: 3px solid var(--danger); }
+
+  .callout { background: rgba(47,111,237,.06); border: 1px solid rgba(47,111,237,.25); border-left: 4px solid var(--accent); border-radius: 9px; padding: .5em .85em; font-size: .88em; color: var(--muted); line-height: 1.48; }
+  .callout b { color: var(--text); }
+  .callout.green { background: rgba(14,165,120,.06); border-color: rgba(14,165,120,.25); border-left-color: var(--accent2); }
+  .callout.warn { background: rgba(217,122,6,.06); border-color: rgba(217,122,6,.25); border-left-color: var(--warn); }
+  .callout.danger { background: rgba(208,69,60,.06); border-color: rgba(208,69,60,.25); border-left-color: var(--danger); }
+
+  .cards { display: grid; gap: .6em; flex: 1; min-height: 0; }
+  .card { background: var(--card); border: 1px solid var(--card-border); border-radius: 11px; padding: .65em .85em; min-width: 0; box-shadow: 0 2px 8px rgba(30,42,61,.04); }
+  .card h3 { font-size: .96em; font-weight: 700; margin-bottom: .28em; line-height: 1.3; }
+  .card h3 .no { color: var(--accent); font-family: var(--mono); margin-right: .4em; }
+  .card p { color: var(--muted); font-size: .85em; line-height: 1.48; }
+  .card p strong { color: var(--text); }
+
+  .pri { font-family: var(--mono); font-size: .7em; font-weight: 700; border-radius: 4px; padding: .04em .38em; margin-right: .3em; vertical-align: .08em; }
+  .pri0 { color: #fff; background: var(--danger); }
+  .pri1 { color: #fff; background: var(--warn); }
+  .pri2 { color: var(--muted); background: #e8edf4; }
+
+  .chip { font-family: var(--mono); font-size: .78em; font-weight: 700; border-radius: 7px; padding: .16em .55em; border: 1.5px solid; white-space: nowrap; display: inline-block; }
+  .chip.base { color: var(--accent); border-color: rgba(47,111,237,.45); background: rgba(47,111,237,.07); }
+  .chip.new { color: var(--accent2); border-color: rgba(14,165,120,.5); background: rgba(14,165,120,.07); }
+  .chip.ext { color: var(--purple); border-color: rgba(124,92,214,.45); background: rgba(124,92,214,.07); border-style: dashed; }
+  .chip.edge { color: var(--muted); border-color: #c6d0de; background: #f2f5fa; border-style: dotted; }
+  .chip.win { color: var(--warn); border-color: rgba(217,122,6,.5); background: rgba(217,122,6,.08); border-radius: 99px; }
+
+  .hero { flex: 1; display: flex; flex-direction: column; justify-content: center; gap: 1.1em; padding: 0 2%; }
+  .hero .kicker { font-family: var(--mono); color: var(--accent2); font-size: .9em; letter-spacing: .1em; }
+  .hero h1 { font-size: 2.8em; line-height: 1.15; white-space: normal; }
+  .hero h1 small { display: block; font-size: .45em; color: var(--muted); font-weight: 500; margin-top: .3em; }
+  .hero .thesis { font-size: 1.2em; color: var(--text); line-height: 1.55; max-width: 34em; border-left: 5px solid var(--accent); padding-left: 1em; }
+  .hero .meta { display: flex; gap: 2.2em; color: var(--muted); font-size: .9em; }
+  .hero .meta b { color: var(--text); display: block; font-size: 1.55em; }
+  .hero .agenda { display: flex; gap: .5em; flex-wrap: wrap; font-size: .82em; color: var(--muted); }
+  .hero .agenda span { background: var(--card); border: 1px solid var(--card-border); border-radius: 99px; padding: .2em .8em; }
+
+  .phases { display: flex; gap: .45em; align-items: stretch; }
+  .phase { flex: 1; border-radius: 11px; border: 1px solid var(--card-border); background: var(--card); padding: .65em .8em; }
+  .phase .letter { font-family: var(--mono); font-size: 1.5em; font-weight: 800; color: var(--accent); line-height: 1; }
+  .phase h3 { font-size: .98em; font-weight: 700; margin: .25em 0 .2em; }
+  .phase p { color: var(--muted); font-size: .82em; line-height: 1.45; }
+  .phase .q { color: var(--text); font-weight: 600; font-size: .86em; margin-top: .45em; padding-top: .4em; border-top: 1px dashed var(--card-border); }
+  .phase.c { border-top: 4px solid var(--accent2); }
+  .phase.x { border-top: 4px solid var(--purple); }
+  .phase.ab, .phase.d { border-top: 4px solid var(--accent); }
+
+  .tiers { display: flex; align-items: stretch; margin: .35em 0 .5em; font-size: .84em; text-align: center; }
+  .tier { padding: .55em .45em; border: 1px solid; }
+  .tier strong { display: block; margin-bottom: .15em; }
+  .tier span { color: var(--muted); }
+  .tier.t0 { flex: 2; background: rgba(14,165,120,.12); border-color: rgba(14,165,120,.4); border-radius: 9px 0 0 9px; }
+  .tier.t1 { flex: 3; background: rgba(217,122,6,.1); border-color: rgba(217,122,6,.4); border-left: none; }
+  .tier.t2 { flex: 3; background: rgba(208,69,60,.08); border-color: rgba(208,69,60,.35); border-left: none; }
+  .tier.tp { flex: 2; background: rgba(47,111,237,.1); border-color: rgba(47,111,237,.4); border-left: none; border-radius: 0 9px 9px 0; }
+
+  .band { border-radius: 9px; padding: .5em .85em; font-size: .86em; line-height: 1.48; color: var(--muted); border: 1px solid var(--card-border); background: var(--card); }
+  .band strong { color: var(--text); }
+  .band.l4 { border-left: 5px solid var(--accent); }
+  .band.l3 { border-left: 5px solid var(--accent2); }
+  .band.l2 { border-left: 5px solid var(--warn); }
+  .band.l1 { border-left: 5px solid var(--purple); }
+  .down { text-align: center; color: var(--muted); font-size: .78em; line-height: 1.1; }
+
+  .ok { color: var(--accent2); font-weight: 700; }
+  .bad { color: var(--danger); font-weight: 700; }
+  .mid { color: var(--warn); font-weight: 700; }
+
+  svg text { font-family: "PingFang SC", "Microsoft YaHei", sans-serif; }
+  svg .mono-t { font-family: var(--mono); }
+</style>
+</head>
+<body>
+
+<!-- ═══════════ P1 封面 ═══════════ -->
+<section class="slide">
+  <div class="hero">
+    <div class="kicker">OMNI 实时语音 · 设计评审</div>
+    <h1>全双工语音交互<span class="hl">状态模型</span> v3.2
+      <small>从 34 个交互场景推导出的 6 + 3 + 2 态模型、四层协议与三项待拍板决策</small></h1>
+    <p class="thesis">全双工的本质不是模型更聪明，而是系统在任何时刻都知道自己该<b>听、等，还是说</b>——并且这个判断能从用户实际听到的内容推导出来、被验证。</p>
+    <div class="meta">
+      <div><b>6 + 3 + 2</b>系统侧状态（主干 / 扩展 / 边缘）</div>
+      <div><b>34</b>交互场景，按 P0 / P1 / P2 分级</div>
+      <div><b>4</b>层协议（信号 → 窗口 → 事件 → 状态）</div>
+      <div><b>3</b>项待拍板决策</div>
+    </div>
+    <div class="agenda">
+      <span>① 为什么需要显式状态</span><span>② 一张图看全貌 · 完整状态清单</span><span>③ 三条设计原则</span><span>④ 场景全集：五段 × 34 个</span><span>⑤ 两个最难点：打断三分 · 时延与工具</span><span>⑥ 四层协议 · 与外部词表逐项对比</span><span>⑦ 决策 · 模型需求 · 验收 · 附录转换表</span>
+    </div>
+  </div>
+  <span class="footer-note">事实源：docs/omni-realtime-voice/08-场景全集与状态交互分层.md ｜ 技术讨论底稿：幻灯片 v3 ｜ 状态名统一为「英文（中文）」，事件与信号名保留协议字段原文</span>
+  <span class="pageno">1 / 15</span>
+</section>
+
+<!-- ═══════════ P2 为什么 ═══════════ -->
+<section class="slide">
+  <div class="header">
+    <h1>为什么全双工需要<span class="hl">显式状态</span></h1>
+    <p class="subtitle">人与人之间的轮次交替是免费的，机器必须建模——<strong>下面每一条差异都逼出一个必须显式设计的机制</strong></p>
+  </div>
+  <div class="panel" style="flex:1;">
+    <table style="font-size:.9em;">
+      <tr><th style="width:3%;">#</th><th style="width:26%;">人人对话</th><th style="width:27%;">人机对话</th><th>逼出的机制</th><th style="width:9%;">对应场景</th></tr>
+      <tr><td>1</td><td>受话人总有某种反馈，不存在"这句不是对我说的"</td><td>误唤醒、旁路收音、多人在场</td><td><strong>拒识决策</strong>：respond / reject / defer 三分，且在全双工下从一次性判定变成<strong>持续判定</strong></td><td>B5 / B7</td></tr>
+      <tr><td>2</td><td>靠句法与韵律<em>预测</em>话轮结束，接话间隙常为负</td><td>等静音阈值，慢半拍，还会在换气口抢话</td><td>用户侧 <span class="st">PAUSED<i>（持轮停顿）</i></span>：<strong>停顿 ≠ 说完</strong>；语义端点；停顿期预生成不出声</td><td>B3 / B4 / C7</td></tr>
+      <tr><td>3</td><td>听者的"嗯 / 对"是自然伴随，不干扰说者</td><td>每个"嗯"都可能触发打断</td><td><strong>打断判定窗</strong>：真打断 / 附和 / 噪声三分出口</td><td>D2 / D3 / D4</td></tr>
+      <tr><td>4</td><td>被打断者说完当前小句，优雅让出</td><td>要么生硬地立刻停，要么不理会</td><td>显式 <span class="st">YIELDING<i>（让出）</i></span> 过渡态 + 截断到用户<strong>实际听到</strong>的位置</td><td>D3 / D4</td></tr>
+      <tr><td>5</td><td>人不会"挂起等待"某个子系统</td><td>工具、检索、大模型委托都有秒级等待</td><td><span class="st">PREPARING<i>（备答）</i></span> / <span class="st">HOLDING<i>（持轮等待）</i></span> + 三档时延 T0 / T1 / T2：静默 → 垫话 → 兜底</td><td>C1–C6 / D6–D8</td></tr>
+      <tr><td>6</td><td>有视线、张嘴、呼吸等视觉线索</td><td>只有音频（或极有限的视觉）</td><td><strong>起音确认窗与端点窗不可省略</strong>；窗口时长是产品参数而非实现细节</td><td>B1 / B3</td></tr>
+    </table>
+    <div style="display:flex; gap:.6em; margin-top:.6em;">
+      <div class="callout" style="flex:1.2;">
+        <b>与业界评测口径对齐：</b>差异 2 / 3 / 4 正是 Full‑Duplex‑Bench 的四个维度（停顿处理、附和、轮次交替、打断）；差异 1 是其 v1.5 的"对旁人说话 / 背景人声"；差异 5 是 Agora 三时钟测量（应答起点 / 实质起点 / 完成）所覆盖的内容。我们的场景集能与公开基准一一对上。
+      </div>
+      <div class="callout green" style="flex:1;">
+        <b>本组幻灯片回答三个问题：</b>有哪些状态（第 3–4 页）、为什么是这些而不是别的（第 5–9 页）、状态怎么判定和验证（第 10–15 页）。
+      </div>
+    </div>
+  </div>
+  <span class="pageno">2 / 15</span>
+</section>
+
+<!-- ═══════════ P3 全貌图 ═══════════ -->
+<section class="slide">
+  <div class="header">
+    <h1>一张图看全貌：<span class="hl">主干 6 态 + 扩展 3 态 + 边缘 2 态</span></h1>
+    <p class="subtitle">粗线 = 日常一轮：<strong>LISTENING → PREPARING → SPEAKING → LISTENING</strong>；其余都是主干上的岔路｜实线 = 系统可观测事实，虚线 = 判定 / 决策｜①–⑯ 对应第 15 页转换表</p>
+  </div>
+  <div style="flex:1; min-height:0; display:flex; flex-direction:column;">
+    <svg viewBox="0 0 1200 520" style="width:100%; flex:1; min-height:0;" preserveAspectRatio="xMidYMid meet">
+      <defs>
+        <marker id="a" markerWidth="10" markerHeight="8" refX="9" refY="4" orient="auto"><polygon points="0 0, 10 4, 0 8" fill="#33507a"/></marker>
+        <marker id="aP" markerWidth="10" markerHeight="8" refX="9" refY="4" orient="auto"><polygon points="0 0, 10 4, 0 8" fill="#7c5cd6"/></marker>
+        <marker id="aG" markerWidth="10" markerHeight="8" refX="9" refY="4" orient="auto"><polygon points="0 0, 10 4, 0 8" fill="#8b9ab0"/></marker>
+      </defs>
+
+      <!-- 边缘态入口链 -->
+      <rect x="40" y="26" rx="9" width="170" height="34" fill="#f2f5fa" stroke="#8b9ab0" stroke-width="1.4" stroke-dasharray="5 4"/>
+      <text x="125" y="48" font-size="13" fill="#5a6b84" text-anchor="middle" class="mono-t">INITIALIZING<tspan font-family="PingFang SC, sans-serif" font-size="11">（建立）</tspan></text>
+      <path d="M 210 43 L 250 43" fill="none" stroke="#8b9ab0" stroke-width="1.6" marker-end="url(#aG)"/>
+      <rect x="252" y="26" rx="9" width="118" height="34" fill="#f2f5fa" stroke="#8b9ab0" stroke-width="1.4" stroke-dasharray="5 4"/>
+      <text x="311" y="48" font-size="13" fill="#5a6b84" text-anchor="middle" class="mono-t">IDLE<tspan font-family="PingFang SC, sans-serif" font-size="11">（待机）</tspan></text>
+      <path d="M 200 60 Q 170 140 158 212" fill="none" stroke="#8b9ab0" stroke-width="1.6" marker-end="url(#aG)"/>
+      <text x="40" y="80" font-size="11.5" fill="#8b9ab0">边缘态：会话建立 A1 / 双方静默 A2</text>
+
+      <!-- 主干 -->
+      <path d="M 272 232 Q 360 150 484 100" fill="none" stroke="#33507a" stroke-width="4" marker-end="url(#a)"/>
+      <path d="M 716 100 Q 840 150 928 232" fill="none" stroke="#33507a" stroke-width="4" marker-end="url(#a)"/>
+      <path d="M 928 285 L 272 285" fill="none" stroke="#33507a" stroke-width="4" marker-end="url(#a)"/>
+      <!-- ③ PREPARING → LISTENING -->
+      <path d="M 500 132 Q 400 200 262 218" fill="none" stroke="#7c5cd6" stroke-width="2" stroke-dasharray="7 5" marker-end="url(#aP)"/>
+      <!-- ④ PREPARING 自环 -->
+      <path d="M 565 40 C 550 6 650 6 635 38" fill="none" stroke="#7c5cd6" stroke-width="2" stroke-dasharray="7 5" marker-end="url(#aP)"/>
+      <!-- ⑤⑥ SPEAKING ⇄ HOLDING -->
+      <path d="M 1010 218 L 1010 132" fill="none" stroke="#33507a" stroke-width="2.4" marker-end="url(#a)"/>
+      <path d="M 1080 132 L 1080 216" fill="none" stroke="#33507a" stroke-width="2.4" marker-end="url(#a)"/>
+      <!-- ⑦ HOLDING → LISTENING -->
+      <path d="M 928 92 C 720 150 460 180 262 226" fill="none" stroke="#7c5cd6" stroke-width="1.8" stroke-dasharray="6 5" marker-end="url(#aP)"/>
+      <!-- ⑫ SPEAKING 自环 -->
+      <path d="M 1160 236 C 1200 220 1200 282 1160 268" fill="none" stroke="#7c5cd6" stroke-width="2" stroke-dasharray="7 5" marker-end="url(#aP)"/>
+      <!-- ⑨ SPEAKING → YIELDING -->
+      <path d="M 980 308 Q 920 380 872 418" fill="none" stroke="#33507a" stroke-width="2.6" marker-end="url(#a)"/>
+      <!-- ⑪ YIELDING → SPEAKING -->
+      <path d="M 850 400 Q 950 350 1030 310" fill="none" stroke="#7c5cd6" stroke-width="2" stroke-dasharray="7 5" marker-end="url(#aP)"/>
+      <!-- ⑩ YIELDING → LISTENING -->
+      <path d="M 640 445 Q 420 440 215 310" fill="none" stroke="#33507a" stroke-width="2.6" marker-end="url(#a)"/>
+      <!-- ⑬ LISTENING ⇄ BACKCHANNEL -->
+      <path d="M 120 308 L 120 400" fill="none" stroke="#7c5cd6" stroke-width="2" stroke-dasharray="7 5" marker-end="url(#aP)"/>
+      <path d="M 190 400 L 190 308" fill="none" stroke="#7c5cd6" stroke-width="2" stroke-dasharray="7 5" marker-end="url(#aP)"/>
+      <!-- ⑭ LISTENING → SPEAKING（INTERJECTING） -->
+      <path d="M 272 300 Q 600 400 928 300" fill="none" stroke="#7c5cd6" stroke-width="1.8" stroke-dasharray="4 5" marker-end="url(#aP)"/>
+
+      <!-- 边标签 -->
+      <text x="300" y="150" font-size="13" fill="#33507a" font-weight="700">① 用户说完，话轮交给系统</text>
+      <text x="300" y="167" font-size="12" fill="#8b9ab0" class="mono-t">committed ∧ respond · B4/B5</text>
+      <text x="760" y="150" font-size="13" fill="#33507a" font-weight="700">② 首帧音频播出</text>
+      <text x="760" y="167" font-size="12" fill="#8b9ab0" class="mono-t">playout_started · C1</text>
+      <text x="600" y="272" font-size="13" fill="#33507a" font-weight="700" text-anchor="middle">⑧ 播完：释放话轮，或提问后标记"等用户回答"继续持有</text>
+      <text x="600" y="303" font-size="12" fill="#8b9ab0" text-anchor="middle" class="mono-t">playout_done ∧ release / floor=agent-expecting-user · D9/D10</text>
+      <text x="345" y="200" font-size="12" fill="#7c5cd6">③ 拒识 / 用户又开口弃答 · B5/C5/X1</text>
+      <text x="600" y="18" font-size="12" fill="#7c5cd6" text-anchor="middle">④ 工具调用 · 委托大模型 · T1 垫话 · T2 兜底 · C2–C6</text>
+      <text x="1000" y="182" font-size="12" fill="#5a6b84" text-anchor="end">⑤ 说完宣告，等结果</text>
+      <text x="1000" y="197" font-size="11" fill="#8b9ab0" text-anchor="end" class="mono-t">playout_done ∧ 持轮 · D5/D6</text>
+      <text x="1090" y="182" font-size="12" fill="#5a6b84">⑥ 结果到，续说</text>
+      <text x="1090" y="197" font-size="11" fill="#8b9ab0" class="mono-t">tool_done · D6</text>
+      <text x="560" y="128" font-size="12" fill="#7c5cd6">⑦ 取消 / 超时释放 · D7/D8</text>
+      <text x="1120" y="312" font-size="12" fill="#7c5cd6">⑫ 用户"嗯嗯"→ 继续说</text>
+      <text x="1120" y="327" font-size="11" fill="#8b9ab0">判为附和 / 旁人 / 背景 · D2</text>
+      <text x="900" y="372" font-size="13" fill="#33507a" font-weight="700">⑨ 真打断 → 让出</text>
+      <text x="900" y="388" font-size="12" fill="#8b9ab0" class="mono-t">interrupt · D3</text>
+      <text x="905" y="345" font-size="12" fill="#7c5cd6" text-anchor="end">⑪ 误报 → 恢复播放 · D4</text>
+      <text x="400" y="480" font-size="13" fill="#33507a" font-weight="700">⑩ 停播完成，截断到用户实际听到的位置</text>
+      <text x="400" y="496" font-size="12" fill="#8b9ab0" class="mono-t">truncate 到播放毫秒数 · D3</text>
+      <text x="205" y="360" font-size="12" fill="#7c5cd6">⑬ 系统轻声"嗯"，不改话轮</text>
+      <text x="205" y="375" font-size="11" fill="#8b9ab0">B2</text>
+      <text x="600" y="368" font-size="12" fill="#7c5cd6" text-anchor="middle">⑭ INTERJECTING（主动插话）：高价值信息 ∧ 打扰管理放行 · A3/A4/X2/X3</text>
+
+      <!-- 节点 -->
+      <rect x="40" y="218" rx="14" width="232" height="90" fill="rgba(47,111,237,.08)" stroke="#2f6fed" stroke-width="2.6"/>
+      <text x="156" y="254" font-size="21" font-weight="800" fill="#1d4fc4" text-anchor="middle" class="mono-t">LISTENING</text>
+      <text x="156" y="280" font-size="13" fill="#5a6b84" text-anchor="middle">（聆听）安静 · 话轮在用户</text>
+
+      <rect x="484" y="44" rx="14" width="232" height="90" fill="rgba(14,165,120,.09)" stroke="#0ea578" stroke-width="2.6"/>
+      <text x="600" y="80" font-size="21" font-weight="800" fill="#0b7d5c" text-anchor="middle" class="mono-t">PREPARING</text>
+      <text x="600" y="106" font-size="13" fill="#5a6b84" text-anchor="middle">（备答）已接话轮 · 还没出声</text>
+
+      <rect x="928" y="218" rx="14" width="232" height="90" fill="rgba(47,111,237,.08)" stroke="#2f6fed" stroke-width="2.6"/>
+      <text x="1044" y="254" font-size="21" font-weight="800" fill="#1d4fc4" text-anchor="middle" class="mono-t">SPEAKING</text>
+      <text x="1044" y="280" font-size="13" fill="#5a6b84" text-anchor="middle">（说话）锚定播放首帧</text>
+
+      <rect x="928" y="44" rx="14" width="232" height="88" fill="rgba(14,165,120,.09)" stroke="#0ea578" stroke-width="2.6"/>
+      <text x="1044" y="80" font-size="21" font-weight="800" fill="#0b7d5c" text-anchor="middle" class="mono-t">HOLDING</text>
+      <text x="1044" y="106" font-size="13" fill="#5a6b84" text-anchor="middle">（持轮等待）出过声 · 仍持话轮</text>
+
+      <rect x="40" y="400" rx="14" width="232" height="80" fill="rgba(14,165,120,.09)" stroke="#0ea578" stroke-width="2.4"/>
+      <text x="156" y="432" font-size="19" font-weight="800" fill="#0b7d5c" text-anchor="middle" class="mono-t">BACKCHANNEL</text>
+      <text x="156" y="458" font-size="13" fill="#5a6b84" text-anchor="middle">（附和）出声但不夺话轮</text>
+
+      <rect x="640" y="400" rx="14" width="232" height="80" fill="rgba(14,165,120,.09)" stroke="#0ea578" stroke-width="2.4"/>
+      <text x="756" y="432" font-size="19" font-weight="800" fill="#0b7d5c" text-anchor="middle" class="mono-t">YIELDING</text>
+      <text x="756" y="458" font-size="13" fill="#5a6b84" text-anchor="middle">（让出）停播 + 截断对账</text>
+
+      <rect x="928" y="404" rx="11" width="108" height="76" fill="rgba(124,92,214,.06)" stroke="#7c5cd6" stroke-width="1.8" stroke-dasharray="7 5"/>
+      <text x="982" y="432" font-size="14" font-weight="700" fill="#6a4cc0" text-anchor="middle" class="mono-t">MUTED</text>
+      <text x="982" y="450" font-size="11.5" fill="#5a6b84" text-anchor="middle">（禁言）</text>
+      <text x="982" y="467" font-size="10.5" fill="#8b9ab0" text-anchor="middle">⑮ 任意态 ⇄ · B8</text>
+      <rect x="1052" y="404" rx="11" width="108" height="76" fill="rgba(124,92,214,.06)" stroke="#7c5cd6" stroke-width="1.8" stroke-dasharray="7 5"/>
+      <text x="1106" y="432" font-size="14" font-weight="700" fill="#6a4cc0" text-anchor="middle" class="mono-t">REPAIR</text>
+      <text x="1106" y="450" font-size="11.5" fill="#5a6b84" text-anchor="middle">（澄清）</text>
+      <text x="1106" y="467" font-size="10.5" fill="#8b9ab0" text-anchor="middle">⑯ 任意态 → · B7</text>
+    </svg>
+    <div style="display:flex; gap:1.2em; align-items:center; margin-top:.3em; font-size:.8em; color:var(--muted);">
+      <span><span class="chip base">基础态</span> 半双工也有</span>
+      <span><span class="chip new">全双工特有</span> 本方案新增</span>
+      <span><span class="chip ext">扩展态</span> 低频、按需启用</span>
+      <span><span class="chip edge">边缘态</span> 会话边界</span>
+      <span style="border-left:1px solid var(--card-border); padding-left:1.2em;"><b>用户侧：</b><span class="st">SILENT<i>（已释放）</i></span> → 起音确认窗 → <span class="st">SPEAKING<i>（说话中）</i></span> ⇄ <span class="st">PAUSED<i>（持轮停顿）</i></span> → committed → SILENT；长静默 → <span class="st">AWAY<i>（离开）</i></span></span>
+    </div>
+  </div>
+  <span class="pageno">3 / 15</span>
+</section>
+
+<!-- ═══════════ P4 完整状态清单 ═══════════ -->
+<section class="slide">
+  <div class="header">
+    <h1>完整状态清单：<span class="hl">系统 11 态 · 用户 4 态 · 话轮变量 floor</span></h1>
+    <p class="subtitle">每个状态对用户<strong>可感知地不同</strong>，或对系统<strong>可操作地不同</strong>；两者都不满足的不单列｜话轮归属单独记，不塞进状态机</p>
+  </div>
+  <div class="cols">
+    <div class="col" style="flex:1.4;">
+      <div class="panel" style="flex:1;">
+        <h2><span class="tag">系统侧 11 态</span></h2>
+        <table style="font-size:.83em;">
+          <tr><th>状态</th><th>定义</th><th>用户听到什么</th><th>典型场景</th><th>类别</th></tr>
+          <tr><td><span class="st">LISTENING<i>（聆听）</i></span></td><td>沉默；话轮在用户或空置；持续消费输入</td><td>安静</td><td>B1–B8</td><td><span class="chip base">主干</span></td></tr>
+          <tr><td><span class="st">PREPARING<i>（备答）</i></span></td><td>话轮已接、<strong>还没出声</strong>；生成、工具、委托都在这里发生</td><td>安静（≤T0）或垫话</td><td>C1–C7</td><td><span class="chip new">主干</span></td></tr>
+          <tr><td><span class="st">SPEAKING<i>（说话）</i></span></td><td>音频正在播放；以首帧进入播放通道为准</td><td>正常说话</td><td>D1–D3</td><td><span class="chip base">主干</span></td></tr>
+          <tr><td><span class="st">HOLDING<i>（持轮等待）</i></span></td><td><strong>出过声</strong>、仍持话轮、暂无新内容（等工具、轮内停顿、尾音）</td><td>短停顿，但不像说完</td><td>D5–D8</td><td><span class="chip new">主干</span></td></tr>
+          <tr><td><span class="st">BACKCHANNEL<i>（附和）</i></span></td><td>不夺话轮的短反馈</td><td>"嗯嗯 / 对"</td><td>B2</td><td><span class="chip new">主干</span></td></tr>
+          <tr><td><span class="st">YIELDING<i>（让出）</i></span></td><td>判定真打断；停止播放并截断未播内容</td><td>立刻安静</td><td>D3 / D4</td><td><span class="chip new">主干</span></td></tr>
+          <tr><td><span class="st">INTERJECTING<i>（主动插话）</i></span></td><td>系统主动发起实质性发言（提醒、告警）；须经打扰管理放行</td><td>被插话</td><td>A3 / A4 / X2 / X3</td><td><span class="chip ext">扩展</span></td></tr>
+          <tr><td><span class="st">MUTED<i>（禁言）</i></span></td><td>用户显式要求闭嘴，直到解除</td><td>长时安静</td><td>B8</td><td><span class="chip ext">扩展</span></td></tr>
+          <tr><td><span class="st">REPAIR<i>（澄清）</i></span></td><td>元对话："你是在跟我说吗？"</td><td>一句反问</td><td>B7</td><td><span class="chip ext">扩展</span></td></tr>
+          <tr><td><span class="st">INITIALIZING<i>（建立）</i></span> / <span class="st">IDLE<i>（待机）</i></span></td><td>会话预热（缓冲用户先说的话）/ 双方静默</td><td>—</td><td>A1 / A2</td><td><span class="chip edge">边缘</span></td></tr>
+        </table>
+      </div>
+    </div>
+    <div class="col" style="flex:.85;">
+      <div class="panel">
+        <h2><span class="tag purple">用户侧 4 态</span></h2>
+        <table style="font-size:.85em;">
+          <tr><td><span class="st">SPEAKING<i>（说话中）</i></span></td><td>起音已确认</td></tr>
+          <tr><td><span class="st">PAUSED<i>（持轮停顿）</i></span></td><td>停了但<strong>没说完</strong>，话轮仍在用户手上——B3 的依据</td></tr>
+          <tr><td><span class="st">SILENT<i>（已释放）</i></span></td><td>话轮已交出（committed）</td></tr>
+          <tr><td><span class="st">AWAY<i>（离开）</i></span></td><td>双方长时间静默</td></tr>
+        </table>
+      </div>
+      <div class="panel" style="flex:1;">
+        <h2><span class="tag warn">话轮变量 floor</span>谁持有话轮</h2>
+        <table style="font-size:.85em;">
+          <tr><td class="mono">user</td><td>用户在说或持轮停顿</td></tr>
+          <tr><td class="mono">agent</td><td>系统备答、说话或持轮等待</td></tr>
+          <tr><td class="mono">open</td><td>双方都没持有（静默期）</td></tr>
+          <tr><td class="mono">contested</td><td>双方同时开口，待让步（X1）</td></tr>
+          <tr><td class="mono">agent-expecting-user</td><td>系统提问后等答（D9 / D10）</td></tr>
+        </table>
+        <div class="callout green" style="margin-top:.5em; font-size:.84em;">
+          <b>为什么单独记：</b>系统问完"你要哪天出发？"后状态回到 <span class="st">LISTENING</span>，但 floor 标为"等用户回答"——系统因此知道该追问而不是干等。没有 floor 就得为此多造状态。
+        </div>
+      </div>
+    </div>
+  </div>
+  <span class="pageno">4 / 15</span>
+</section>
+
+<!-- ═══════════ P5 三条原则 ═══════════ -->
+<section class="slide">
+  <div class="header">
+    <h1>三条设计原则：让状态机<span class="hl">小、可验证、可扩展</span></h1>
+    <p class="subtitle">原则的用处是在加功能时<strong>拒绝新状态</strong>——三条原则各挡住一类最常见的膨胀来源</p>
+  </div>
+  <div class="cards" style="grid-template-columns: 1fr 1fr 1fr;">
+    <div class="card" style="display:flex; flex-direction:column;">
+      <h3><span class="no">原则一</span>状态以用户耳朵听到的为准</h3>
+      <p style="flex:1;"><span class="st">SPEAKING</span> 从<strong>第一帧音频进入播放通道</strong>开始算，不是从模型开始生成算。字幕跟播放进度走。被打断后，对话历史截断到用户<strong>实际听到的那一毫秒</strong>，未播出的内容不进历史。</p>
+      <ul style="margin-top:.4em;">
+        <li>挡住的膨胀：不再需要"生成中""缓冲中"这类系统内部忙闲态。</li>
+        <li>实践验证：LiveKit Agents × OpenAI Realtime 就是按播放毫秒数截断；锚在生成进度上会让字幕和截断全部错位。</li>
+      </ul>
+    </div>
+    <div class="card" style="display:flex; flex-direction:column;">
+      <h3><span class="no">原则二</span>时延是计时器，不是状态</h3>
+      <p style="flex:1;">无论在生成、调工具还是等大模型，都只是 <span class="st">PREPARING</span> 或 <span class="st">HOLDING</span> <strong>变长了</strong>。状态内部用三个阈值切分体验：<strong>T0 ≈ 0.5 秒</strong>静默无感 · <strong>T1 ≈ 1.5 秒</strong>出垫话（"嗯，我看一下"）· <strong>T2 ≈ 8 秒</strong>道歉兜底。</p>
+      <ul style="margin-top:.4em;">
+        <li>挡住的膨胀：不再需要"思考中""等待工具""委托中"等状态。</li>
+        <li>阈值按状态分别配置（备答与持轮等待的垫话目标不同），上线后按打断率和放弃率调。</li>
+      </ul>
+    </div>
+    <div class="card" style="display:flex; flex-direction:column;">
+      <h3><span class="no">原则三</span>工具与委托不新增状态</h3>
+      <p style="flex:1;">交互层只关心两件事：<strong>话轮在谁手上</strong>、<strong>用户耳朵里是什么</strong>。工具运行中，没出过声就是 <span class="st">PREPARING</span>，宣告过就是 <span class="st">HOLDING</span>。工具的开始 / 完成 / 失败是<strong>事件</strong>，不是节点。委托大模型与工具同构，只多一步：结果由全双工模型<strong>代言播出</strong>。</p>
+      <ul style="margin-top:.4em;">
+        <li>挡住的膨胀：以后加检索、设备控制、任意异步动作，节点数不变。</li>
+        <li>与 GPT‑Live 分工一致：语音模型管"说不说"，应用服务器管委托、分轮、持久化。</li>
+      </ul>
+    </div>
+  </div>
+  <div class="callout danger" style="margin-top:.6em;">
+    <b>三条原则底下的同一条分类规则：</b>只有<b>交互态</b>（稳定、UI 可渲染）画成节点；<b>判定窗口</b>（短暂、带计时器、结论出来就坍缩）画在边上；<b>决策事件</b>（瞬时）是边的标签。绝大多数状态图失控，都是把窗口和事件画成了节点——"打断判定中""端点等待中"一旦成为节点，每个还要定义自己的超时出边，图就不可维护了。
+  </div>
+  <span class="pageno">5 / 15</span>
+</section>
+
+<!-- ═══════════ P6 一轮对话五段 ═══════════ -->
+<section class="slide">
+  <div class="header">
+    <h1>一轮对话的五段：<span class="hl">场景从时间线推导</span>，不是拍脑袋列</h1>
+    <p class="subtitle">每段有一个核心考点；场景里"系统必须在此刻做一个判定"的点才产生状态需求</p>
+  </div>
+  <div class="phases" style="flex:1;">
+    <div class="phase ab"><div class="letter">A</div><h3>静默期与会话边界</h3><p>会话建立、双方静默、长静默离开、系统主动发起、会话结束与断线重连。</p><p class="q">考点：什么时候该开口，什么时候该保持安静。</p><p style="margin-top:.35em;">涉及：<span class="st">INITIALIZING</span> / <span class="st">IDLE</span> / <span class="st">INTERJECTING</span></p><p><span class="mono">A1–A5</span> · 5 个</p></div>
+    <div class="phase ab"><div class="letter">B</div><h3>用户输入期</h3><p>起音确认、系统附和、停顿 vs 说完、端点确认、拒识、超长说话、多人在场、禁言。</p><p class="q">考点：<b>停顿不等于说完</b>，绝不在换气处抢话。</p><p style="margin-top:.35em;">涉及：<span class="st">LISTENING</span> 常驻；用户侧 <span class="st">PAUSED</span>；起音窗、端点窗</p><p><span class="mono">B1–B8</span> · 8 个</p></div>
+    <div class="phase c"><div class="letter">C</div><h3>响应准备期</h3><p>从用户最后一个字到系统首帧出声：快路径、慢生成、先调工具、委托大模型、用户又开口、超时、预提交。</p><p class="q">考点：沉默别太久，超时要垫好。</p><p style="margin-top:.35em;">涉及：<span class="st">PREPARING</span> + T0/T1/T2 三档</p><p><span class="mono">C1–C7</span> · 7 个</p></div>
+    <div class="phase d"><div class="letter">D</div><h3>系统输出期</h3><p>字幕同步、用户附和、真打断、假打断、边说边调、宣告后等待、等待中用户开口、等待超时、说完去向、缺参数追问。</p><p class="q">考点：<b>分清真打断和"嗯嗯"</b>。</p><p style="margin-top:.35em;">涉及：<span class="st">SPEAKING</span> / <span class="st">HOLDING</span> / <span class="st">YIELDING</span>；打断判定窗</p><p><span class="mono">D1–D10</span> · 10 个</p></div>
+    <div class="phase x"><div class="letter">X</div><h3>贯穿性并发</h3><p>双方同时开口、外部事件在说话中到达、系统需要打断用户（告警）、非语音并行输入。</p><p class="q">考点：碰撞与外部事件的处置。</p><p style="margin-top:.35em;">涉及：floor = contested；<span class="st">INTERJECTING</span> 放行策略</p><p><span class="mono">X1–X4</span> · 4 个</p></div>
+  </div>
+  <div class="callout" style="margin-top:.6em;">
+    <b>共 34 个场景，分三级：</b><span class="pri pri0">P0</span><b>9 个必做</b>——没有它们就不是一个能用的语音助手 · <span class="pri pri1">P1</span><b>15 个体验分水岭</b>——把全双工和"对讲机式"半双工区分开 · <span class="pri pri2">P2</span><b>10 个有意暂缓</b>——依赖尚不成熟的模型能力，或低频。下面三页逐条列出，每条带例子、<b>状态轨迹</b>（用状态英文名，含义见第 4 页）和涉及的窗口 / 事件。
+  </div>
+  <span class="pageno">6 / 15</span>
+</section>
+
+<!-- ═══════════ P7 P0 ═══════════ -->
+<section class="slide">
+  <div class="header">
+    <h1><span class="pri pri0" style="font-size:.6em; vertical-align:middle;">P0</span> 九个必做场景：<span class="hl">最小可用闭环</span></h1>
+    <p class="subtitle">其中两个是<strong>命门</strong>（红底）：一个是抢话的代价，一个是被叫停却不停的代价——这两个做砸了，其他都白搭</p>
+  </div>
+  <div class="panel" style="flex:1;">
+    <table style="font-size:.84em;">
+      <tr><th style="width:5%;">编号</th><th style="width:36%;">场景与具体例子</th><th style="width:36%;">状态轨迹</th><th>窗口 / 事件</th></tr>
+      <tr><td><strong>A1</strong></td><td><strong>会话建立。</strong>戴上耳机 1 秒内听到"我在"；预热期间用户先说的半句话进缓冲，不丢。</td><td class="tr">INITIALIZING ─session_ready→ LISTENING</td><td class="mono" style="font-size:.9em;">session_open / ready</td></tr>
+      <tr><td><strong>A2</strong></td><td><strong>双方静默。</strong>开场后 5 秒没人说话，系统保持安静，不催促。</td><td class="tr">IDLE（floor = open，无输入不转移）</td><td>—</td></tr>
+      <tr><td><strong>B1</strong></td><td><strong>起音确认。</strong>0.3 秒的咳嗽不算开口；"哎对了…"约 200 毫秒内确认——这里同时发出<strong>外挂 ASR 启动信号</strong>。</td><td class="tr"><u>用户 SILENT</u> <i>[起音确认窗]</i> → <u>用户 SPEAKING</u>；系统 LISTENING 不变</td><td class="mono" style="font-size:.9em;">asr_prearm → asr_start / asr_cancel</td></tr>
+      <tr class="key"><td><strong>B3</strong></td><td><strong>停顿 ≠ 说完。</strong>"帮我订一张…（停 1.2 秒想日期）…周五去上海的高铁票"。换气处绝不能抢答。判据是<strong>静音时长 与 语义完整性 同时满足</strong>。</td><td class="tr"><u>用户 SPEAKING</u> <i>[端点窗：不坍缩]</i> <u>用户 PAUSED</u> ─再开口→ <u>用户 SPEAKING</u>；系统全程 LISTENING</td><td>端点窗 = VAD 后沿 + 语义判定</td></tr>
+      <tr><td><strong>B4</strong></td><td><strong>端点确认。</strong>说完后静音 600 毫秒且语义完整 → 话轮交给系统。</td><td class="tr"><u>用户 PAUSED/SPEAKING</u> ─committed→ <u>用户 SILENT</u>；LISTENING ─respond→ PREPARING</td><td class="mono" style="font-size:.9em;">committed + asr_stop</td></tr>
+      <tr><td><strong>C1</strong></td><td><strong>快路径。</strong>"现在几点？"→ 0.4 秒内"十点二十"；中间的处理用户完全无感。</td><td class="tr">LISTENING → PREPARING（≤T0 静默）─playout_started→ SPEAKING</td><td>T0 内出首帧</td></tr>
+      <tr><td><strong>D1</strong></td><td><strong>字幕跟播放。</strong>播报行程时，屏幕文字跟随<strong>实际已播放</strong>的内容，不是跟随已生成的内容。</td><td class="tr">SPEAKING（字幕、打断对账全部锚定播放时间戳）</td><td class="mono" style="font-size:.9em;">playout_started / delta / done</td></tr>
+      <tr class="key"><td><strong>D3</strong></td><td><strong>真打断。</strong>读新闻读到一半，用户"停停停，换国际的"→ <strong>300 毫秒</strong>内闭嘴，历史里只保留用户真听到的那半句。</td><td class="tr">SPEAKING <i>[打断判定窗：真打断]</i> ─interrupt→ YIELDING ─停播+truncate→ LISTENING → PREPARING → SPEAKING</td><td>stop latency ≤ 300 ms；truncate 到播放位置</td></tr>
+      <tr><td><strong>D9</strong></td><td><strong>提问后持有。</strong>"你要哪天出发？"说完不释放话轮，标记为"等用户回答"。</td><td class="tr">SPEAKING ─playout_done→ LISTENING（floor = agent‑expecting‑user）</td><td>释放 vs 等答由 floor 表达</td></tr>
+    </table>
+    <div class="callout danger" style="margin-top:.55em;">
+      <b>轨迹记法：</b>大写英文 = 系统侧状态；<u style="text-decoration:none; color:var(--purple);">紫色</u> = 用户侧状态；<i style="color:var(--warn);">[方括号]</i> = 判定窗口；箭头上的字 = 驱动转换的事件。B3 与 D3 合起来就是全双工的两条底线：<b>不抢用户的话，听到"停"就真的停</b>。
+    </div>
+  </div>
+  <span class="pageno">7 / 15</span>
+</section>
+
+<!-- ═══════════ P8 P1 ═══════════ -->
+<section class="slide">
+  <div class="header">
+    <h1><span class="pri pri1" style="font-size:.6em; vertical-align:middle;">P1</span> 十五个体验分水岭场景：<span class="hl">像人，而不是像对讲机</span></h1>
+    <p class="subtitle">这一级集中了全双工的核心价值：<strong>等待时有人在、被打断时优雅、说错了能改、别人的话不上钩</strong></p>
+  </div>
+  <div class="panel" style="flex:1;">
+    <table style="font-size:.79em;">
+      <tr><th style="width:4%;">编号</th><th style="width:37%;">场景与具体例子</th><th style="width:38%;">状态轨迹</th><th>窗口 / 事件</th></tr>
+      <tr><td><strong>A5</strong></td><td><strong>收尾与重连。</strong>"就这样，拜拜"→ 系统收尾；蓝牙断开重连后上下文还在。</td><td class="tr">SPEAKING（收尾）─close→ 会话止；重连 INITIALIZING（状态重建）→ LISTENING</td><td class="mono" style="font-size:.9em;">session close / error</td></tr>
+      <tr><td><strong>B5</strong></td><td><strong>别人的话不上钩。</strong>旁边同事对用户说"中午吃什么"→ 判定非对我说，保持安静，记一条 defer 日志。</td><td class="tr">LISTENING ─reject / defer→ LISTENING（交互态不变）</td><td>拒识三分 respond / reject / defer</td></tr>
+      <tr><td><strong>B8</strong></td><td><strong>显式禁言。</strong>"你先别说，听我说完"→ 禁言；"好了你说吧"→ 解除。</td><td class="tr">任意态 ─禁言→ MUTED ─解除→ LISTENING</td><td class="mono" style="font-size:.9em;">mute / unmute</td></tr>
+      <tr><td><strong>C2</strong></td><td><strong>慢回答垫话。</strong>"把这段翻成英文"1.5 秒还没出首帧 → 先"嗯…"垫一下，再出译文。</td><td class="tr">PREPARING ─T1→ SPEAKING（垫话）→ HOLDING → SPEAKING（译文）</td><td>T1 超时 → 垫话；决策 3</td></tr>
+      <tr><td><strong>C3</strong></td><td><strong>先查再答。</strong>"明天北京天气？"→ 静默调天气 API 0.8 秒 →"明天晴，3 到 12 度"。</td><td class="tr">PREPARING <s>(invoke_tool → tool_done)</s> ─playout_started→ SPEAKING</td><td class="mono" style="font-size:.9em;">tool_started / done / failed</td></tr>
+      <tr><td><strong>C4</strong></td><td><strong>委托大模型。</strong>"帮我规划三天成都行程"→"好，我好好想想哈"→ 大模型跑 6 秒 → 结果回灌，由小模型代言播出。</td><td class="tr">PREPARING <s>(escalate)</s> ─T1→ SPEAKING（宣告）→ HOLDING ─result→ SPEAKING（代言）</td><td class="mono" style="font-size:.9em;">escalation_started / done</td></tr>
+      <tr><td><strong>C5</strong></td><td><strong>备答中改口。</strong>"查下天气"刚说完又补"哦对，是后天的"→ 合并重新生成，旧答案服务端丢弃。</td><td class="tr">PREPARING ─<u>用户再开口</u>→ LISTENING（合并）─committed→ PREPARING</td><td>合并 / 丢弃 / 保留三策略</td></tr>
+      <tr><td><strong>C6</strong></td><td><strong>准备超时兜底。</strong>查询 8 秒无结果 →"这个查得有点慢，出来我马上告诉你"，转为异步任务。</td><td class="tr">PREPARING ─T2→ SPEAKING（兜底话术）→ LISTENING（后续经 INTERJECTING 回报）</td><td>T2 超时</td></tr>
+      <tr><td><strong>D2</strong></td><td><strong>用户附和不让出。</strong>介绍方案时用户"嗯嗯 / 对 / 好的"→ 系统不停顿继续说。</td><td class="tr">SPEAKING <i>[打断判定窗：附和]</i> → SPEAKING（自环）</td><td>floor 不变，不开新轮</td></tr>
+      <tr><td><strong>D4</strong></td><td><strong>假打断。</strong>说话中背景"砰"一声 → 暂停 0.5 秒，无有效转写 → 从暂停处续播。</td><td class="tr">SPEAKING <i>[暂停待判窗]</i> YIELDING（暂停）─超时 resume→ SPEAKING</td><td>暂停待判窗</td></tr>
+      <tr><td><strong>D6</strong></td><td><strong>"我查一下哈"。</strong>说完去调 API，等 2 秒 →"查到了，周五有三趟…"——话轮始终没让出。</td><td class="tr">SPEAKING（宣告）→ HOLDING ─tool_done→ SPEAKING</td><td>决策 1：续说时延归属</td></tr>
+      <tr><td><strong>D7</strong></td><td><strong>等待中被叫停。</strong>等结果时用户"算了，不用查了"→ 取消工具，"好的那不查了"。</td><td class="tr">HOLDING ─<u>用户开口</u>∧判取消→ tool_cancel → SPEAKING（确认）→ LISTENING</td><td>取消 / 催促 / 无关三分</td></tr>
+      <tr><td><strong>D8</strong></td><td><strong>等待超时。</strong>等待超过 8 秒 →"还在查，稍等我一下"，或降级放弃。</td><td class="tr">HOLDING ─T2→ SPEAKING（道歉 / 降级）→ LISTENING 或续 HOLDING</td><td>T2 超时（持轮等待档）</td></tr>
+      <tr><td><strong>D10</strong></td><td><strong>缺参数追问。</strong>"帮我订高铁票"→"要几点出发的？"→ 等 15 秒没回应，再问一次或放弃。</td><td class="tr">SPEAKING（追问）→ LISTENING（expecting，计时）─超时→ SPEAKING（再问）/ 释放</td><td>D9 特例</td></tr>
+      <tr><td><strong>X1</strong></td><td><strong>同时开口。</strong>系统刚要开口，用户也开口 → 系统立刻让，用户优先。</td><td class="tr">PREPARING ─<u>用户起音</u>→ floor = contested ─让步→ LISTENING</td><td>让步策略可配</td></tr>
+    </table>
+  </div>
+  <span class="pageno">8 / 15</span>
+</section>
+
+<!-- ═══════════ P9 P2 + 覆盖检查 ═══════════ -->
+<section class="slide">
+  <div class="header">
+    <h1><span class="pri pri2" style="font-size:.6em; vertical-align:middle;">P2</span> 十个有意暂缓的场景 + <span class="hl">双向覆盖检查</span></h1>
+    <p class="subtitle">暂缓只有两个理由：<strong>业界目前做不好</strong>，或<strong>低频</strong>。暂缓是决策，不是遗漏</p>
+  </div>
+  <div class="cols">
+    <div class="col" style="flex:1.5;">
+      <div class="panel" style="flex:1;">
+        <table style="font-size:.8em;">
+          <tr><th style="width:5%;">编号</th><th style="width:38%;">场景与具体例子</th><th style="width:33%;">状态轨迹</th><th>暂缓理由</th></tr>
+          <tr><td><strong>B2</strong></td><td><strong>系统主动附和。</strong>用户讲了 20 秒需求，系统在语义边界轻声"嗯，明白"，不抢话。</td><td class="tr">LISTENING ─附和时机→ BACKCHANNEL → LISTENING</td><td class="bad">Instruct‑FD 实测业界遵循率 0–50%，全行业最弱</td></tr>
+          <tr><td><strong>B7</strong></td><td><strong>多人在场。</strong>车内两人聊天夹杂指令，判不准时问"是在跟我说吗？"</td><td class="tr">LISTENING ─指向不明→ REPAIR → LISTENING</td><td class="bad">依赖外挂 ASR 与声纹</td></tr>
+          <tr><td><strong>D5</strong></td><td><strong>边说边调。</strong>"我先给你念着新闻，同时帮你查着路况"——说话与工具调用并行。</td><td class="tr">SPEAKING <s>(+invoke_tool 同帧)</s> → HOLDING ─tool_done→ SPEAKING</td><td class="bad">依赖模型能力 R1（同帧双流）</td></tr>
+          <tr><td><strong>C7</strong></td><td><strong>预提交。</strong>用户停顿 1.2 秒时后台已预生成答案，committed 后即刻出声，负时延。</td><td class="tr"><u>用户 PAUSED</u> 期间 LISTENING（后台预生成不出声）─committed→ PREPARING（≈0）→ SPEAKING</td><td class="bad">先把 B3 做稳，否则预生成会抢话</td></tr>
+          <tr><td><strong>A3</strong></td><td><strong>离开与关怀。</strong>静默 15 秒 → 用户离开；再 30 秒轻声"还在吗？"</td><td class="tr">IDLE + <u>用户 AWAY</u> ─关怀策略→ INTERJECTING → SPEAKING → LISTENING</td><td class="mid">低频</td></tr>
+          <tr><td><strong>A4</strong></td><td><strong>系统主动发起。</strong>19:00 提醒触发："到点了，该给妈妈回电话了"。</td><td class="tr">IDLE ─外部事件∧放行→ INTERJECTING → SPEAKING → LISTENING</td><td class="mid">低频；须经打扰管理</td></tr>
+          <tr><td><strong>B6</strong></td><td><strong>超长说话。</strong>连续说 60 秒无端点 → 强制分段，增量理解，防上下文与 ASR 溢出。</td><td class="tr"><u>用户 SPEAKING</u> 持续；LISTENING + 周期性 segment_split</td><td class="mid">低频</td></tr>
+          <tr><td><strong>X2</strong></td><td><strong>外部事件在说话中到达。</strong>导航播报中提醒到 → 等当前句播完再插入。</td><td class="tr">SPEAKING × 外部事件 ─speak_at_pause→ 句边界 INTERJECTING → SPEAKING</td><td class="mid">低频</td></tr>
+          <tr><td><strong>X3</strong></td><td><strong>系统打断用户。</strong>用户在说话但煤气报警 → 硬插话。</td><td class="tr">LISTENING（<u>用户 SPEAKING</u>）─speak_now 放行→ INTERJECTING → SPEAKING</td><td class="mid">默认禁用，仅告警</td></tr>
+          <tr><td><strong>X4</strong></td><td><strong>非语音并行输入。</strong>语音对话中用户在屏幕点了"取消"→ 不破坏 floor 语义。</td><td class="tr">任意态 × GUI 事件（本版不展开）</td><td class="mid">低频</td></tr>
+        </table>
+      </div>
+    </div>
+    <div class="col" style="flex:.8;">
+      <div class="panel" style="flex:1;">
+        <h2><span class="tag green">状态 → 场景</span>无孤儿状态</h2>
+        <table style="font-size:.8em;">
+          <tr><td class="st">LISTENING</td><td>B1–B8 常驻、C5、C6、D3、D7–D10、X1</td></tr>
+          <tr><td class="st">PREPARING</td><td>B4、C1–C7、D3、X1</td></tr>
+          <tr><td class="st">SPEAKING</td><td>C1–C6、D1–D10、A3/A4、X2/X3</td></tr>
+          <tr><td class="st">HOLDING</td><td>C2、C4、D5、D6、D7、D8</td></tr>
+          <tr><td class="st">BACKCHANNEL</td><td>B2</td></tr>
+          <tr><td class="st">YIELDING</td><td>D3、D4</td></tr>
+          <tr><td class="st">INTERJECTING</td><td>A3、A4、C6、X2、X3</td></tr>
+          <tr><td class="st">MUTED / REPAIR</td><td>B8 / B7</td></tr>
+          <tr><td class="st">INITIALIZING / IDLE</td><td>A1、A5 / A2、A3</td></tr>
+          <tr><td>起音窗 / 端点窗</td><td>B1、X1 / B3、B4、C7</td></tr>
+          <tr><td>打断判定窗 / 暂停待判窗</td><td>D2、D3、D4 / D4</td></tr>
+        </table>
+        <div class="callout green" style="margin-top:.5em; font-size:.84em;">
+          <b>双向结论：</b>34 个场景全部可用 11 系统态 + 4 用户态 + 4 窗口 + 事件 + floor 表达，<b>不需要新增状态</b>；每个状态都至少被一个场景使用，<b>没有孤儿状态</b>。<span class="st">BACKCHANNEL</span> / <span class="st">MUTED</span> / <span class="st">REPAIR</span> 各只有一个场景支撑，是决策 2 的讨论对象。
+        </div>
+      </div>
+    </div>
+  </div>
+  <span class="pageno">9 / 15</span>
+</section>
+
+<!-- ═══════════ P10 打断三分 ═══════════ -->
+<section class="slide">
+  <div class="header">
+    <h1>最难的判定：<span class="hl">打断三分</span>——用户在系统说话时出声了</h1>
+    <p class="subtitle">一个判定窗、<strong>三种出口</strong>；同一个窗口的阈值决定产品性格，<strong>没有全局最优</strong>，必须做成可配置策略</p>
+  </div>
+  <div class="cols">
+    <div class="col" style="flex:1.1;">
+      <div class="panel" style="flex:1;">
+        <h2><span class="tag warn">打断判定窗</span>在 <span class="st">SPEAKING</span> 中收到 speech_started</h2>
+        <div class="cards" style="grid-template-columns: 1fr; gap:.5em;">
+          <div class="card" style="border-left:5px solid var(--danger);"><h3>真打断 → <span class="st">YIELDING<i>（让出）</i></span></h3><p>"停，换国际的"——含新意图。停播 ≤ 300 毫秒，历史截断到已听到的位置，开新一轮。<strong>指标：stop latency</strong>（重叠开始 → 系统停嘴），目标 ≤ 300 ms。</p></div>
+          <div class="card" style="border-left:5px solid var(--accent2);"><h3>附和 → <span class="st">SPEAKING</span> 自环，继续说</h3><p>"嗯嗯 / 对 / 好的"——短、无新意图。话轮不变、不开新轮、播放不中断。<strong>指标：误让出率</strong>（把附和当打断的比例），目标接近 0。</p></div>
+          <div class="card" style="border-left:5px solid var(--warn);"><h3>噪声 / 不是对我说 → 暂停待判 → 恢复</h3><p>"砰"一声、背景人声、屋里另一个人。暂停最多 0.5 秒，无有效转写则从暂停处续播。<strong>指标：response latency</strong>（重叠结束 → 系统再开口）与<strong>误接管率</strong>（对旁人说话也停下来的比例）。</p></div>
+        </div>
+      </div>
+    </div>
+    <div class="col" style="flex:.95;">
+      <div class="panel">
+        <h2><span class="tag">策略取向是参数</span>两种性格</h2>
+        <table style="font-size:.85em;">
+          <tr><th></th><th>快让出（repair‑first）</th><th>重连贯（continuity‑first）</th></tr>
+          <tr><td><strong>倾向</strong></td><td>快速让出，容忍一些误接管</td><td>坚持说完，容忍让出慢一点</td></tr>
+          <tr><td><strong>适合</strong></td><td>客服、任务执行</td><td>陪伴、辅导、朗读</td></tr>
+          <tr><td><strong>业界样本</strong></td><td>GPT‑4o Realtime：真打断响应 0.78，但对旁人说话也响应 0.91</td><td>Gemini Live / Sonic：恢复率高，打断响应低</td></tr>
+          <tr><td><strong>窗口参数</strong></td><td>判定窗短、置信阈值低</td><td>判定窗长、置信阈值高</td></tr>
+        </table>
+        <p style="margin-top:.45em; font-size:.85em;">Full‑Duplex‑Bench v1.5：<strong>没有一种策略在四种重叠场景全优</strong>。因此判定窗阈值必须做成策略 profile，按产品线配置。</p>
+      </div>
+      <div class="callout danger">
+        <b>业界现状：</b>GPT‑Live 把这个判定放进模型内部（Agora 实测：让出慢约 500 毫秒，但 30 次背景人声 30 次拒绝）。第二代 API（OpenAI / Qwen Realtime）默认把任何用户出声都当打断，除非另配。我们的设计把判定<b>显式化在窗口层</b>，产地可以先是系统启发式，日后迁移到模型控制输出，协议不变。
+      </div>
+    </div>
+  </div>
+  <span class="pageno">10 / 15</span>
+</section>
+
+<!-- ═══════════ P11 时延、工具与委托 ═══════════ -->
+<section class="slide">
+  <div class="header">
+    <h1>时延、工具与委托的容器：<span class="hl">PREPARING（备答）/ HOLDING（持轮等待）</span></h1>
+    <p class="subtitle">两个等待态，<strong>一个在出声前、一个在出声后</strong>；所有异步动作都以事件形式住在它们里面</p>
+  </div>
+  <div class="cols">
+    <div class="col" style="flex:1.2;">
+      <div class="panel">
+        <h2><span class="tag green">时延三档</span>从用户最后一个字到系统首帧</h2>
+        <div class="tiers">
+          <div class="tier t0"><strong>≤ T0（约 0.5 秒）</strong><span>静默，用户无感。快路径 C1。</span></div>
+          <div class="tier t1"><strong>&gt; T1（约 1.5 秒）</strong><span>出垫话："嗯，我看一下…"（C2 / C3 / C4）。</span></div>
+          <div class="tier t2"><strong>&gt; T2（约 8 秒）</strong><span>兜底：道歉、降级，或转异步任务（C6 / D8）。</span></div>
+          <div class="tier tp"><strong>playout_started</strong><span>首帧 → <span class="st">SPEAKING</span></span></div>
+        </div>
+        <table style="font-size:.83em;">
+          <tr><th></th><th><span class="st">PREPARING<i>（备答）</i></span></th><th><span class="st">HOLDING<i>（持轮等待）</i></span></th></tr>
+          <tr><td><strong>定义</strong></td><td>话轮已接，<strong>还没出声</strong></td><td><strong>出过声</strong>，仍持话轮，等待中</td></tr>
+          <tr><td><strong>典型</strong></td><td>生成中；先调工具；委托大模型</td><td>"我查一下"之后等结果；轮内停顿</td></tr>
+          <tr><td><strong>垫话目标</strong></td><td>打破沉默（从静默到开口）</td><td>维持在场感（别像掉线）</td></tr>
+          <tr><td><strong>建议阈值</strong></td><td>T0 0.5 s / T1 1.5 s / T2 8 s</td><td>T1 2.0 s / T2 8 s（已出过声，容忍略长）</td></tr>
+          <tr><td><strong>T1 话术示例</strong></td><td>"嗯，我看一下" / "稍等" / 背景提示音</td><td>"还在查" / "快了" / 轻微呼吸音</td></tr>
+          <tr><td><strong>T2 话术示例</strong></td><td>"这个我需要多点时间，出来马上告诉你"</td><td>"还没查到，要不先聊别的，好了我插进来说"</td></tr>
+          <tr><td><strong>用户此时开口</strong></td><td>C5：合并 / 丢弃 / 保留</td><td>D7：取消 / 催促 / 无关</td></tr>
+        </table>
+      </div>
+    </div>
+    <div class="col" style="flex:.85;">
+      <div class="panel" style="flex:1;">
+        <h2><span class="tag warn">工具与委托</span>是事件，不是状态</h2>
+        <ul>
+          <li><span class="mono">invoke_tool</span>（kind = tool / escalate）→ <span class="mono">tool_done</span> / <span class="mono">tool_failed</span> 驱动 <span class="st">PREPARING</span> 或 <span class="st">HOLDING</span> 的进出，本身从不改变交互态。</li>
+          <li><strong>委托大模型</strong>与工具结构相同，只多一步：大模型的文本结果由全双工模型<strong>代言播出</strong>。大模型对交互层完全透明。</li>
+          <li>所有"宣告 → 等 → 续说"的情形——垫话 C2、委托 C4、边说边调 D5、"我查一下"D6——全部收敛为<strong>同一个模式</strong>：<span class="st">SPEAKING</span> → <span class="st">HOLDING</span> → <span class="st">SPEAKING</span>。</li>
+          <li>C6 / D8 超时转异步后，结果回来经 <span class="st">INTERJECTING</span> 回报，走打扰管理——与 phone‑assistant 的长时异步任务同一条路。</li>
+        </ul>
+        <div class="callout green" style="margin-top:.5em;">
+          <b>与 GPT‑Live 分工一致：</b>语音模型决定"说不说"；应用服务器负责委托、分轮、持久化——正是我们双脑架构的接口划分。Agora 实测 GPT‑Live 的"应答起点 / 实质起点 / 完成"三时钟，对应到这里就是 T1 垫话、代言首帧、播完三个事件。
+        </div>
+      </div>
+    </div>
+  </div>
+  <span class="pageno">11 / 15</span>
+</section>
+
+<!-- ═══════════ P12 四层协议 ═══════════ -->
+<section class="slide">
+  <div class="header">
+    <h1>四层协议与控制面词表：<span class="hl">信号源 → 判定窗口 → 事件 → 交互状态</span></h1>
+    <p class="subtitle">每层只依赖下层；状态是事件的<strong>只读投影</strong>，由编排层单点写入</p>
+  </div>
+  <div class="cols">
+    <div class="col" style="flex:1.3;">
+      <div class="panel" style="flex:1; gap:.3em;">
+        <div class="band l4"><strong>④ 交互状态层</strong> —— 系统 11 态、用户 4 态、floor。编排层单写者；UI 和产品文档只读。</div>
+        <div class="down">↑ 纯函数推导（验收标准）</div>
+        <div class="band l3"><strong>③ 事件层 = 控制面词表</strong><br><b>感知：</b><span class="mono">speech_started</span>（prearm / confirmed）· <span class="mono">speech_stopped</span> · <span class="mono">speech_cancelled</span> · <span class="mono">playout_started</span> · <span class="mono">playout_done</span> · <span class="mono">tool_done / failed</span> · <span class="mono">away</span> · <span class="mono">session close / error</span><br><b>决策：</b><span class="mono">committed</span> · respond / reject / defer · <span class="mono">invoke_tool</span> · interrupt / pause / resume · backchannel · filler（T1）· timeout（T2）· floor 转移<br><b>外发：</b><span class="mono">asr_prearm / asr_start / asr_stop / asr_cancel</span></div>
+        <div class="down">↑ 窗口坍缩产出事件</div>
+        <div class="band l2"><strong>② 判定窗口层</strong> —— <span class="chip win">起音确认窗</span> <span class="chip win">端点窗（VAD 后沿 + 语义）</span> <span class="chip win">打断判定窗</span> <span class="chip win">暂停待判窗</span> + T0/T1/T2 时延分段。编排层的计时器与判定器。</div>
+        <div class="down">↑ 原始信号进窗</div>
+        <div class="band l1"><strong>① 信号源层</strong> —— 端侧 VAD 能量 · 模型控制流 token（轮次 / 意图头）· 播放回调（首帧 / 播完）· 工具与大模型回调 · 外部事件（提醒、告警）。</div>
+      </div>
+    </div>
+    <div class="col" style="flex:.9;">
+      <div class="panel">
+        <h2><span class="tag purple">产地决策</span>每层信号谁来产</h2>
+        <table style="font-size:.82em;">
+          <tr><th>路线</th><th>做法</th><th>评价</th></tr>
+          <tr><td><strong>系统合成</strong></td><td>VAD + 播放事件 + 启发式（GPT‑Realtime / LiveKit 现状）</td><td>不动模型；但附和、持轮意图<strong>从外面猜不准</strong></td></tr>
+          <tr><td><strong>模型原生</strong></td><td>控制 token 作训练目标（SALMONN‑omni、BayLing 四 token）</td><td>正解；但业界只覆盖 listen / speak 二元</td></tr>
+          <tr><td><strong>混合（推荐）</strong></td><td>物理事实系统产（出声、播放位置）；意图类模型产（floor、附和、升级）</td><td>协议在③层合并，产地可渐进迁移</td></tr>
+        </table>
+      </div>
+      <div class="panel" style="flex:1;">
+        <h2><span class="tag warn">外挂 ASR 外部标识</span>新需求</h2>
+        <p>系统对外发出信号启动外挂 ASR（另有其他用途）。信号<strong>挂在判定窗口的进出沿上</strong>——这正是第②层必须显式建模的证明。</p>
+        <table style="font-size:.82em; margin:.4em 0;">
+          <tr><td class="mono">asr_prearm</td><td>疑似起音 → ASR 预热建流，吃掉启动延迟</td></tr>
+          <tr><td class="mono">asr_start</td><td>起音确认 → <span class="mono">segment_id</span> + 时间戳<strong>回溯到起音点</strong></td></tr>
+          <tr><td class="mono">asr_stop</td><td>端点确认（committed）→ 终止时间戳</td></tr>
+          <tr><td class="mono">asr_cancel</td><td>确认窗判为误报 → 回收 prearm</td></tr>
+        </table>
+        <p style="font-size:.84em;"><b>泛化</b>为 segment 级协处理触发：载荷 = segment_id + 时间窗 + 音频路由；ASR 是第一个订阅者，拒识复核、合规记录、热词检测复用同一组信号。产地日后从系统 VAD 换成模型 token，<b>协议不变</b>。</p>
+      </div>
+    </div>
+  </div>
+  <span class="pageno">12 / 15</span>
+</section>
+
+<!-- ═══════════ P13 与外部词表对比 ═══════════ -->
+<section class="slide">
+  <div class="header">
+    <h1>与外部提供词表的<span class="hl">逐项详细对比</span></h1>
+    <p class="subtitle">外部 7 项与 OpenAI Realtime 控制面几乎一一对应——是一份<strong>可用的事件层骨架</strong>，但只有一层</p>
+  </div>
+  <div class="panel" style="flex:1;">
+    <table style="font-size:.82em;">
+      <tr><th style="width:11%;">外部条目</th><th style="width:12%;">外部原定义</th><th style="width:9%;">裁定</th><th>我们的处理与理由</th><th style="width:9%;">场景</th></tr>
+      <tr><td class="mono">speech_started</td><td>感知用户开口</td><td class="ok">保留 ✓</td><td>感知事件。<strong>拆成两段 prearm（疑似）+ confirmed（确认）</strong>，让外挂 ASR 与打断判定能提前动作；补 <span class="mono">speech_cancelled</span> 回收误报。</td><td>B1</td></tr>
+      <tr><td class="mono">speech_stopped</td><td>感知用户说完</td><td class="mid">保留，改义</td><td>感知事件 = VAD 后沿。<strong>它不等于"说完"</strong>——它与 <span class="mono">committed</span> 之间的差正是"停顿 vs 说完"，是用户侧 <span class="st">PAUSED<i>（持轮停顿）</i></span> 的依据。</td><td>B3</td></tr>
+      <tr><td class="mono">committed</td><td>语义完整</td><td class="ok">保留 ✓</td><td>决策事件 = 端点确认 + 话轮释放。载荷应带<strong>端点置信度</strong>，以支持预提交（C7）。</td><td>B4</td></tr>
+      <tr><td class="mono">listen</td><td>本轮说完</td><td class="bad">错位 ✗</td><td>这是<strong>状态，不是事件</strong>。改为感知事件 <span class="mono">playout_done</span> + 状态 <span class="st">LISTENING<i>（聆听）</i></span>。"本轮说完"还要区分<em>释放</em>与<em>提问等答</em>——那是 floor 变量。</td><td>D9</td></tr>
+      <tr><td class="mono">speak</td><td>决定响应 / 回复</td><td class="mid">保留，拆分</td><td>决策事件，但要<strong>三分：respond / reject / defer</strong>。拒识必须显式（日志、外挂 ASR 复核都要用）。载荷带 expect_reply 写 floor。</td><td>B5 / C</td></tr>
+      <tr><td class="mono">invoke_tool</td><td>工具调用和委托</td><td class="ok">保留 ✓</td><td>决策事件，kind = tool / escalate；补生命周期 <span class="mono">done / failed</span>。<strong>不改变交互态</strong>，只决定归属 <span class="st">PREPARING</span> 还是 <span class="st">HOLDING</span>。</td><td>C3 / C4 / D5 / D6</td></tr>
+      <tr><td class="mono">stop</td><td>判定新一轮，停止播报</td><td class="bad">过载 ✗</td><td>一个词两个意思。<strong>拆成 interrupt / pause / resume</strong>：真打断 = 停播 + 截断 + 开新轮；假打断 = 暂停待判；附和不开新轮。"判定新一轮"与"停止播报"必须解耦。</td><td>D3 / D4</td></tr>
+    </table>
+    <div class="cols" style="margin-top:.6em; flex:0;">
+      <div class="callout danger" style="flex:1.2;">
+        <b>结构性缺口（逐项修补不了的）：</b>没有判定窗口层（第②层）· 没有交互状态与用户侧状态（第④层）· 没有 floor 变量 · 没有时延分档 · 没有 <span class="mono">playout_started</span>——缺它 <span class="st">SPEAKING</span> 只能锚在生成上，字幕与截断全错位 · 没有附和、垫话、超时、离开、会话事件 · 没有外发 ASR 信号。
+      </div>
+      <div class="callout green" style="flex:1;">
+        <b>可取之处：</b><span class="mono">speech_started / stopped</span> ↔ Realtime <span class="mono">input_audio_buffer.*</span>；<span class="mono">committed</span> ↔ commit；<span class="mono">speak</span> ↔ <span class="mono">response.create</span>；<span class="mono">stop</span> ↔ <span class="mono">response.cancel</span> + truncate。建议<b>作为第③层的种子采纳</b>，再在它周围补齐其余三层。
+      </div>
+    </div>
+  </div>
+  <span class="pageno">13 / 15</span>
+</section>
+
+<!-- ═══════════ P14 决策 · 需求 · 验收 · 下一步 ═══════════ -->
+<section class="slide">
+  <div class="header">
+    <h1>三项待拍板决策 · 模型需求 · 验收 · <span class="hl">下一步</span></h1>
+    <p class="subtitle">三项决策同一个根源：<strong>"以播放事实定状态"与"具名状态"冲突时听谁的</strong>——建议：判定听播放事实，命名照顾可读性</p>
+  </div>
+  <div class="cols">
+    <div class="col" style="flex:1.3;">
+      <div class="panel">
+        <h2><span class="tag danger">三项决策</span>含建议方案与影响范围</h2>
+        <table style="font-size:.82em;">
+          <tr><th style="width:3%;">#</th><th style="width:34%;">问题</th><th>建议方案</th><th style="width:22%;">影响范围</th></tr>
+          <tr><td>1</td><td><span class="mono">tool_done</span> 之后还有"生成 + TTS 首帧"的时延，这段算谁的计时器？垫话怎么出？</td><td>停留在 <span class="st">HOLDING</span>，<strong>重置其 T1 / T2 计时器</strong>；发事件 <span class="mono">resume_pending</span> 供观测。不加子状态。</td><td>转换表第 6 行；场景 D6、C4</td></tr>
+          <tr><td>2</td><td><span class="st">BACKCHANNEL<i>（附和）</i></span> 与 <span class="st">REPAIR<i>（澄清）</i></span> 期间都在出声，按原则一就是 <span class="st">SPEAKING</span>；差异只在 floor 与记录语义。</td><td><strong>对外保留具名态</strong>（可读性）；<strong>内部按"SPEAKING × floor 不变 × 记录类型"推导</strong>，具名态是推导结果的别名。</td><td>转换表第 13、16 行；场景 B2、B7；状态清单注释</td></tr>
+          <tr><td>3</td><td>T1 垫话（"嗯…"）已出声，系统还算 <span class="st">PREPARING</span> 吗？</td><td>不算——<strong>出声即 SPEAKING</strong>；内容打标 <span class="mono">speech_kind = filler / substantive</span>。同时给 Agora 三时钟（应答起点 / 实质起点 / 完成）提供度量点。</td><td>转换表第 4 行；场景 C2、C4；08 章 C 段描述</td></tr>
+        </table>
+      </div>
+      <div class="panel" style="flex:1;">
+        <h2><span class="tag">对模型输出的五条需求</span></h2>
+        <ul style="font-size:.9em;">
+          <li><strong>R1 同帧双流：</strong>工具调用字段与音频字段可在同一帧输出（边说边调 D5）。</li>
+          <li><strong>R2 异步结果中途注入：</strong>任意状态下接受注入，模型自行决定接续时机（C4 / D6）。</li>
+          <li><strong>R3 升级信号 + 代言回灌：</strong>能输出"回答不了、请升级"控制字段；大模型文本由全双工模型代言播出。</li>
+          <li><strong>R4 细分意图字段：</strong><span class="mono">voice_intent</span>（silence / speak / backchannel / yield）、<span class="mono">floor_intent</span>（keep / release / take）、拒识声明——超出业界二元 listen / speak。</li>
+          <li><strong>R5 共享时间基准：</strong>所有输出携带 <span class="mono">segment_id</span> + 帧内偏移，否则截断对账与词表协议全部落空。</li>
+        </ul>
+      </div>
+    </div>
+    <div class="col" style="flex:.8;">
+      <div class="panel">
+        <h2><span class="tag green">验收</span>两条硬标准</h2>
+        <ul style="font-size:.9em;">
+          <li><strong>纯函数推导：</strong>给定模型输出流 + 播放时间戳，任一交互态可被机械推导，不需要额外启发式。做不到说明字段有漏。</li>
+          <li><strong>五个场景必须端到端跑通：</strong>真打断 D3 · 假打断 D4 · 边说边调 D5 · 等待超时 C6 / D8 · <strong>大模型接管中被打断</strong> C4 × D3（最容易暴露跨层漏洞）。</li>
+        </ul>
+      </div>
+      <div class="panel" style="flex:1;">
+        <h2><span class="tag warn">下一步</span></h2>
+        <ul style="font-size:.9em;">
+          <li>拍板三项决策，回写设计文档 08 章（转换表第 4 / 6 行、C2 轨迹、状态定义）。</li>
+          <li>按 9 个 P0 场景写验收用例，含状态轨迹的自动化断言。</li>
+          <li><span class="mono">asr_*</span> 信号与端侧 VAD 联调；与 phone‑assistant 双脑架构对齐代言回灌接口。</li>
+          <li>自建中文评测子集：覆盖 Full‑Duplex‑Bench 四维度 + Instruct‑FD 五策略指令遵循 + 三时钟。</li>
+          <li><strong>风险提示：</strong>R4 主动性字段（附和 / 插话）是业界得分最低的能力（Instruct‑FD 插话 ≤ 11.7%）——先把 <span class="mono">speak_at_pause</span> 设为默认，<span class="mono">speak_now</span> 仅限高紧急。</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+  <span class="pageno">14 / 15</span>
+</section>
+
+<!-- ═══════════ P15 附录转换表 ═══════════ -->
+<section class="slide">
+  <div class="header">
+    <h1>附录：<span class="hl">完整转换表</span>（16 条系统侧 + 6 条用户侧）</h1>
+    <p class="subtitle">● = 系统可观测事实（VAD / 播放 / 回调 / 超时）｜○ = 判定或决策（窗口坍缩或模型意图）｜每条可溯源到场景，编号与第 3 页图一致</p>
+  </div>
+  <div class="cols">
+    <div class="col" style="flex:1.5;">
+      <div class="panel" style="flex:1;">
+        <h2><span class="tag">系统侧</span></h2>
+        <table style="font-size:.78em;">
+          <tr><th>#</th><th>转换</th><th>触发</th><th>窗口</th><th>场景</th></tr>
+          <tr><td>①</td><td>LISTENING → PREPARING</td><td>○ committed ∧ respond</td><td>端点窗</td><td>B4 / B5</td></tr>
+          <tr><td>②</td><td>PREPARING → SPEAKING</td><td>● playout_started（首帧）</td><td>—</td><td>C1</td></tr>
+          <tr><td>③</td><td>PREPARING → LISTENING</td><td>○ reject / 用户再开口弃答 / 碰撞让步</td><td>—</td><td>B5 / C5 / X1</td></tr>
+          <tr><td>④</td><td>PREPARING 自环</td><td>○ invoke_tool / escalate；● T1 垫话；● T2 兜底（垫话出声即触发②，决策 3）</td><td>时延分段</td><td>C2–C6</td></tr>
+          <tr><td>⑤</td><td>SPEAKING → HOLDING</td><td>● playout_done ∧ ○ 持轮（工具未返回 / 尾音）</td><td>—</td><td>C2 / C4 / D5 / D6</td></tr>
+          <tr><td>⑥</td><td>HOLDING → SPEAKING</td><td>● tool_done → 续说（计时器重置，决策 1）</td><td>—</td><td>D6</td></tr>
+          <tr><td>⑦</td><td>HOLDING → LISTENING</td><td>○ 取消 / ● T2 兜底后释放</td><td>—</td><td>D7 / D8</td></tr>
+          <tr><td>⑧</td><td>SPEAKING → LISTENING</td><td>● playout_done ∧ ○ 释放（或 floor = expecting）</td><td>—</td><td>D9 / D10</td></tr>
+          <tr><td>⑨</td><td>SPEAKING → YIELDING</td><td>● speech_started → ○ 判为真打断 → interrupt</td><td>打断判定窗</td><td>D3</td></tr>
+          <tr><td>⑩</td><td>YIELDING → LISTENING</td><td>● 停播完成 + 截断对账</td><td>—</td><td>D3</td></tr>
+          <tr><td>⑪</td><td>YIELDING → SPEAKING</td><td>● 暂停待判超时 → resume</td><td>暂停待判窗</td><td>D4</td></tr>
+          <tr><td>⑫</td><td>SPEAKING 自环</td><td>○ 判为附和 / 旁人 / 背景 → 继续</td><td>打断判定窗</td><td>D2</td></tr>
+          <tr><td>⑬</td><td>LISTENING ⇄ BACKCHANNEL</td><td>○ 附和时机 / 附和结束（floor 不变，决策 2）</td><td>—</td><td>B2</td></tr>
+          <tr><td>⑭</td><td>LISTENING → SPEAKING（INTERJECTING）</td><td>○ 高价值 ∧ 打扰管理放行</td><td>—</td><td>A3 / A4 / X2 / X3</td></tr>
+          <tr><td>⑮</td><td>任意 ⇄ MUTED</td><td>○ 用户禁言 / 解除</td><td>—</td><td>B8</td></tr>
+          <tr><td>⑯</td><td>任意 → REPAIR → LISTENING</td><td>○ 没听清 / 指向不明（决策 2）</td><td>—</td><td>B7</td></tr>
+        </table>
+      </div>
+    </div>
+    <div class="col" style="flex:.9;">
+      <div class="panel">
+        <h2><span class="tag purple">用户侧</span></h2>
+        <table style="font-size:.8em;">
+          <tr><th>转换</th><th>触发</th><th>窗口</th><th>场景</th></tr>
+          <tr><td>SILENT → SPEAKING</td><td>● speech_started（确认）</td><td>起音确认窗</td><td>B1</td></tr>
+          <tr><td>SPEAKING → PAUSED</td><td>● speech_stopped ∧ ○ ¬committed</td><td>端点窗</td><td>B3</td></tr>
+          <tr><td>PAUSED → SPEAKING</td><td>● 再开口</td><td>—</td><td>B3</td></tr>
+          <tr><td>PAUSED / SPEAKING → SILENT</td><td>○ committed</td><td>端点窗</td><td>B4</td></tr>
+          <tr><td>SILENT → AWAY</td><td>● 双方静默超时</td><td>—</td><td>A3</td></tr>
+          <tr><td>AWAY → SILENT</td><td>● 任意活动</td><td>—</td><td>A3</td></tr>
+        </table>
+      </div>
+      <div class="panel" style="flex:1;">
+        <h2><span class="tag warn">读表要点</span></h2>
+        <ul style="font-size:.88em;">
+          <li><strong>只有 ②⑤⑧⑩ 是纯播放事实</strong>——状态与用户感知对齐的锚点，任何实现不得用模型侧信号替代。</li>
+          <li><strong>⑨ 与 ⑫ 共享打断判定窗</strong>：三分出口，快让出 / 重连贯的策略 profile 就是这个窗口的参数。</li>
+          <li><strong>⑥ 不经过 PREPARING</strong>：话轮从未让出，没有"重新接轮"语义；其计时器处理是决策 1。</li>
+          <li><strong>⑭⑮⑯ 是扩展边</strong>：主干图保持六个节点，扩展态按需启用。</li>
+          <li>用户侧 <strong>SPEAKING → PAUSED</strong> 是全表最关键的一条：它把"停顿"和"说完"在协议层分开，B3 才有落脚点。</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+  <span class="pageno">15 / 15</span>
+</section>
+
+</body>
+</html>
