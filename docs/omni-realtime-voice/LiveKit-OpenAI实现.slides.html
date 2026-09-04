@@ -1,0 +1,494 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LiveKit × OpenAI：他们是怎么实现实时语音的</title>
+<style>
+  :root {
+    --bg: #e9eef6;
+    --slide-bg: linear-gradient(135deg, #ffffff 0%, #f8fbfe 55%, #f2f7fd 100%);
+    --card: #ffffff;
+    --card-border: #dfe6f0;
+    --text: #1e2a3d;
+    --muted: #5a6b84;
+    --accent: #2f6fed;
+    --accent2: #0ea578;
+    --warn: #d97a06;
+    --danger: #d0453c;
+    --purple: #7c5cd6;
+    --code-bg: #f3f6fb;
+    --code-text: #24405f;
+    --mono: "SF Mono", "JetBrains Mono", Consolas, "Courier New", monospace;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { background: var(--bg); }
+  body {
+    font-family: "PingFang SC", "Microsoft YaHei", "Noto Sans SC", -apple-system, sans-serif;
+    color: var(--text);
+    display: flex; flex-direction: column; align-items: center;
+    padding: 28px 16px; gap: 28px; min-height: 100vh;
+  }
+  .slide {
+    width: min(1280px, 96vw);
+    aspect-ratio: 16 / 9;
+    background: var(--slide-bg);
+    border: 1px solid var(--card-border);
+    border-radius: 18px;
+    box-shadow: 0 18px 44px rgba(30,42,61,.14);
+    padding: 2% 2.6%;
+    display: flex; flex-direction: column;
+    overflow: hidden; position: relative;
+    font-size: clamp(10px, 1.22vw, 17px);
+  }
+  .slide::before {
+    content: ""; position: absolute; inset: 0 0 auto 0; height: 4px;
+    background: linear-gradient(90deg, var(--accent), var(--accent2));
+    border-radius: 18px 18px 0 0;
+  }
+  .pageno { position: absolute; right: 1.6em; bottom: 1em; font-family: var(--mono); font-size: .8em; color: var(--muted); }
+
+  .header { display: flex; align-items: baseline; justify-content: space-between; gap: 1.4em; margin-bottom: .6em; }
+  h1 { font-size: 1.55em; font-weight: 700; white-space: nowrap; }
+  h1 .hl { color: var(--accent); }
+  h1 .ver { font-family: var(--mono); font-size: .6em; color: var(--accent2); vertical-align: super; margin-left: .3em; }
+  .subtitle { color: var(--muted); font-size: .88em; line-height: 1.4; text-align: right; }
+  .subtitle strong { color: var(--text); }
+
+  code, .mono {
+    font-family: var(--mono); font-size: .92em;
+    background: var(--code-bg); color: var(--code-text);
+    border: 1px solid #e4eaf3; padding: 0 .3em; border-radius: 4px;
+  }
+
+  .cols { display: flex; gap: .9em; flex: 1; min-height: 0; }
+  .col { display: flex; flex-direction: column; gap: .7em; min-width: 0; min-height: 0; }
+
+  .panel {
+    background: var(--card); border: 1px solid var(--card-border); border-radius: 12px;
+    padding: .7em .9em; box-shadow: 0 2px 8px rgba(30,42,61,.04);
+    display: flex; flex-direction: column; min-height: 0;
+  }
+  .panel > h2 { font-size: 1em; font-weight: 700; margin-bottom: .45em; display: flex; align-items: baseline; gap: .5em; }
+  .panel > h2 .tag {
+    flex: none; font-size: .72em; font-weight: 700; color: var(--accent);
+    background: rgba(47,111,237,.08); border: 1px solid rgba(47,111,237,.3);
+    border-radius: 99px; padding: .1em .65em;
+  }
+  .panel > h2 .tag.green { color: var(--accent2); background: rgba(14,165,120,.08); border-color: rgba(14,165,120,.3); }
+  .panel > h2 .tag.warn { color: var(--warn); background: rgba(217,122,6,.08); border-color: rgba(217,122,6,.3); }
+  .panel > h2 .tag.purple { color: var(--purple); background: rgba(124,92,214,.08); border-color: rgba(124,92,214,.3); }
+  .panel > h2 .tag.red { color: var(--danger); background: rgba(208,69,60,.08); border-color: rgba(208,69,60,.3); }
+  .panel ul { list-style: none; }
+  .panel li { color: var(--muted); font-size: .86em; line-height: 1.45; padding-left: .95em; position: relative; margin-bottom: .3em; }
+  .panel li::before { content: "•"; color: var(--accent); position: absolute; left: 0; }
+  .panel li strong { color: var(--text); font-weight: 600; }
+  .panel p { color: var(--muted); font-size: .86em; line-height: 1.45; }
+  .panel p strong { color: var(--text); }
+
+  table { width: 100%; border-collapse: collapse; font-size: .82em; }
+  th, td { text-align: left; padding: .36em .55em; border-bottom: 1px solid #edf1f7; vertical-align: top; line-height: 1.4; }
+  th { color: var(--muted); font-size: .88em; font-weight: 700; background: #f6f9fd; white-space: nowrap; }
+  td strong { color: var(--text); }
+  td { color: var(--muted); }
+  tr:last-child td { border-bottom: none; }
+  td.num { font-family: var(--mono); white-space: nowrap; }
+  td .good { color: var(--accent2); font-weight: 700; }
+  td .bad { color: var(--danger); font-weight: 700; }
+  td .mid { color: var(--warn); font-weight: 700; }
+
+  .callout {
+    border-radius: 10px; padding: .5em .85em; font-size: .84em; line-height: 1.45;
+    background: rgba(14,165,120,.07); border: 1px solid rgba(14,165,120,.35); color: var(--text);
+  }
+  .callout.warn { background: #fdf7f0; border-color: rgba(217,122,6,.4); }
+  .callout.blue { background: rgba(47,111,237,.06); border-color: rgba(47,111,237,.35); }
+  .callout.red { background: rgba(208,69,60,.05); border-color: rgba(208,69,60,.35); }
+  .callout b { color: var(--accent2); }
+  .callout.warn b { color: var(--warn); }
+  .callout.blue b { color: var(--accent); }
+  .callout.red b { color: var(--danger); }
+
+  .band {
+    border-radius: 10px; padding: .5em .8em;
+    font-size: .86em; color: var(--text); line-height: 1.42;
+    border: 1px solid var(--card-border); background: #fff;
+  }
+  .band strong { font-weight: 700; }
+  .band.l1 { border-color: rgba(47,111,237,.4); background: linear-gradient(90deg, rgba(47,111,237,.07), #fff 60%); }
+  .band.l2 { border-color: rgba(124,92,214,.4); background: linear-gradient(90deg, rgba(124,92,214,.07), #fff 60%); }
+  .band.l3 { border-color: rgba(14,165,120,.4); background: linear-gradient(90deg, rgba(14,165,120,.07), #fff 60%); }
+
+  .flow { display: flex; gap: .5em; align-items: stretch; }
+  .flow .node {
+    flex: 1; min-width: 0; background: #fff; border: 1px solid var(--card-border);
+    border-radius: 8px; padding: .42em .55em; font-size: .8em; line-height: 1.38; color: var(--muted);
+  }
+  .flow .node strong { display: block; color: var(--text); font-size: .95em; margin-bottom: .1em; }
+  .flow .node.hl { border-color: rgba(47,111,237,.55); background: linear-gradient(180deg, rgba(47,111,237,.06), #fff 50%); }
+  .flow .node.green { border-color: rgba(14,165,120,.55); background: linear-gradient(180deg, rgba(14,165,120,.06), #fff 50%); }
+  .flow .node.warn { border-color: rgba(217,122,6,.55); background: linear-gradient(180deg, rgba(217,122,6,.08), #fff 50%); }
+  .flow .arr { align-self: center; color: var(--accent); font-weight: 700; flex: none; }
+
+  .states { display: grid; grid-template-columns: repeat(5, 1fr); gap: .5em; }
+  .stcard { background: #fff; border: 1px solid var(--card-border); border-radius: 9px; padding: .45em .6em; font-size: .78em; line-height: 1.38; color: var(--muted); }
+  .stcard b { display: block; font-family: var(--mono); font-size: .95em; margin-bottom: .12em; }
+  .stcard.u b { color: var(--accent); } .stcard.u { border-top: 3px solid var(--accent); }
+  .stcard.m b { color: var(--accent2); } .stcard.m { border-top: 3px solid var(--accent2); }
+  .stcard.t b { color: var(--purple); } .stcard.t { border-top: 3px solid var(--purple); }
+  .stcard.x b { color: var(--danger); } .stcard.x { border-top: 3px solid var(--danger); opacity: .85; }
+
+  .kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: .6em; }
+  .kpi { background: #fff; border: 1px solid var(--card-border); border-radius: 10px; padding: .5em .7em; }
+  .kpi .v { font-family: var(--mono); font-size: 1.45em; font-weight: 700; color: var(--accent); line-height: 1.1; }
+  .kpi .v.red { color: var(--danger); } .kpi .v.green { color: var(--accent2); } .kpi .v.warn { color: var(--warn); }
+  .kpi .k { color: var(--muted); font-size: .78em; line-height: 1.35; margin-top: .2em; }
+
+  .recs { display: grid; grid-template-columns: 1fr 1fr; gap: .6em; flex: 1; min-height: 0; }
+  .rec { background: #fff; border: 1px solid var(--card-border); border-radius: 10px; padding: .55em .75em; min-width: 0; }
+  .rec h3 { font-size: .92em; font-weight: 700; margin-bottom: .22em; }
+  .rec h3 .no { color: #fff; background: var(--accent); font-family: var(--mono); border-radius: 6px; padding: 0 .45em; margin-right: .45em; font-size: .85em; }
+  .rec p { color: var(--muted); font-size: .8em; line-height: 1.42; }
+  .rec p strong { color: var(--text); }
+</style>
+</head>
+<body>
+
+<!-- P1 -->
+<section class="slide">
+  <div class="header">
+    <h1>LiveKit × OpenAI：<span class="hl">他们是怎么实现的</span><span class="ver">v1</span></h1>
+    <p class="subtitle">入口：<strong>docs.livekit.io/agents/integrations/openai/</strong><br>源码：livekit/agents · RealtimeModel + AgentActivity</p>
+  </div>
+  <div class="cols">
+    <div class="col" style="flex: 0 0 48%;">
+      <div class="panel" style="flex:1;">
+        <h2><span class="tag">先定性</span>不是 GPT‑Live，也不是全双工模型</h2>
+        <p style="margin-bottom:.5em;">LiveKit Agents 是开源<strong>编排框架</strong>：用户侧 WebRTC，模型侧 OpenAI Realtime WebSocket。OpenAI 负责听懂并说话，LiveKit 负责接到真实产品。</p>
+        <div class="flow" style="margin-bottom:.55em;">
+          <div class="node"><strong>App / Phone</strong>LiveKit WebRTC<br>音频 · 字幕 · RPC</div>
+          <div class="arr">↔</div>
+          <div class="node hl"><strong>Agent worker</strong>转码 · 状态 · 打断截断<br>工具 · 多 Agent</div>
+          <div class="arr">↔</div>
+          <div class="node green"><strong>Realtime API</strong>WebSocket<br>S2S 模型</div>
+        </div>
+        <div class="callout blue"><b>本页结论</b>：抄的是适配器 + 轮次所有权互斥，不是把 LiveKit 当成 GPT‑Live 开源版。</div>
+      </div>
+    </div>
+    <div class="col" style="flex:1;">
+      <div class="panel" style="flex:1;">
+        <h2><span class="tag green">目录</span>9 页</h2>
+        <table>
+          <tr><th>#</th><th>主题</th><th>要记住的</th></tr>
+          <tr><td class="num">2</td><td><strong>三种管道同一 Session</strong></td><td>Realtime 只是一种 <code>llm=</code></td></tr>
+          <tr><td class="num">3</td><td><strong>运行时分层</strong></td><td>Session 编排，Activity 干活</td></tr>
+          <tr><td class="num">4</td><td><strong>插件翻译协议</strong></td><td>24 kHz / 100 ms / 九步响应</td></tr>
+          <tr><td class="num">5</td><td><strong>打断 = cancel + truncate</strong></td><td>按播放头剪历史</td></tr>
+          <tr><td class="num">6</td><td><strong>轮次只能有一个主人</strong></td><td>双检测器是硬错误</td></tr>
+          <tr><td class="num">7</td><td><strong>对照 10 态</strong></td><td>公开只有 listening / thinking / speaking</td></tr>
+          <tr><td class="num">8</td><td><strong>做对了 vs 没做</strong></td><td>第二代 S2S 的产品化</td></tr>
+          <tr><td class="num">9</td><td><strong>对我们的建议</strong></td><td>七条可执行原则</td></tr>
+        </table>
+      </div>
+    </div>
+  </div>
+  <div class="pageno">1 / 9</div>
+</section>
+
+<!-- P2 -->
+<section class="slide">
+  <div class="header">
+    <h1>三种管道，Realtime 只是其中一种 <span class="hl">llm</span></h1>
+    <p class="subtitle">docs.livekit.io/agents/models/pipelines/<br>对开发者暴露同一个 <code>AgentSession</code></p>
+  </div>
+  <div class="flow" style="margin-bottom:.7em;">
+    <div class="node"><strong>STT‑LLM‑TTS 级联</strong>分别填 stt / llm / tts<br>可审计、可念稿、实时字幕<br><span class="mid">生产默认</span></div>
+    <div class="node hl"><strong>纯 Realtime</strong><code>llm=RealtimeModel()</code><br>最快、听语气、带情感<br><span class="good">延迟优先</span></div>
+    <div class="node green"><strong>半级联 half-cascade</strong>Realtime 出 text + 独立 TTS<br>输入仍听音频，输出可控<br><span class="mid">品牌音色 / 念稿</span></div>
+  </div>
+  <div class="cols">
+    <div class="col" style="flex:1;">
+      <div class="panel" style="flex:1;">
+        <h2><span class="tag">关键抽象</span>不是第三套 Session 类型</h2>
+        <ul>
+          <li>Realtime 实现 <code>llm.RealtimeModel</code> 接口，塞进 <code>llm=</code>。</li>
+          <li><code>AgentSession</code> 发现类型后走 <code>_rt_session</code> 双向音频，否则走 STT→LLM→TTS。</li>
+          <li>SpeechHandle 队列、工具、多 Agent 交接，<strong>三条管道共用</strong>。</li>
+          <li>半级联是对 OpenAI 已知坑的绕过：灌长历史后模型爱改用纯文本回答。</li>
+        </ul>
+      </div>
+    </div>
+    <div class="col" style="flex:0 0 42%;">
+      <div class="panel" style="flex:1;">
+        <h2><span class="tag warn">和三代架构对齐</span></h2>
+        <p style="margin-bottom:.45em;">LiveKit 今天交付的是<strong>第二代 S2S 的产品化</strong>，外加可插拔第一代级联。</p>
+        <div class="callout warn"><b>没有</b>第三代全双工模型，也没有 GPT‑Live 的说/想双时钟。OpenAI 在这里出现四次（Realtime / Chat LLM / STT / TTS），不要混成一条管道。</div>
+      </div>
+    </div>
+  </div>
+  <div class="pageno">2 / 9</div>
+</section>
+
+<!-- P3 -->
+<section class="slide">
+  <div class="header">
+    <h1>运行时：<span class="hl">Session 编排，Activity 干活</span></h1>
+    <p class="subtitle">agent_session.py · agent_activity.py<br>对外状态刻意很粗</p>
+  </div>
+  <div class="cols">
+    <div class="col" style="flex: 0 0 46%;">
+      <div class="panel" style="flex:1;">
+        <h2><span class="tag">两级</span>谁干什么</h2>
+        <table>
+          <tr><th>对象</th><th>职责</th></tr>
+          <tr><td><strong>AgentSession</strong></td><td>房间 I/O、Agent 切换、对外状态与事件、生命周期</td></tr>
+          <tr><td><strong>AgentActivity</strong></td><td>单个 Agent 运行时：识别、语音队列 <code>_speech_q</code>、RealtimeSession、工具、假打断恢复</td></tr>
+        </table>
+        <p style="margin-top:.5em;">同一时刻一个 active Agent。这是多专家工作流，不是全双工委托时钟。</p>
+      </div>
+    </div>
+    <div class="col" style="flex:1;">
+      <div class="panel" style="flex:1;">
+        <h2><span class="tag green">公开状态</span>产品时钟，不是模型时钟</h2>
+        <div class="flow" style="margin-bottom:.5em;">
+          <div class="node"><strong>listening</strong>在听</div>
+          <div class="arr">→</div>
+          <div class="node warn"><strong>thinking</strong>已提交，还没出声</div>
+          <div class="arr">→</div>
+          <div class="node green"><strong>speaking</strong>首帧到达播放器</div>
+        </div>
+        <ul>
+          <li>User：<code>speaking</code> / <code>listening</code> / <code>away</code>（默认 15 s 静音）。</li>
+          <li><code>thinking → speaking</code> 触发点是<strong>第一帧音频</strong>，不是 <code>response.created</code>。</li>
+          <li>插件用 <code>RealtimeCapabilities</code> 申报能力；编排按比特分支，不写 OpenAI 专用 if。</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+  <div class="pageno">3 / 9</div>
+</section>
+
+<!-- P4 -->
+<section class="slide">
+  <div class="header">
+    <h1>插件是一台<span class="hl">协议翻译机</span></h1>
+    <p class="subtitle">realtime_model.py · PCM16 24 kHz · Azure 事件名归一</p>
+  </div>
+  <div class="kpis" style="margin-bottom:.65em;">
+    <div class="kpi"><div class="v">24 kHz</div><div class="k">WebRTC 帧经 AudioResampler 降采样，mono PCM16</div></div>
+    <div class="kpi"><div class="v">100 ms</div><div class="k">AudioByteStream 切块后 base64，<code>input_audio_buffer.append</code></div></div>
+    <div class="kpi"><div class="v">9 步</div><div class="k">认定一次 response 只产出一条 message，收成两条 Chan</div></div>
+    <div class="kpi"><div class="v green">重连</div><div class="k">到期拆线；重放 session / tools / chat_ctx，丢掉 item_id</div></div>
+  </div>
+  <div class="cols">
+    <div class="col" style="flex:1;">
+      <div class="panel" style="flex:1;">
+        <h2><span class="tag">生成两条路径</span></h2>
+        <table>
+          <tr><th>来源</th><th>LiveKit</th></tr>
+          <tr><td>服务端 VAD 认为说完</td><td><code>user_initiated=False</code> → 自动 generation</td></tr>
+          <tr><td><code>generate_reply()</code></td><td>带 <code>client_event_id</code> 的 <code>response.create</code>；10 s 超时则 cancel 迟到响应</td></tr>
+        </table>
+      </div>
+    </div>
+    <div class="col" style="flex:1;">
+      <div class="panel" style="flex:1;">
+        <h2><span class="tag purple">脏活写在插件里</span></h2>
+        <ul>
+          <li><code>_DiscardedGeneration</code> 吞掉打断/超时后的幽灵 delta。</li>
+          <li>配额类错误进 fatal set，<strong>禁止重连死循环</strong>。</li>
+          <li>Azure beta 事件名映射成 GA，后面只维护一套 handler。</li>
+          <li>视频（Python）：说话 1 fps / 静音 0.3 fps，打成 image item。</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+  <div class="pageno">4 / 9</div>
+</section>
+
+<!-- P5 -->
+<section class="slide">
+  <div class="header">
+    <h1>打断 = <span class="hl">cancel + 按播放头 truncate</span></h1>
+    <p class="subtitle">这是第二代 S2S 能做“假全双工”的关键<br>模型仍是轮次制，系统层把没说完的尾巴从上下文剪掉</p>
+  </div>
+  <div class="flow" style="margin-bottom:.7em;">
+    <div class="node"><strong>1. speech_started</strong>OpenAI 服务端 VAD<br>或本地 VAD（若模型 VAD 已关）</div>
+    <div class="arr">→</div>
+    <div class="node hl"><strong>2. interrupt()</strong><code>response.cancel</code><br>停当前生成，不改历史</div>
+    <div class="arr">→</div>
+    <div class="node green"><strong>3. truncate</strong><code>conversation.item.truncate</code><br><code>audio_end_ms</code> = 用户听到哪</div>
+    <div class="arr">→</div>
+    <div class="node"><strong>4. listening</strong>agent_state 切回<br>下一轮上下文已对齐耳朵</div>
+  </div>
+  <div class="cols">
+    <div class="col" style="flex:1;">
+      <div class="panel" style="flex:1;">
+        <h2><span class="tag">细节</span></h2>
+        <ul>
+          <li><code>audio_end_ms == 0</code> 则直接 <code>item.delete</code>。</li>
+          <li>半级联只有 text：改本地 chat_ctx 再同步回去。</li>
+          <li>不可打断时 <code>discard_audio_if_uninterruptible</code> 仍生效，丢掉缓冲，避免回声堆积。</li>
+        </ul>
+      </div>
+    </div>
+    <div class="col" style="flex:1;">
+      <div class="panel" style="flex:1;">
+        <h2><span class="tag red">不要配一半</span></h2>
+        <div class="callout red" style="margin-bottom:.4em;"><b>硬错误</b>：服务端 VAD 开着时 <code>interruption.enabled=False</code> 直接 <code>ValueError</code>。</div>
+        <p><code>create_response=False</code> 但 <code>interrupt_response</code> 仍为真会警告：两边都会取消响应，LiveKit 以为自己在管，OpenAI 也在管。</p>
+      </div>
+    </div>
+  </div>
+  <div class="pageno">5 / 9</div>
+</section>
+
+<!-- P6 -->
+<section class="slide">
+  <div class="header">
+    <h1>轮次检测：<span class="hl">必须只有一个主人</span></h1>
+    <p class="subtitle">这是整套集成最值得抄的一条<br>允许两种实现，同一时刻只许一个做主</p>
+  </div>
+  <div class="cols">
+    <div class="col" style="flex:1;">
+      <div class="panel" style="flex:1;">
+        <h2><span class="tag green">默认 · 模型做主</span>semantic_vad</h2>
+        <ul>
+          <li>Agent <strong>原样转发</strong>音频，不在本地做 EOT。</li>
+          <li><code>speech_started</code> → 框架立刻 <code>interrupt()</code>。</li>
+          <li><code>InterruptionOptions</code> 几乎全部忽略。</li>
+          <li><code>server_vad</code> 可调 threshold / padding / silence（电话示例 0.7 / 400 ms）。</li>
+          <li><code>semantic_vad.eagerness</code>：low / medium / high。</li>
+        </ul>
+      </div>
+    </div>
+    <div class="col" style="flex:1;">
+      <div class="panel" style="flex:1;">
+        <h2><span class="tag">备选 · LiveKit 做主</span>TurnDetector</h2>
+        <ul>
+          <li>必须 <code>RealtimeModel(turn_detection=None)</code>。</li>
+          <li>文本端点模型跑在转写空间；Realtime 用户转写往往<strong>晚于开口</strong>。</li>
+          <li>所以官方示例强制并行 Deepgram STT：音频复制进两条路径。</li>
+          <li>源码守卫：<code>capabilities.turn_detection</code> 为真则 <code>_interrupt_by_audio_activity</code> 直接 return。</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+  <div class="callout warn" style="margin-top:.65em;"><b>级联上的 TurnHandlingOptions 默认不作用于 Realtime 服务端 VAD 路径。</b>自适应打断、假打断恢复、抢跑生成、动态 endpointing —— 都是客户端策略。Realtime 路径刻意不假装拥有它们。</div>
+  <div class="pageno">6 / 9</div>
+</section>
+
+<!-- P7 -->
+<section class="slide">
+  <div class="header">
+    <h1>对照 10 态：LiveKit 实现的是<span class="hl">系统事件层</span></h1>
+    <p class="subtitle">公开状态机比 06 章粗得多 · 打断是边沿事件，不是一等状态</p>
+  </div>
+  <div class="states" style="margin-bottom:.55em;">
+    <div class="stcard m"><b>LISTENING</b>有 · agent_state=listening</div>
+    <div class="stcard t"><b>HOLDING</b>无 · 默认交给 eagerness</div>
+    <div class="stcard m"><b>THINKING</b>半有 · 含“还没出声”；工具无独立态</div>
+    <div class="stcard x"><b>BACKCHANNEL</b>Realtime 默认无 · 级联 adaptive 才有意图</div>
+    <div class="stcard m"><b>SPEAKING</b>有 · 首帧回调才进入</div>
+    <div class="stcard u"><b>YIELDING</b>事件不是状态 · cancel+truncate</div>
+    <div class="stcard t"><b>RESUMING</b>级联有 · 服务端 VAD 下被忽略</div>
+    <div class="stcard x"><b>INTERJECTING</b>无 · 只有用户打断模型</div>
+    <div class="stcard t"><b>MUTED</b>弱 · away / 关麦 / 丢帧</div>
+    <div class="stcard x"><b>REPAIR</b>无 · 靠 prompt / 工具</div>
+  </div>
+  <div class="cols">
+    <div class="col" style="flex:1;">
+      <div class="panel" style="flex:1;">
+        <h2><span class="tag">阴影态</span></h2>
+        <ul>
+          <li><strong>委托中</strong>：工具执行；<code>max_tool_steps=3</code> 用尽再要一轮口头总结。</li>
+          <li><strong>切换中</strong>：handoff 时 <code>_scheduling_paused</code>，新 realtime generation 被丢掉。</li>
+          <li><strong>分轮暂定</strong>：无 GPT‑Live 双视图；chat_ctx 按 item 追加。</li>
+        </ul>
+      </div>
+    </div>
+    <div class="col" style="flex:1;">
+      <div class="callout blue" style="flex:1; display:flex; flex-direction:column; justify-content:center;">
+        <b>落点</b>
+        <p style="margin-top:.4em; color:var(--text);">10 态如果要长在这种框架上，不能指望 <code>agent_state</code> 变成十个枚举。要在 TurnHandlingOptions + 模型 turn_detection + 自管 SpeechHandle 上长出来。</p>
+      </div>
+    </div>
+  </div>
+  <div class="pageno">7 / 9</div>
+</section>
+
+<!-- P8 -->
+<section class="slide">
+  <div class="header">
+    <h1>做对了什么，<span class="hl">和 GPT‑Live / Instruct‑FD 差在哪</span></h1>
+    <p class="subtitle">第二代 S2S 的产品外壳 · 不是第三代全双工</p>
+  </div>
+  <div class="cols">
+    <div class="col" style="flex:1;">
+      <div class="panel" style="flex:1;">
+        <h2><span class="tag green">可直接借鉴</span></h2>
+        <ul>
+          <li><strong>单一 Session，三种管道是插件</strong>不是产品分叉。</li>
+          <li><strong>Turn taking 所有权显式互斥</strong>；关打断是硬错误，不是静默失效。</li>
+          <li><strong>打断按已播放毫秒 truncate</strong>，上下文与耳朵对齐。</li>
+          <li><strong>重连当一等操作</strong>：重放配置，丢弃 in-flight，item_id 随连接丢弃。</li>
+          <li><strong>capabilities 比特</strong>：新提供商实现同一接口，编排不用改。</li>
+          <li>假打断 / 抢跑 / 动态 endpointing 做在级联侧 —— 清楚这些是<strong>客户端策略</strong>。</li>
+        </ul>
+      </div>
+    </div>
+    <div class="col" style="flex:1;">
+      <div class="panel" style="flex:1;">
+        <h2><span class="tag red">没做，也不该误会他们做了</span></h2>
+        <ul>
+          <li><strong>不是全双工</strong>：输出仍是一轮 response；重叠只来自 barge-in。</li>
+          <li><strong>没有说/想分离</strong>：thinking = 音频还没到；工具会卡住或另起 response。</li>
+          <li><strong>没有 Instruct‑FD 输出策略指令</strong>：可控的是 VAD 参数，不是“现在允许附和”。</li>
+          <li>字幕天然滞后；需要实时转写就加独立 STT。</li>
+          <li>纯 Realtime 不能 <code>say(精确稿件)</code>，要念稿走半级联。</li>
+          <li>插件假设一次 response 一条 message。</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+  <div class="pageno">8 / 9</div>
+</section>
+
+<!-- P9 -->
+<section class="slide">
+  <div class="header">
+    <h1>对我们的建议<span class="ver">接同样的栈时</span></h1>
+    <p class="subtitle">叠在 05 / 06 章之上 · 专门针对 LiveKit 这类编排层接 OpenAI Realtime</p>
+  </div>
+  <div class="recs">
+    <div class="rec">
+      <h3><span class="no">1</span>先选管道，再谈状态</h3>
+      <p>还在 Realtime API 这一代上，产品状态机就按 listening / thinking / speaking + 打断边沿。BACKCHANNEL / INTERJECTING / RESUMING 能做多少，取决于有没有把 turn taking 从模型手里拿回来。</p>
+    </div>
+    <div class="rec">
+      <h3><span class="no">2</span>默认把 VAD 留给模型</h3>
+      <p>与 LiveKit 官方一致。只有需要自适应打断、假打断恢复、或更好的语义 EOT 时，才 <code>turn_detection=None</code> + 并行 STT。</p>
+    </div>
+    <div class="rec">
+      <h3><span class="no">3</span>禁止双检测器</h3>
+      <p>配置校验做成<strong>启动失败</strong>，不要运行期互抢。半开的 create_response / interrupt_response 同样禁止。</p>
+    </div>
+    <div class="rec">
+      <h3><span class="no">4</span>truncate 按播放头</h3>
+      <p>用户听到哪，历史就剪到哪。不要按生成头或整句 item 删除，否则下一轮会引用没说完的句子。</p>
+    </div>
+    <div class="rec">
+      <h3><span class="no">5</span>半级联当逃逸舱</h3>
+      <p>品牌音色和念稿用它。不要和“全双工”混谈：它解决输出可控，代价是延迟回到级联量级。</p>
+    </div>
+    <div class="rec">
+      <h3><span class="no">6</span>工具离开活跃音频路径</h3>
+      <p><code>max_tool_steps</code> 只是止血。要对齐 GPT‑Live，在编排之外加委托会话（第二时钟），前台只说“我去查”。</p>
+    </div>
+  </div>
+  <div class="callout" style="margin-top:.55em;"><b>一句话</b>：LiveKit × OpenAI = WebRTC ↔ Realtime WS 适配器 + 一条可切换主人的轮次状态机。所谓自动处理打断，是 <code>speech_started → response.cancel → item.truncate</code>，不是全双工输出状态。</div>
+  <div class="pageno">9 / 9</div>
+</section>
+
+</body>
+</html>

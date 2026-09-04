@@ -1,0 +1,816 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>全双工输出状态：业界盘点、洞察与建议</title>
+<style>
+  :root {
+    --bg: #e9eef6;
+    --slide-bg: linear-gradient(135deg, #ffffff 0%, #f8fbfe 55%, #f2f7fd 100%);
+    --card: #ffffff;
+    --card-border: #dfe6f0;
+    --text: #1e2a3d;
+    --muted: #5a6b84;
+    --accent: #2f6fed;
+    --accent2: #0ea578;
+    --warn: #d97a06;
+    --danger: #d0453c;
+    --purple: #7c5cd6;
+    --code-bg: #f3f6fb;
+    --code-text: #24405f;
+    --mono: "SF Mono", "JetBrains Mono", Consolas, "Courier New", monospace;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { background: var(--bg); }
+  body {
+    font-family: "PingFang SC", "Microsoft YaHei", "Noto Sans SC", -apple-system, sans-serif;
+    color: var(--text);
+    display: flex; flex-direction: column; align-items: center;
+    padding: 28px 16px; gap: 28px; min-height: 100vh;
+  }
+  .slide {
+    width: min(1280px, 96vw);
+    aspect-ratio: 16 / 9;
+    background: var(--slide-bg);
+    border: 1px solid var(--card-border);
+    border-radius: 18px;
+    box-shadow: 0 18px 44px rgba(30,42,61,.14);
+    padding: 2% 2.6%;
+    display: flex; flex-direction: column;
+    overflow: hidden; position: relative;
+    font-size: clamp(10px, 1.22vw, 17px);
+  }
+  .slide::before {
+    content: ""; position: absolute; inset: 0 0 auto 0; height: 4px;
+    background: linear-gradient(90deg, var(--accent), var(--accent2));
+    border-radius: 18px 18px 0 0;
+  }
+  .pageno { position: absolute; right: 1.6em; bottom: 1em; font-family: var(--mono); font-size: .8em; color: var(--muted); }
+
+  .header { display: flex; align-items: baseline; justify-content: space-between; gap: 1.4em; margin-bottom: .6em; }
+  h1 { font-size: 1.6em; font-weight: 700; white-space: nowrap; }
+  h1 .hl { color: var(--accent); }
+  h1 .ver { font-family: var(--mono); font-size: .6em; color: var(--accent2); vertical-align: super; margin-left: .3em; }
+  .subtitle { color: var(--muted); font-size: .92em; line-height: 1.4; text-align: right; }
+  .subtitle strong { color: var(--text); }
+
+  code, .mono {
+    font-family: var(--mono); font-size: .92em;
+    background: var(--code-bg); color: var(--code-text);
+    border: 1px solid #e4eaf3; padding: 0 .3em; border-radius: 4px;
+  }
+
+  .cols { display: flex; gap: .9em; flex: 1; min-height: 0; }
+  .col { display: flex; flex-direction: column; gap: .7em; min-width: 0; min-height: 0; }
+
+  .panel {
+    background: var(--card); border: 1px solid var(--card-border); border-radius: 12px;
+    padding: .7em .9em; box-shadow: 0 2px 8px rgba(30,42,61,.04);
+    display: flex; flex-direction: column; min-height: 0;
+  }
+  .panel > h2 { font-size: 1em; font-weight: 700; margin-bottom: .45em; display: flex; align-items: baseline; gap: .5em; }
+  .panel > h2 .tag {
+    flex: none; font-size: .72em; font-weight: 700; color: var(--accent);
+    background: rgba(47,111,237,.08); border: 1px solid rgba(47,111,237,.3);
+    border-radius: 99px; padding: .1em .65em;
+  }
+  .panel > h2 .tag.green { color: var(--accent2); background: rgba(14,165,120,.08); border-color: rgba(14,165,120,.3); }
+  .panel > h2 .tag.warn { color: var(--warn); background: rgba(217,122,6,.08); border-color: rgba(217,122,6,.3); }
+  .panel > h2 .tag.purple { color: var(--purple); background: rgba(124,92,214,.08); border-color: rgba(124,92,214,.3); }
+  .panel > h2 .tag.red { color: var(--danger); background: rgba(208,69,60,.08); border-color: rgba(208,69,60,.3); }
+  .panel ul { list-style: none; }
+  .panel li { color: var(--muted); font-size: .86em; line-height: 1.45; padding-left: .95em; position: relative; margin-bottom: .3em; }
+  .panel li::before { content: "•"; color: var(--accent); position: absolute; left: 0; }
+  .panel li strong { color: var(--text); font-weight: 600; }
+  .panel p { color: var(--muted); font-size: .86em; line-height: 1.45; }
+  .panel p strong { color: var(--text); }
+
+  table { width: 100%; border-collapse: collapse; font-size: .82em; }
+  th, td { text-align: left; padding: .36em .55em; border-bottom: 1px solid #edf1f7; vertical-align: top; line-height: 1.4; }
+  th { color: var(--muted); font-size: .88em; font-weight: 700; background: #f6f9fd; white-space: nowrap; }
+  td strong { color: var(--text); }
+  td { color: var(--muted); }
+  tr:last-child td { border-bottom: none; }
+  td.num { font-family: var(--mono); white-space: nowrap; }
+  td .good { color: var(--accent2); font-weight: 700; }
+  td .bad { color: var(--danger); font-weight: 700; }
+  td .mid { color: var(--warn); font-weight: 700; }
+
+  .callout {
+    border-radius: 10px; padding: .5em .85em; font-size: .84em; line-height: 1.45;
+    background: rgba(14,165,120,.07); border: 1px solid rgba(14,165,120,.35); color: var(--text);
+  }
+  .callout.warn { background: #fdf7f0; border-color: rgba(217,122,6,.4); }
+  .callout.blue { background: rgba(47,111,237,.06); border-color: rgba(47,111,237,.35); }
+  .callout.red { background: rgba(208,69,60,.05); border-color: rgba(208,69,60,.35); }
+  .callout b { color: var(--accent2); }
+  .callout.warn b { color: var(--warn); }
+  .callout.blue b { color: var(--accent); }
+  .callout.red b { color: var(--danger); }
+
+  /* 三层带 */
+  .band {
+    border-radius: 10px; padding: .5em .8em;
+    font-size: .86em; color: var(--text); line-height: 1.42;
+    border: 1px solid var(--card-border); background: #fff;
+  }
+  .band strong { font-weight: 700; }
+  .band.l1 { border-color: rgba(47,111,237,.4); background: linear-gradient(90deg, rgba(47,111,237,.07), #fff 60%); }
+  .band.l2 { border-color: rgba(124,92,214,.4); background: linear-gradient(90deg, rgba(124,92,214,.07), #fff 60%); }
+  .band.l3 { border-color: rgba(14,165,120,.4); background: linear-gradient(90deg, rgba(14,165,120,.07), #fff 60%); }
+  .down { text-align: center; color: var(--accent); font-weight: 700; font-size: .82em; line-height: 1.1; }
+
+  /* 三代对比流 */
+  .flow { display: flex; gap: .5em; align-items: stretch; }
+  .flow .node {
+    flex: 1; min-width: 0; background: #fff; border: 1px solid var(--card-border);
+    border-radius: 8px; padding: .42em .55em; font-size: .8em; line-height: 1.38; color: var(--muted);
+  }
+  .flow .node strong { display: block; color: var(--text); font-size: .95em; margin-bottom: .1em; }
+  .flow .node.hl { border-color: rgba(47,111,237,.55); background: linear-gradient(180deg, rgba(47,111,237,.06), #fff 50%); }
+  .flow .node.green { border-color: rgba(14,165,120,.55); background: linear-gradient(180deg, rgba(14,165,120,.06), #fff 50%); }
+  .flow .arr { align-self: center; color: var(--accent); font-weight: 700; flex: none; }
+
+  /* 状态卡 */
+  .states { display: grid; grid-template-columns: repeat(5, 1fr); gap: .5em; }
+  .stcard { background: #fff; border: 1px solid var(--card-border); border-radius: 9px; padding: .45em .6em; font-size: .78em; line-height: 1.38; color: var(--muted); }
+  .stcard b { display: block; font-family: var(--mono); font-size: .95em; margin-bottom: .12em; }
+  .stcard.u b { color: var(--accent); } .stcard.u { border-top: 3px solid var(--accent); }
+  .stcard.m b { color: var(--accent2); } .stcard.m { border-top: 3px solid var(--accent2); }
+  .stcard.t b { color: var(--purple); } .stcard.t { border-top: 3px solid var(--purple); }
+
+  /* 大数字 */
+  .kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: .6em; }
+  .kpi { background: #fff; border: 1px solid var(--card-border); border-radius: 10px; padding: .5em .7em; }
+  .kpi .v { font-family: var(--mono); font-size: 1.6em; font-weight: 700; color: var(--accent); line-height: 1.1; }
+  .kpi .v.red { color: var(--danger); } .kpi .v.green { color: var(--accent2); } .kpi .v.warn { color: var(--warn); }
+  .kpi .k { color: var(--muted); font-size: .78em; line-height: 1.35; margin-top: .2em; }
+
+  /* 建议编号 */
+  .recs { display: grid; grid-template-columns: 1fr 1fr; gap: .6em; flex: 1; min-height: 0; }
+  .rec { background: #fff; border: 1px solid var(--card-border); border-radius: 10px; padding: .55em .75em; min-width: 0; }
+  .rec h3 { font-size: .92em; font-weight: 700; margin-bottom: .22em; }
+  .rec h3 .no { color: #fff; background: var(--accent); font-family: var(--mono); border-radius: 6px; padding: 0 .45em; margin-right: .45em; font-size: .85em; }
+  .rec p { color: var(--muted); font-size: .8em; line-height: 1.42; }
+  .rec p strong { color: var(--text); }
+  .recs.big .rec { padding: .6em .85em; display: flex; flex-direction: column; }
+  .recs.big .rec h3 { font-size: 1.02em; margin-bottom: .3em; }
+  .recs.big .rec p { font-size: .88em; line-height: 1.45; }
+  .recs.big .rec .ev { margin-top: auto; padding-top: .4em; border-top: 1px dashed var(--card-border); font-size: .76em; color: var(--muted); }
+  .recs.big .rec .ev b { color: var(--accent); font-weight: 700; }
+
+  svg text { font-family: "PingFang SC", "Microsoft YaHei", "Noto Sans SC", sans-serif; }
+  svg .st { font-family: var(--mono); font-weight: 700; }
+</style>
+</head>
+<body>
+
+<!-- ═══════════ P1 导读 ═══════════ -->
+<section class="slide">
+  <div class="header">
+    <h1>全双工<span class="hl">输出状态</span>：业界盘点、洞察与建议<span class="ver">v1</span></h1>
+    <p class="subtitle">素材：Sacks 1974 / Skantze 2021 / VAP · Moshi / Freeze‑Omni / BayLing‑Duplex / Fun‑Audio‑Chat / Qwen3‑Omni<br>Full‑Duplex‑Bench · <strong>Instruct‑FD（Boson AI, 2026）</strong> · GPT‑Live / OpenAI &amp; Qwen Realtime API / Flux / Easy Turn</p>
+  </div>
+  <div class="cols">
+    <div class="col" style="flex: 0 0 46%;">
+      <div class="panel" style="flex:1;">
+        <h2><span class="tag">核心问题</span>全双工模型每个时间步先回答"要不要出声"</h2>
+        <div class="flow" style="margin-bottom:.6em;">
+          <div class="node"><strong>轮次制（第二代）</strong>轮次检测器判"说完了"→ 模型才开始生成。<br>输出状态只有：<code>沉默</code> / <code>说</code></div>
+          <div class="arr">→</div>
+          <div class="node hl"><strong>全双工（第三代）</strong>输入永不停止，模型每秒多次决策：说 / 听 / 停 / 插话 / 调工具。<br>输出状态成为<strong>一等设计对象</strong></div>
+        </div>
+        <p style="margin-bottom:.5em;">GPT‑Live 官方原话：<em>"make interaction decisions many times per second: whether to <strong>speak, continue listening, pause, interrupt, or invoke a tool</strong>."</em> 这就是"状态"问题——先决定动作，再决定内容。</p>
+        <div class="callout blue" style="margin-bottom:.6em;"><b>本页结论</b>：状态盘点必须分三层——混在一起就会把"附和"既当现象又当 token 又当事件来争论。</div>
+        <div class="band l1" style="margin-bottom:.35em;"><strong>层一 · 会话现象</strong>：人类对话里真实发生的轮次事件（hold / yield / backchannel / interruption）</div>
+        <div class="band l2" style="margin-bottom:.35em;"><strong>层二 · 模型表示</strong>：用什么 token / 分类头 / 序列布局把事件编码成可预测目标</div>
+        <div class="band l3"><strong>层三 · 系统事件</strong>：API / 编排层 / 产品对外暴露什么状态与事件，谁有权改变它</div>
+      </div>
+    </div>
+    <div class="col" style="flex: 1;">
+      <div class="panel" style="flex:1;">
+        <h2><span class="tag green">目录</span>11 页</h2>
+        <table>
+          <tr><th>#</th><th>主题</th><th>回答的问题</th></tr>
+          <tr><td class="num">2</td><td><strong>会话现象层</strong></td><td>人类对话里到底有哪些轮次事件</td></tr>
+          <tr><td class="num">3</td><td><strong>模型表示层</strong></td><td>各家模型怎么把状态编进 token / 分类头</td></tr>
+          <tr><td class="num">4</td><td><strong>系统事件层</strong></td><td>用户侧状态判定与 API / 产品事件</td></tr>
+          <tr><td class="num">5</td><td><strong>评测定义"正确状态"</strong></td><td>Full‑Duplex‑Bench 的期望行为与两种策略取向</td></tr>
+          <tr><td class="num">6</td><td><strong>Instruct‑FD</strong></td><td>状态不仅要"有"，还要"可被指令控制"——现状差多远</td></tr>
+          <tr><td class="num">7</td><td><strong>统一状态模型</strong></td><td>10 态输出状态图（讨论稿）</td></tr>
+          <tr><td class="num">8</td><td><strong>转移守卫</strong></td><td>五个关键判定与各家做法</td></tr>
+          <tr><td class="num">9</td><td><strong>总结分析</strong></td><td>六条跨来源的结论</td></tr>
+          <tr><td class="num">10</td><td><strong>对我们的建议</strong></td><td>架构、策略、评测、接口、路线</td></tr>
+          <tr><td class="num">11</td><td><strong>附录：来源 Top 10</strong></td><td>各来源对"状态"问题的贡献排序与 Qwen 系定位</td></tr>
+        </table>
+        <div class="kpis" style="margin-top:auto; grid-template-columns: repeat(2,1fr);">
+          <div class="kpi"><div class="v">10</div><div class="k">统一模型给出的输出状态数（按发言权分列）</div></div>
+          <div class="kpi"><div class="v warn">10–20%</div><div class="k">真实口语中重叠所占时间——重叠是常态</div></div>
+          <div class="kpi"><div class="v red">≤ 11.7%</div><div class="k">Instruct‑FD 中最好系统的"主动插话"指令遵循率</div></div>
+          <div class="kpi"><div class="v green">64.4%</div><div class="k">Instruct‑FD 总体最高分（Gemini Live）——可控性仍是瓶颈</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="pageno">1 / 11</div>
+</section>
+
+<!-- ═══════════ P2 会话现象层 ═══════════ -->
+<section class="slide">
+  <div class="header">
+    <h1>层一：<span class="hl">会话现象</span>——人类是怎么组织轮次的</h1>
+    <p class="subtitle">Sacks, Schegloff &amp; Jefferson 1974 · Skantze, <em>Computer Speech &amp; Language</em> 2021 · Voice Activity Projection / TurnGPT</p>
+  </div>
+  <div class="cols">
+    <div class="col" style="flex: 0 0 34%;">
+      <div class="panel" style="flex:1;">
+        <h2><span class="tag">1974 最简系统学</span>三个动词</h2>
+        <ul>
+          <li><strong>TCU</strong>：构成轮次的语言单元（词 / 短语 / 从句 / 句）。</li>
+          <li><strong>TRP</strong>：可能换人的位置，与句法、韵律、语义边界重合。</li>
+          <li>在 TRP 上只有三种动作：<strong>hold 持有 / yield 让出 / abandon 放弃</strong>。</li>
+          <li>系统目标是最小化间隙与重叠，但<strong>重叠占真实口语 10–20% 时间</strong>（Moshi 引 Çetin &amp; Shriberg 2006）——重叠是常态。</li>
+        </ul>
+        <div class="callout" style="margin-top:.5em;"><b>洞察</b>：所有工程状态最终都要映射回 hold / yield / abandon 三个动词，否则就是在发明没有语言学依据的状态。</div>
+      </div>
+      <div class="panel">
+        <h2><span class="tag warn">多模态线索</span>人类靠什么判断 TRP</h2>
+        <table>
+          <tr><th>线索</th><th>hold 信号</th><th>yield 信号</th></tr>
+          <tr><td><strong>语言</strong></td><td>句法未闭合、"然后…"</td><td>句法完整、问句</td></tr>
+          <tr><td><strong>韵律</strong></td><td>平调 / 升调、拉长音</td><td>降调、音量下降</td></tr>
+          <tr><td><strong>呼吸</strong></td><td>吸气准备继续</td><td>呼气结束</td></tr>
+          <tr><td><strong>注视 / 手势</strong></td><td>看向别处、手势未收</td><td>回看对方、手势收回</td></tr>
+        </table>
+        <p style="margin-top:.4em;">纯音频系统只能拿到前三类——这是"是对我说的吗"（设备指向性）在音频系统里格外难的原因。</p>
+      </div>
+    </div>
+    <div class="col" style="flex: 1;">
+      <div class="panel">
+        <h2><span class="tag purple">Skantze 2021 综述</span>对话系统需要建模的四类事件</h2>
+        <div class="flow">
+          <div class="node"><strong>End‑of‑turn 检测</strong>轮内停顿（hold）vs 轮间停顿（shift）在<strong>声学上不可分</strong>，必须用连续预测</div>
+          <div class="node"><strong>用户打断处理</strong>停、截断、回应新意图</div>
+          <div class="node"><strong>轮次线索生成</strong>系统自己发出 hold / yield 信号（韵律、填充语）</div>
+          <div class="node"><strong>多方交互</strong>谁在对我说话</div>
+        </div>
+      </div>
+      <div class="panel" style="flex:1;">
+        <h2><span class="tag green">VAP / TurnGPT</span>最小公分母：四类事件</h2>
+        <table>
+          <tr><th>事件</th><th>定义</th><th>对系统输出的含义</th></tr>
+          <tr><td><strong>turn‑yielding（shift）</strong></td><td>说话人让出发言权</td><td>系统可以开口</td></tr>
+          <tr><td><strong>turn‑holding（hold）</strong></td><td>停顿但仍持有</td><td>系统必须继续沉默</td></tr>
+          <tr><td><strong>backchannel</strong></td><td>不夺发言权的短反馈，多发生在重叠里</td><td><strong>独立状态</strong>：既不是"说"也不是"沉默"</td></tr>
+          <tr><td><strong>interruption</strong></td><td>夺取发言权</td><td>系统要么让出，要么主动发起</td></tr>
+        </table>
+        <div class="callout warn" style="margin-top:.5em;"><b>洞察</b>：VAP 直接预测未来 2 s 双方语音活动分布，事件是<strong>派生</strong>的；TurnGPT 从文本预测轮次完成概率。韵律 + 语义两路并用是学界共识——单靠静音阈值（VAD）只是最粗的替代物。</div>
+      </div>
+      <div class="panel">
+        <h2><span class="tag">现象 → 状态</span>会话现象如何落成系统输出状态（预告第 7 页）</h2>
+        <div class="flow">
+          <div class="node"><strong>用户 hold</strong>→ 系统 LISTENING（不接管）</div>
+          <div class="arr">·</div>
+          <div class="node"><strong>用户 yield</strong>→ 系统 SPEAKING</div>
+          <div class="arr">·</div>
+          <div class="node"><strong>系统 backchannel</strong>→ BACKCHANNEL（不夺 floor）</div>
+          <div class="arr">·</div>
+          <div class="node"><strong>用户 interruption</strong>→ YIELDING 或 RESUMING（取决于是否真打断）</div>
+          <div class="arr">·</div>
+          <div class="node hl"><strong>系统 interruption</strong>→ INTERJECTING（主动性，行业短板）</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="pageno">2 / 11</div>
+</section>
+
+<!-- ═══════════ P3 模型表示层 ═══════════ -->
+<section class="slide">
+  <div class="header">
+    <h1>层二：<span class="hl">模型表示</span>——各家如何把状态编进模型</h1>
+    <p class="subtitle">隐式涌现（Moshi / SyncLLM）→ 分类头（Freeze‑Omni）→ 显式状态 token（SALMONN‑omni / BayLing‑Duplex）→ 把沉默变成思考（FLM‑Audio / Chronological Thinking）</p>
+  </div>
+  <div class="cols">
+    <div class="col" style="flex: 0 0 63%;">
+      <div class="panel" style="flex:1;">
+        <h2><span class="tag">对照表</span>状态载体 × 状态集合 × 时间粒度</h2>
+        <table style="font-size:.74em;">
+          <tr><th>模型</th><th>载体</th><th>状态集合</th><th>粒度</th></tr>
+          <tr><td><strong>Moshi</strong> 2024</td><td>文本流 <code>PAD</code>/<code>EPAD</code> + 音频"自然静音"</td><td>隐式；<code>EPAD</code>=即将开口，可强制采样令其开口</td><td class="num">80 ms</td></tr>
+          <tr><td><strong>SyncLLM</strong> 2024</td><td>周期同步 token + 双方 chunk 交错</td><td>隐式；序列建模涌现附和 / 重叠 / 打断</td><td class="num">chunk</td></tr>
+          <tr><td><strong>LSLM</strong> 2024</td><td><code>IRQ</code> 中断 token</td><td>说 / 被打断停</td><td class="num">帧</td></tr>
+          <tr><td><strong>Freeze‑Omni</strong> 2024</td><td>LLM 末层分类头</td><td><code>0</code> 继续收音 / <code>1</code> 打断→新生成 / <code>2</code> 说完</td><td class="num">chunk 末帧</td></tr>
+          <tr><td><strong>SALMONN‑omni</strong> 2024</td><td><code>start_speak</code> / <code>end_speak</code> + thinking</td><td>speaking / non‑speaking 两态</td><td class="num">时间块</td></tr>
+          <tr><td><strong>BayLing‑Duplex</strong> 2026</td><td>文本通道 4 个状态 token</td><td><code>[SILENCE]</code> / <code>[ASSISTANT]</code> / <code>[PAD]</code> 文本完语音未完 / <code>[EPAD]</code></td><td class="num">0.8 s 块</td></tr>
+          <tr><td><strong>FLM‑Audio</strong> 2025</td><td>连续独白 + <code>&lt;wait&gt;</code></td><td>说 / 等 / 被有意义语音打断</td><td class="num">句级</td></tr>
+          <tr><td><strong>Chrono. Thinking</strong> StepFun 2025</td><td>思考链替换沉默 token</td><td>沉默 = 边听边想</td><td class="num">帧</td></tr>
+          <tr><td><strong>Fun‑Audio‑Chat‑Duplex</strong> 通义·Qwen3 2025</td><td>并行 speech‑text 输入流 + <code>&lt;|SIL|&gt;</code></td><td>隐式；重叠为附和→继续、新指令→停；自报 turn‑taking 100%</td><td class="num">5 / 25 Hz</td></tr>
+          <tr><td><strong>Qwen3‑Omni</strong> Thinker‑Talker 2025</td><td>不定义输出状态</td><td>轮次制，发言权交外部 VAD；解耦"想/说"而非"听/说"</td><td class="num">12.5 Hz</td></tr>
+          <tr><td><strong>Unit‑based agent</strong> 2026</td><td>MLLM 输出动作</td><td>状态 listen/speak × 动作 continue/switch</td><td class="num">单元</td></tr>
+          <tr><td><strong>GPT‑Live</strong> 2026</td><td>未公开</td><td>speak / continue listening / pause / interrupt / invoke tool</td><td class="num">—</td></tr>
+        </table>
+      </div>
+    </div>
+    <div class="col" style="flex: 1;">
+      <div class="panel" style="flex:1; font-size:.88em;">
+        <h2><span class="tag warn">洞察</span>四条设计脉络</h2>
+        <ul>
+          <li><strong>"要不要说"与"说什么"是两步。</strong> Moshi 把 <code>EPAD</code>（结束填充）与下一个词分开预测，论文明说是"拆成两步"；BayLing 用 <code>[ASSISTANT]</code> 单独标记"开口"事件。</li>
+          <li><strong>沉默不是一种状态，至少三种。</strong> BayLing 区分 <code>[SILENCE]</code>（没轮到我）与 <code>[PAD]</code>（文本完、语音在播）；Chronological Thinking 把沉默变成思考期。外观相同、内部不同。</li>
+          <li><strong>打断判定在迁移：</strong>声学触发（Freeze‑Omni 靠 VAD + 分类头）→ 语义判定（Unit‑agent 在 speak 态区分附和 vs 真打断）→ 模型内生（GPT‑Live：让出慢 ~500 ms，但 30/30 拒绝背景人声）。</li>
+          <li><strong>显式 token 的代价是极度不平衡。</strong> Moshi 报告 PAD 占英语对话 65%；BayLing 指出 <code>[SILENCE]</code> 占绝对多数、<code>[ASSISTANT]</code> 每轮一次，必须逐 token 加权 + DPO 单独调"时机"。</li>
+        </ul>
+        <div class="callout red" style="margin-top:.4em;"><b>粒度是架构参数</b>：Moshi 80 ms 帧 → 160 ms 理论时延；BayLing 0.8 s 块——论文承认块太小则轮次抖动、太大则最小时延超阈值。状态粒度直接决定最小响应时延。</div>
+        <div class="callout warn" style="margin-top:.4em;"><b>Qwen 系的位置</b>：Qwen3‑Omni 的 Thinker‑Talker 解决的是 THINKING 态首包时延（单路 234 ms，6 并发 1172 ms），不管发言权；原生全双工是 Fun‑Audio‑Chat‑Duplex——<strong>自报 turn‑taking 100%，Instruct‑FD 却只有 46.2%</strong>（Backchannel 0%、Acknowledge 5.4%）："轮次成功率"不够，必须测状态判定本身。</div>
+      </div>
+    </div>
+  </div>
+  <div class="pageno">3 / 11</div>
+</section>
+
+<!-- ═══════════ P4 系统事件层 ═══════════ -->
+<section class="slide">
+  <div class="header">
+    <h1>层三：<span class="hl">系统事件</span>——用户侧状态判定与 API / 产品事件</h1>
+    <p class="subtitle">Easy Turn（ICASSP 2026）· TEN Turn Detection · Deepgram Flux · OpenAI Realtime API · GPT‑Live</p>
+  </div>
+  <div class="cols">
+    <div class="col" style="flex: 0 0 50%;">
+      <div class="panel" style="flex:1;">
+        <h2><span class="tag">用户侧状态</span>把"用户话语"分类，再映射成系统输出</h2>
+        <table>
+          <tr><th>用户话语</th><th>Easy Turn</th><th>TEN</th><th>Deepgram Flux 事件</th><th>期望输出</th></tr>
+          <tr><td>语义完整</td><td><code>complete</code></td><td><code>finished</code></td><td><code>EndOfTurn</code> / <code>EagerEndOfTurn</code>（中置信、可投机）</td><td><strong>开口</strong></td></tr>
+          <tr><td>语义未完</td><td><code>incomplete</code></td><td><code>unfinished</code></td><td><code>TurnResumed</code>（撤回投机）</td><td><strong>继续听</strong></td></tr>
+          <tr><td>用户附和</td><td><code>backchannel</code></td><td>—</td><td>—</td><td><strong>继续说</strong></td></tr>
+          <tr><td>要求闭嘴 / 暂停</td><td><code>wait</code></td><td><code>wait</code></td><td>—</td><td><strong>立即停、纯聆听</strong></td></tr>
+          <tr><td>用户开口</td><td>—</td><td>—</td><td><code>StartOfTurn</code></td><td>若在说 → 让出判定</td></tr>
+        </table>
+        <div class="callout blue" style="margin-top:.6em;"><b>洞察</b>：Flux 的 <code>Eager / Resumed</code> 一对事件把"<strong>投机开口、发现没说完再撤回</strong>"做成一等公民——换 150–250 ms 提前，付 50–70% 更多 LLM 调用。这是 GPT‑Live"先应答、后实质"两时钟在级联系统里的落地。</div>
+        <div class="callout warn" style="margin-top:.5em;"><b>洞察</b>：Easy Turn 与 TEN 都把 <code>wait</code>（用户要求闭嘴）单列为一态——"被禁言"不是普通的沉默，它需要一个<strong>显式解除条件</strong>，否则模型会在下一个 TRP 自动开口。这就是统一模型里 MUTED 单列的依据。</div>
+      <div class="callout red" style="margin-top:.5em;"><b>关键对照</b>：Instruct‑FD 把 <strong>GPT‑Realtime 排除在评测之外</strong>——理由是其 API"要求用户显式发出打断信号，不允许模型自主管理发言权"。OpenAI 与 Qwen 的第二代 API 状态都是<strong>外部驱动</strong>的；第三代才把决策交回模型。</div>
+      </div>
+    </div>
+    <div class="col" style="flex: 1;">
+      <div class="panel">
+        <h2><span class="tag purple">GPT‑Live（第三代）</span>模型动作 + 用户听不见的系统状态</h2>
+        <div class="states" style="grid-template-columns: repeat(5,1fr); margin-bottom:.5em;">
+          <div class="stcard m"><b>speak</b>持有发言权</div>
+          <div class="stcard u"><b>continue listening</b>发言权在用户</div>
+          <div class="stcard m"><b>pause</b>自己的停顿</div>
+          <div class="stcard u"><b>interrupt</b>主动插话</div>
+          <div class="stcard t"><b>invoke tool</b>委托 / 工具</div>
+        </div>
+        <p>系统层另有三个<strong>影子状态</strong>约束模型能做什么：<strong>委托中</strong>（只能打圆场，不能给实质答案）、<strong>切换中</strong>（实例迁移 / 压缩，媒体不断）、<strong>分轮暂定</strong>（谁持有发言权尚未定稿，最新消息可回改）。</p>
+      </div>
+      <div class="panel">
+        <h2><span class="tag green">Realtime API（OpenAI / Qwen，第二代表面）</span>状态以事件形式暴露</h2>
+        <table style="font-size:.76em;">
+          <tr><th>事件 / 配置</th><th>对应输出状态变化</th></tr>
+          <tr><td><code>speech_started</code></td><td>用户开口；若在说 → <code>response.cancelled</code> + <code>truncate</code>（让出 + 截断）</td></tr>
+          <tr><td><code>response.created → delta → done</code></td><td>进入说话 → 持续说 → 说完</td></tr>
+          <tr><td><code>create_response=false</code></td><td>听到了但不自动开口</td></tr>
+          <tr><td><code>conversation="none"</code></td><td>旁路推理不进主对话——"边想边说"雏形</td></tr>
+          <tr><td><code>semantic_vad.eagerness</code></td><td>hold / yield 判定做成单一可配旋钮</td></tr>
+          <tr><td><strong>Qwen Realtime</strong> <code>server_vad / semantic_vad</code> + <code>interrupt_response</code>；Qwen‑Audio 3.0 <code>smart_turn</code></td><td>与 OpenAI 同构；<code>smart_turn</code> 声学 + 语义判轮，"嗯 / 呃"不打断——Easy Turn 四态的 API 落地</td></tr>
+        </table>
+      </div>
+    </div>
+  </div>
+  <div class="pageno">4 / 11</div>
+</section>
+
+<!-- ═══════════ P5 评测定义正确状态 ═══════════ -->
+<section class="slide">
+  <div class="header">
+    <h1>评测反向定义"<span class="hl">正确的输出状态</span>"</h1>
+    <p class="subtitle">Full‑Duplex‑Bench v1.0（Lin et al. 2025）· v1.5 重叠处理（2025/2026）· Agora 三时钟（2026‑07）</p>
+  </div>
+  <div class="cols">
+    <div class="col" style="flex: 0 0 40%;">
+      <div class="panel" style="flex:1;">
+        <h2><span class="tag">FDB v1.0</span>四维度：期望行为即期望状态</h2>
+        <table>
+          <tr><th>场景</th><th>期望</th><th>指标</th></tr>
+          <tr><td><strong>Pause handling</strong> 用户轮内停顿</td><td>不接管（hold 给用户）</td><td>Takeover Rate ↓</td></tr>
+          <tr><td><strong>Backchanneling</strong> 用户在说</td><td>短反馈、不接管</td><td>TOR、频率、与人类时机 JSD</td></tr>
+          <tr><td><strong>Smooth turn‑taking</strong> 用户说完</td><td>及时开口</td><td>响应时延</td></tr>
+          <tr><td><strong>User interruption</strong></td><td>接管、让出、回应新意图</td><td>TOR≈1、质量分、打断后时延</td></tr>
+        </table>
+        <div class="kpis" style="grid-template-columns: repeat(3,1fr); margin-top:.6em;">
+          <div class="kpi"><div class="v red">1.000</div><div class="k">Moshi 在 pause handling 的接管率——几乎每次停顿都抢话</div></div>
+          <div class="kpi"><div class="v warn">0.287</div><div class="k">Freeze‑Omni 同项（真实 Candor 语料）——保守但 turn‑taking 只有 0.369</div></div>
+          <div class="kpi"><div class="v">0.005</div><div class="k">Moshi 附和频率/秒——几乎不附和，而是直接接管</div></div>
+        </div>
+      </div>
+    </div>
+    <div class="col" style="flex: 1;">
+      <div class="panel">
+        <h2><span class="tag purple">FDB v1.5</span>四种重叠 × 行为标签 <code>Respond / Resume / Uncertain / Unknown</code></h2>
+        <table>
+          <tr><th>重叠场景</th><th>期望</th><th>GPT‑4o</th><th>Freeze‑Omni</th><th>Moshi</th><th>Gemini</th><th>Sonic</th></tr>
+          <tr><td>用户打断（新请求）</td><td><strong>Respond</strong></td><td class="num"><span class="good">0.78</span></td><td class="num">0.72</td><td class="num">0.50</td><td class="num">0.33</td><td class="num"><span class="bad">0.24</span></td></tr>
+          <tr><td>用户附和 uh‑huh</td><td><strong>Resume</strong></td><td class="num">0.70</td><td class="num">0.80</td><td class="num"><span class="bad">0.06</span></td><td class="num">0.93</td><td class="num"><span class="good">0.98</span></td></tr>
+          <tr><td>用户对旁人说话</td><td>Resume（少量 Uncertain）</td><td class="num"><span class="bad">Respond 0.91</span></td><td class="num">Respond 0.58</td><td class="num">—</td><td class="num"><span class="good">Resume 0.99</span></td><td class="num">Resume 0.90</td></tr>
+          <tr><td>背景人声</td><td>Resume，近零 Respond</td><td class="num"><span class="bad">Respond 0.93</span></td><td class="num">—</td><td class="num">—</td><td class="num">0.70</td><td class="num"><span class="good">Resume 0.98</span></td></tr>
+        </table>
+      </div>
+      <div class="cols" style="flex:1;">
+        <div class="panel" style="flex:1;">
+          <h2><span class="tag warn">洞察</span>两种策略取向，没有全局最优</h2>
+          <ul>
+            <li><strong>repair‑first（快速让出）</strong>：GPT‑4o —— 打断响应最好，但对旁人说话、背景人声也 0.9+ 误接管。</li>
+            <li><strong>continuity‑first（维持连贯）</strong>：Sonic / Gemini —— 抗干扰最好，但真打断响应只有 0.24–0.33。</li>
+            <li>结论：<strong>YIELDING vs RESUMING 的判定阈值是产品决策</strong>，客服偏前者、陪伴 / 辅导偏后者。</li>
+          </ul>
+        </div>
+        <div class="panel" style="flex:1;">
+          <h2><span class="tag green">时序</span>一个全双工系统至少测五个时间点</h2>
+          <ul>
+            <li>用户停 → 系统<strong>首音</strong>（FDB 响应时延）</li>
+            <li>重叠开始 → 系统<strong>停嘴</strong>（stop latency）</li>
+            <li>重叠结束 → 系统<strong>再开口</strong>（response latency）</li>
+            <li>首音 → <strong>实质内容</strong>；实质 → <strong>说完</strong>（Agora 三时钟）</li>
+          </ul>
+          <p style="margin-top:.3em;">GPT‑Live 实测：首音仅快 205 ms，但<strong>抖动降 5 倍</strong>（σ 489→104 ms）；10% 丢包 +314 ms vs AVM +2448 ms。</p>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="pageno">5 / 11</div>
+</section>
+
+<!-- ═══════════ P6 Instruct-FD ═══════════ -->
+<section class="slide">
+  <div class="header">
+    <h1><span class="hl">Instruct‑FD</span>：状态不仅要"有"，还要"可被指令控制"</h1>
+    <p class="subtitle">Tang et al., Boson AI, arXiv 2607.20460（2026）· 912 用例 × 29 场景 × 6 系统 · WebRTC 多轮编排器 + LLM 裁判（88.9% 与人一致）</p>
+  </div>
+  <div class="cols">
+    <div class="col" style="flex: 0 0 44%;">
+      <div class="panel">
+        <h2><span class="tag">按"谁持有发言权"划分</span>五条可指令化的轮次策略</h2>
+        <div class="cols" style="gap:.5em;">
+          <div class="col" style="flex:1; gap:.35em;">
+            <div class="band l1"><strong>Proactive · 用户在说</strong>，模型决定是否介入</div>
+            <div class="stcard u"><b>Listen</b>沉默，不附和不插话，等清晰结束</div>
+            <div class="stcard u"><b>Backchannel</b>在触发点短应答，不夺发言权</div>
+            <div class="stcard u"><b>Interrupt</b>触发（矛盾 / 安全错误）时立即夺取发言权</div>
+          </div>
+          <div class="col" style="flex:1; gap:.35em;">
+            <div class="band l3"><strong>Responsive · 模型在说</strong>，用户重叠时如何反应</div>
+            <div class="stcard m"><b>Continue</b>用户"嗯嗯"视为支持，不让出</div>
+            <div class="stcard m"><b>Acknowledge</b>用户纠正 / 加约束 / 转向 → 立即承接并调整</div>
+          </div>
+        </div>
+        <p style="margin-top:.5em;">同一段对话配多条不同指令 → 隔离"指令遵循"与"对话内容"；对比无指令基线得 <strong>ΔIAS</strong>（指令敏感度）。人类在同一用例上准确率 89.6%，说明场景自然、指令可执行。</p>
+      </div>
+      <div class="panel" style="flex:1;">
+        <h2><span class="tag purple">29 个场景</span>其实是一张精细的"触发词典"</h2>
+        <p><strong>Proactive 触发：</strong>序列信息口述停顿、"你懂吗？"注意力确认、子句边界、填充词停顿、情感停顿、显式持有发言权信号、事实错误、犹豫、安全错误、自我矛盾、找词、认知停顿、投射停顿、自问自答。</p>
+        <p style="margin-top:.3em;"><strong>Responsive 重叠：</strong>确认 / 认同 / 笑 / 理解 / 继续者（→ Continue）；"等一下""再说一遍""我没跟上""还在吗？"、加约束、转向、缩范围、跳过基础、要摘要、加个人背景（→ Acknowledge）。</p>
+      </div>
+    </div>
+    <div class="col" style="flex: 1;">
+      <div class="panel">
+        <h2><span class="tag red">结果</span>Instruction Adherence Score（IAS）</h2>
+        <table>
+          <tr><th>模型</th><th>Overall</th><th>Listen</th><th>Backchannel</th><th>Interrupt</th><th>Continue</th><th>Acknowledge</th></tr>
+          <tr><td><strong>Gemini Live</strong></td><td class="num"><span class="good">64.4%</span></td><td class="num">72.4%</td><td class="num"><span class="mid">50.0%</span></td><td class="num"><span class="bad">5.8%</span></td><td class="num">71.7%</td><td class="num"><span class="good">86.3%</span></td></tr>
+          <tr><td>PersonaPlex</td><td class="num">47.0%</td><td class="num">66.7%</td><td class="num">5.8%</td><td class="num">10.0%</td><td class="num">90.0%</td><td class="num">35.8%</td></tr>
+          <tr><td>Fun‑Audio‑Chat</td><td class="num">46.2%</td><td class="num"><span class="good">90.7%</span></td><td class="num"><span class="bad">0.0%</span></td><td class="num">9.2%</td><td class="num">94.2%</td><td class="num"><span class="bad">5.4%</span></td></tr>
+          <tr><td>MiniCPM‑o</td><td class="num">36.4%</td><td class="num">59.6%</td><td class="num">12.5%</td><td class="num"><span class="bad">1.7%</span></td><td class="num"><span class="good">97.5%</span></td><td class="num"><span class="bad">5.4%</span></td></tr>
+          <tr><td>Moshi</td><td class="num">21.1%</td><td class="num">12.8%</td><td class="num">1.7%</td><td class="num">11.7%</td><td class="num">88.3%</td><td class="num">12.0%</td></tr>
+          <tr><td>Freeze‑Omni</td><td class="num"><span class="bad">10.7%</span></td><td class="num">7.1%</td><td class="num">0.0%</td><td class="num">5.0%</td><td class="num">40.0%</td><td class="num">9.6%</td></tr>
+        </table>
+      </div>
+      <div class="panel" style="flex:1;">
+        <h2><span class="tag warn">洞察</span>四个系统性失败模式</h2>
+        <ul>
+          <li><strong>语义合规 ≠ 时序合规。</strong> 模型说了对的话，但在错的时刻——该在用户说话中附和，却等用户说完才"嗯"。这解释了为什么听起来配合，却在 Backchannel / Interrupt 上近乎全败。</li>
+          <li><strong>Continue‑default 坍缩。</strong> Fun‑Audio‑Chat / MiniCPM‑o Continue ≈ 100%，Acknowledge ≈ 5%——分不清"用户继续者"与"用户纠正"，一律硬讲下去。</li>
+          <li><strong>触发层级。</strong> Gemini 对显式触发（"你懂吗？" 100%、持有信号 91.7%）能附和，对隐式触发（子句边界 0%、情感停顿 16.7%）失灵。</li>
+          <li><strong>指令可能反而破坏。</strong> Fun‑Audio‑Chat 加指令后 Acknowledge 显著下降（−11.2%）；PersonaPlex 比 Moshi 基线好一倍，但 ΔIAS 仍小——<strong>基线好 ≠ 可控</strong>。</li>
+        </ul>
+        <div class="callout red" style="margin-top:.4em;"><b>核心判断</b>：<strong>主动性状态（Backchannel / Interrupt）是全行业短板</strong>——最好的系统 Interrupt 也只有 11.7%。而这恰是我们双脑架构里"打扰管理器 → 主动播报"依赖的能力。</div>
+      </div>
+    </div>
+  </div>
+  <div class="pageno">6 / 11</div>
+</section>
+
+<!-- ═══════════ P7 统一状态模型 ═══════════ -->
+<section class="slide">
+  <div class="header">
+    <h1>统一<span class="hl">输出状态模型</span>（讨论稿）：按"谁持有发言权"分列的 10 态</h1>
+    <p class="subtitle">原则：每个状态对用户<strong>可感知地不同</strong>，或对系统<strong>可操作地不同</strong>；两者都不满足的不单列</p>
+  </div>
+  <div class="cols">
+    <div class="col" style="flex: 0 0 62%;">
+      <div class="panel" style="flex:1; padding:.5em .6em;">
+        <svg viewBox="0 0 1000 640" width="100%" height="100%" preserveAspectRatio="xMidYMid meet" style="flex:1; min-height:0;">
+          <defs>
+            <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#5a6b84"/></marker>
+            <marker id="arb" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#2f6fed"/></marker>
+            <marker id="arg" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#0ea578"/></marker>
+            <marker id="arp" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#7c5cd6"/></marker>
+            <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#d0453c"/></marker>
+          </defs>
+          <!-- 三列背景 -->
+          <rect x="8" y="8" width="318" height="624" rx="14" fill="rgba(47,111,237,.05)" stroke="rgba(47,111,237,.25)"/>
+          <text x="167" y="36" text-anchor="middle" font-size="17" font-weight="700" fill="#2f6fed">用户持有发言权 · Proactive 侧</text>
+          <rect x="340" y="8" width="318" height="624" rx="14" fill="rgba(124,92,214,.05)" stroke="rgba(124,92,214,.25)"/>
+          <text x="499" y="36" text-anchor="middle" font-size="17" font-weight="700" fill="#7c5cd6">过渡 / 无人持有</text>
+          <rect x="672" y="8" width="320" height="624" rx="14" fill="rgba(14,165,120,.05)" stroke="rgba(14,165,120,.25)"/>
+          <text x="832" y="36" text-anchor="middle" font-size="17" font-weight="700" fill="#0ea578">模型持有发言权 · Responsive 侧</text>
+
+          <!-- 左列状态 -->
+          <g>
+            <rect x="50" y="80" width="235" height="66" rx="10" fill="#fff" stroke="#2f6fed" stroke-width="1.6"/>
+            <text class="st" x="167" y="108" text-anchor="middle" font-size="18" fill="#2f6fed">BACKCHANNEL</text>
+            <text x="167" y="131" text-anchor="middle" font-size="13.5" fill="#5a6b84">"嗯嗯 / 对"，不夺发言权</text>
+          </g>
+          <g>
+            <rect x="50" y="250" width="235" height="76" rx="10" fill="#fff" stroke="#2f6fed" stroke-width="2.4"/>
+            <text class="st" x="167" y="283" text-anchor="middle" font-size="21" fill="#2f6fed">LISTENING</text>
+            <text x="167" y="308" text-anchor="middle" font-size="13.5" fill="#5a6b84">沉默、持续消费输入</text>
+          </g>
+          <g>
+            <rect x="50" y="420" width="235" height="66" rx="10" fill="#fff" stroke="#2f6fed" stroke-width="1.6"/>
+            <text class="st" x="167" y="448" text-anchor="middle" font-size="18" fill="#2f6fed">INTERJECTING</text>
+            <text x="167" y="471" text-anchor="middle" font-size="13.5" fill="#5a6b84">主动实质插话（经打扰管理）</text>
+          </g>
+          <g>
+            <rect x="50" y="548" width="235" height="66" rx="10" fill="#fff" stroke="#2f6fed" stroke-width="1.6" stroke-dasharray="6 4"/>
+            <text class="st" x="167" y="576" text-anchor="middle" font-size="18" fill="#2f6fed">MUTED</text>
+            <text x="167" y="599" text-anchor="middle" font-size="13.5" fill="#5a6b84">用户显式禁言，直到解除</text>
+          </g>
+          <!-- 中列 -->
+          <g>
+            <rect x="382" y="150" width="235" height="76" rx="10" fill="#fff" stroke="#7c5cd6" stroke-width="2"/>
+            <text class="st" x="499" y="181" text-anchor="middle" font-size="17" fill="#7c5cd6">THINKING / DELEGATING</text>
+            <text x="499" y="207" text-anchor="middle" font-size="13.5" fill="#5a6b84">后台委托，填充语撑住</text>
+          </g>
+          <g>
+            <rect x="382" y="440" width="235" height="70" rx="10" fill="#fff" stroke="#7c5cd6" stroke-width="2"/>
+            <text class="st" x="499" y="469" text-anchor="middle" font-size="18" fill="#7c5cd6">REPAIR</text>
+            <text x="499" y="494" text-anchor="middle" font-size="13.5" fill="#5a6b84">"没听清 / 你在跟我说吗？"</text>
+          </g>
+          <!-- 右列 -->
+          <g>
+            <rect x="714" y="80" width="235" height="66" rx="10" fill="#fff" stroke="#0ea578" stroke-width="1.6"/>
+            <text class="st" x="832" y="108" text-anchor="middle" font-size="18" fill="#0ea578">HOLDING</text>
+            <text x="832" y="131" text-anchor="middle" font-size="13.5" fill="#5a6b84">自己的轮内停顿，不让出</text>
+          </g>
+          <g>
+            <rect x="714" y="250" width="235" height="76" rx="10" fill="#fff" stroke="#0ea578" stroke-width="2.4"/>
+            <text class="st" x="832" y="283" text-anchor="middle" font-size="21" fill="#0ea578">SPEAKING</text>
+            <text x="832" y="308" text-anchor="middle" font-size="13.5" fill="#5a6b84">持有发言权、产出实质内容</text>
+          </g>
+          <g>
+            <rect x="714" y="420" width="235" height="66" rx="10" fill="#fff" stroke="#0ea578" stroke-width="1.6"/>
+            <text class="st" x="832" y="448" text-anchor="middle" font-size="18" fill="#0ea578">RESUMING</text>
+            <text x="832" y="471" text-anchor="middle" font-size="13.5" fill="#5a6b84">重叠判为附和/旁人/背景 → 继续</text>
+          </g>
+          <g>
+            <rect x="714" y="548" width="235" height="66" rx="10" fill="#fff" stroke="#d0453c" stroke-width="2"/>
+            <text class="st" x="832" y="576" text-anchor="middle" font-size="18" fill="#d0453c">YIELDING</text>
+            <text x="832" y="599" text-anchor="middle" font-size="13.5" fill="#5a6b84">真打断：停嘴 + 截断未播内容</text>
+          </g>
+
+          <!-- 主转移：LISTENING ↔ SPEAKING -->
+          <path d="M285 274 L714 274" stroke="#2f6fed" stroke-width="2.4" fill="none" marker-end="url(#arb)"/>
+          <text x="499" y="266" text-anchor="middle" font-size="13.5" fill="#2f6fed">用户语义完整 / TRP → 开口</text>
+          <path d="M714 302 L285 302" stroke="#0ea578" stroke-width="2.4" fill="none" marker-end="url(#arg)"/>
+          <text x="499" y="322" text-anchor="middle" font-size="13.5" fill="#0ea578">说完（EPAD）→ 交回发言权</text>
+
+          <!-- LISTENING ↔ BACKCHANNEL -->
+          <path d="M145 250 L145 146" stroke="#5a6b84" stroke-width="1.6" fill="none" marker-end="url(#ar)"/>
+          <path d="M190 146 L190 250" stroke="#5a6b84" stroke-width="1.6" fill="none" marker-end="url(#ar)"/>
+          <text x="167" y="203" text-anchor="middle" font-size="12.5" fill="#5a6b84">附和时机</text>
+          <!-- LISTENING → INTERJECTING → SPEAKING -->
+          <path d="M167 326 L167 420" stroke="#5a6b84" stroke-width="1.6" fill="none" marker-end="url(#ar)"/>
+          <text x="175" y="378" text-anchor="start" font-size="12.5" fill="#5a6b84">高价值 × 放行</text>
+          <path d="M285 445 C 500 445, 620 360, 714 312" stroke="#5a6b84" stroke-width="1.6" fill="none" marker-end="url(#ar)" stroke-dasharray="7 5"/>
+          <text x="470" y="428" text-anchor="middle" font-size="12" fill="#5a6b84">插话成功 → 持有发言权</text>
+          <!-- LISTENING ↔ MUTED -->
+          <path d="M100 326 L100 548" stroke="#5a6b84" stroke-width="1.3" fill="none" marker-end="url(#ar)" stroke-dasharray="4 3"/>
+          <path d="M78 548 L78 326" stroke="#5a6b84" stroke-width="1.3" fill="none" marker-end="url(#ar)" stroke-dasharray="4 3"/>
+          <text x="66" y="440" text-anchor="middle" font-size="12" fill="#5a6b84" transform="rotate(-90 66 440)">用户 wait / 解除</text>
+          <!-- LISTENING → THINKING → SPEAKING -->
+          <path d="M285 258 C 330 210, 340 188, 382 188" stroke="#7c5cd6" stroke-width="1.8" fill="none" marker-end="url(#arp)"/>
+          <text x="322" y="178" text-anchor="middle" font-size="12.5" fill="#7c5cd6">需委托</text>
+          <path d="M617 188 C 660 188, 670 210, 714 258" stroke="#7c5cd6" stroke-width="1.8" fill="none" marker-end="url(#arp)"/>
+          <text x="678" y="178" text-anchor="middle" font-size="12.5" fill="#7c5cd6">结果到</text>
+          <!-- SPEAKING ↔ HOLDING -->
+          <path d="M810 250 L810 146" stroke="#5a6b84" stroke-width="1.6" fill="none" marker-end="url(#ar)"/>
+          <path d="M855 146 L855 250" stroke="#5a6b84" stroke-width="1.6" fill="none" marker-end="url(#ar)"/>
+          <text x="832" y="203" text-anchor="middle" font-size="12.5" fill="#5a6b84">轮内停顿</text>
+          <!-- SPEAKING → RESUMING → SPEAKING -->
+          <path d="M810 326 L810 420" stroke="#5a6b84" stroke-width="1.6" fill="none" marker-end="url(#ar)"/>
+          <path d="M855 420 L855 326" stroke="#5a6b84" stroke-width="1.6" fill="none" marker-end="url(#ar)"/>
+          <text x="864" y="378" text-anchor="start" font-size="12.5" fill="#5a6b84">重叠 = 非打断</text>
+          <!-- SPEAKING → YIELDING → LISTENING -->
+          <path d="M949 300 C 990 380, 990 500, 949 570" stroke="#d0453c" stroke-width="1.8" fill="none" marker-end="url(#arr)"/>
+          <text x="984" y="435" text-anchor="middle" font-size="12.5" fill="#d0453c" transform="rotate(90 984 435)">重叠 = 真打断</text>
+          <path d="M714 590 C 520 622, 420 622, 285 590" stroke="#d0453c" stroke-width="1.8" fill="none" marker-end="url(#arr)"/>
+          <text x="499" y="628" text-anchor="middle" font-size="12.5" fill="#d0453c">停嘴 + 截断 → 交回发言权</text>
+          <!-- REPAIR -->
+          <path d="M714 440 C 670 455, 650 465, 617 470" stroke="#7c5cd6" stroke-width="1.5" fill="none" marker-end="url(#arp)" stroke-dasharray="4 3"/>
+          <path d="M382 470 C 340 460, 310 400, 285 320" stroke="#7c5cd6" stroke-width="1.5" fill="none" marker-end="url(#arp)" stroke-dasharray="4 3"/>
+          <text x="499" y="538" text-anchor="middle" font-size="12.5" fill="#7c5cd6">任意状态 · 需澄清 → REPAIR → 回 LISTENING</text>
+        </svg>
+      </div>
+    </div>
+    <div class="col" style="flex: 1;">
+      <div class="panel" style="flex:1;">
+        <h2><span class="tag">10 态与来源对应</span></h2>
+        <table style="font-size:.74em;">
+          <tr><th>状态</th><th>文献 / 实践</th></tr>
+          <tr><td><strong>LISTENING</strong></td><td>Moshi PAD；BayLing <code>[SILENCE]</code>；GPT‑Live listening；Instruct‑FD Listen</td></tr>
+          <tr><td><strong>BACKCHANNEL</strong></td><td>VAP；FDB backchanneling；Instruct‑FD Backchannel；GPT‑Live "mhmm"</td></tr>
+          <tr><td><strong>INTERJECTING</strong></td><td>GPT‑Live interrupt；Instruct‑FD Interrupt；OpenAI 分轮规则</td></tr>
+          <tr><td><strong>MUTED</strong></td><td>Easy Turn / TEN <code>wait</code>；GPT‑Live "让它闭嘴听"</td></tr>
+          <tr><td><strong>THINKING</strong></td><td>GPT‑Live 委托；Chronological Thinking；Realtime 异步函数</td></tr>
+          <tr><td><strong>REPAIR</strong></td><td>FDB v1.5 Uncertain；Alexa 设备指向性</td></tr>
+          <tr><td><strong>SPEAKING</strong></td><td>BayLing <code>[ASSISTANT]</code>；SALMONN start_speak；Realtime response.*</td></tr>
+          <tr><td><strong>HOLDING</strong></td><td>Sacks hold；GPT‑Live pause；BayLing <code>[PAD]</code> 尾段</td></tr>
+          <tr><td><strong>RESUMING</strong></td><td>FDB Resume；Instruct‑FD Continue；Unit‑agent speak+continue</td></tr>
+          <tr><td><strong>YIELDING</strong></td><td>Freeze‑Omni state 1；LSLM IRQ；Realtime cancel+truncate；FDB Respond；Instruct‑FD Acknowledge</td></tr>
+        </table>
+        <div class="callout blue" style="margin-top:.45em; font-size:.78em;"><b>为什么按发言权分列</b>：Instruct‑FD 与 Sacks 都以"谁持有 floor"为第一坐标。左列是<strong>主动性</strong>状态（行业短板），右列是<strong>响应性</strong>状态（相对成熟）。</div>
+      </div>
+    </div>
+  </div>
+  <div class="pageno">7 / 11</div>
+</section>
+
+<!-- ═══════════ P8 转移守卫 ═══════════ -->
+<section class="slide">
+  <div class="header">
+    <h1>状态之间的<span class="hl">五个关键判定</span>（转移守卫）</h1>
+    <p class="subtitle">状态本身不难列，难的是转移条件——每个判定都有一条"业界目前做到哪"的现状线</p>
+  </div>
+  <div class="cols">
+    <div class="col" style="flex:1;">
+      <div class="panel" style="flex:1;">
+        <table style="font-size:.9em;">
+          <tr><th style="width:17%">判定</th><th style="width:16%">转移</th><th>输入线索</th><th>难点</th><th>现有做法 / 现状</th></tr>
+          <tr>
+            <td><strong>① 用户说完了吗</strong></td><td class="num">LISTENING → SPEAKING</td>
+            <td>语义完整性 + 韵律 + 停顿长度</td>
+            <td>hold vs shift 声学不可分；Instruct‑FD 里"序列信息口述""自问自答"场景 Listen 仅 33%</td>
+            <td>TurnGPT / VAP 双路；Easy Turn complete / incomplete；Flux Eager / Resumed 投机；GPT‑Live 内生</td>
+          </tr>
+          <tr>
+            <td><strong>② 附和还是打断</strong></td><td class="num">SPEAKING → RESUMING / YIELDING</td>
+            <td>重叠长度、内容、是否含新意图 / 纠正</td>
+            <td>短句"对对对" vs "等一下"歧义；Continue‑default 坍缩（Acknowledge ≈ 5%）</td>
+            <td>Unit‑agent 在 speak 态分类；Freeze‑Omni 分类头；GPT‑Live 让出慢 500 ms 换零误触发</td>
+          </tr>
+          <tr>
+            <td><strong>③ 是对我说的吗</strong></td><td class="num">→ RESUMING / REPAIR</td>
+            <td>说话人、方向、内容指向</td>
+            <td>多方 / 背景人声；GPT‑4o 对旁人说话 0.91 误接管</td>
+            <td>Alexa 设备指向性（端侧音视频融合）；FDB v1.5 允许少量 Uncertain</td>
+          </tr>
+          <tr>
+            <td><strong>④ 该插话吗</strong></td><td class="num">LISTENING → BACKCHANNEL / INTERJECTING</td>
+            <td>触发显著度 × 信息价值 × 紧急度 × 用户状态</td>
+            <td><strong>全行业短板</strong>：Interrupt 最高 11.7%，Backchannel 最高 50%；隐式触发（子句边界 0%）失灵；语义合规 ≠ 时序合规</td>
+            <td>Instruct‑FD 用自然语言指令条件化；我们的打扰管理器（speak_now / speak_at_pause / push / digest / hold）</td>
+          </tr>
+          <tr>
+            <td><strong>⑤ 该沉默多久</strong></td><td class="num">THINKING 时长上限</td>
+            <td>后台进度、已等待时长</td>
+            <td>沉默是语音里最差的失败态；委托撑不住任意慢的响应</td>
+            <td>填充语 + 三时钟预算；预建后台会话 + 亲和 + prompt caching；超时兜底话术</td>
+          </tr>
+        </table>
+      </div>
+    </div>
+  </div>
+  <div class="cols" style="flex:0 0 auto; margin-top:.6em;">
+    <div class="callout warn" style="flex:1;"><b>洞察 A</b>：①②③ 是<strong>响应性</strong>判定，业界已有多条可用路线；④⑤ 是<strong>主动性</strong>判定，学术基线接近于零，产品上只有 GPT‑Live 声称做到、且未公开机制。</div>
+    <div class="callout blue" style="flex:1;"><b>洞察 B</b>：Instruct‑FD 证明<strong>同一段对话在不同指令下应有不同正确状态</strong>——转移守卫不能是常量，必须是<strong>可被策略参数化</strong>的函数。</div>
+  </div>
+  <div class="pageno">8 / 11</div>
+</section>
+
+<!-- ═══════════ P9 总结分析 ═══════════ -->
+<section class="slide">
+  <div class="header">
+    <h1><span class="hl">总结分析</span>：六条跨来源的结论</h1>
+    <p class="subtitle">从 1974 年的会话分析到 2026 年的 Instruct‑FD，全双工"输出状态"这件事的共识与断层</p>
+  </div>
+  <div class="recs big" style="grid-template-columns: repeat(3,1fr);">
+    <div class="rec">
+      <h3><span class="no">1</span>状态是一等设计对象，不是 VAD 的副产品</h3>
+      <p>轮次制只有"沉默 / 说"两态；全双工把"要不要出声"变成每秒多次的决策。Moshi 的 <code>EPAD</code>、BayLing 的 <code>[ASSISTANT]</code>、GPT‑Live 的五动作，都把<strong>动作决策与内容生成拆成两步</strong>。</p>
+      <p class="ev"><b>依据</b> Moshi §3.4.4（EPAD 拆两步）· BayLing‑Duplex §2.1 · GPT‑Live 公告"many times per second"</p>
+    </div>
+    <div class="rec">
+      <h3><span class="no">2</span>沉默至少三种，附和必须单列</h3>
+      <p>听 / 播放尾音 / 思考——外观相同、内部不同（BayLing <code>[SILENCE]</code> vs <code>[PAD]</code>，Chronological Thinking）。backchannel 发生在重叠里、不夺发言权，是<strong>独立状态</strong>而非"短的说话"。</p>
+      <p class="ev"><b>依据</b> BayLing 四 token 定义 · StepFun Chronological Thinking · VAP backchannel 事件 · FDB v1.0 backchanneling 维度</p>
+    </div>
+    <div class="rec">
+      <h3><span class="no">3</span>响应性成熟，主动性是全行业断层</h3>
+      <p>Continue 40–97.5%、Acknowledge 最高 86.3%；而 <strong>Backchannel 0–50%、Interrupt 1.7–11.7%</strong>（Instruct‑FD）。语义合规常伴随时序不合规——"说了对的话，在错的时刻"。Qwen 系 Fun‑Audio‑Chat‑Duplex 自报 turn‑taking 100% 却 IAS 46.2%：<strong>轮次成功率 ≠ 状态判定正确</strong>。</p>
+      <p class="ev"><b>依据</b> Instruct‑FD Table 3 / §4 · Gemini 隐式触发 0% · Fun‑Audio‑Chat 技术报告 Table 7 vs Instruct‑FD Table 3</p>
+    </div>
+    <div class="rec">
+      <h3><span class="no">4</span>没有全局最优策略，状态阈值是产品决策</h3>
+      <p>repair‑first（GPT‑4o：打断响应好、误接管高）vs continuity‑first（Sonic / Gemini：抗干扰好、打断响应差）。Instruct‑FD 进一步证明<strong>同一对话在不同指令下正确状态不同</strong>——转移守卫必须可参数化。</p>
+      <p class="ev"><b>依据</b> FDB v1.5 行为表（GPT‑4o 旁人 Respond 0.91 vs Sonic Resume 0.90）· Instruct‑FD 同对话多指令设计</p>
+    </div>
+    <div class="rec">
+      <h3><span class="no">5</span>显式还是隐式：可控性与数据成本的权衡</h3>
+      <p>隐式涌现（Moshi / SyncLLM）需百万小时双通道数据、可控性差；显式 token / 分类头（Freeze‑Omni / BayLing）40 万样本即可、可加权可 DPO，但面对<strong>极度类别不平衡</strong>（PAD 65%）与合成数据偏差。PersonaPlex vs Moshi 说明<strong>训练数据比架构更能改善基线，但仍不带来可控性</strong>。</p>
+      <p class="ev"><b>依据</b> Moshi PAD 65% · BayLing ω<sub>sil</sub>/ω<sub>role</sub> 加权 + DPO · Instruct‑FD PersonaPlex 47.0% vs Moshi 21.1%，ΔIAS 仍小</p>
+    </div>
+    <div class="rec">
+      <h3><span class="no">6</span>状态归属正在从外部迁回模型，系统层仍需一组"影子状态"</h3>
+      <p>第二代 API 由外部信号驱动（Instruct‑FD 因此排除 GPT‑Realtime）；第三代交回模型。但 GPT‑Live 工程文章表明系统层仍要维护<strong>委托中 / 切换中 / 分轮暂定</strong>等状态，且它们约束模型可做的动作。</p>
+      <p class="ev"><b>依据</b> Instruct‑FD §3.1 排除 GPT‑Realtime 的理由 · OpenAI 工程文章：委托 / 切换 / 分轮暂定</p>
+    </div>
+  </div>
+  <div class="callout" style="margin-top:.6em;"><b>一句话</b>：全双工输出状态 = <strong>按发言权归属分列的 10 态</strong> + <strong>五个可参数化的转移守卫</strong> + <strong>一组系统影子状态</strong>；其中主动性状态（附和 / 插话）的<strong>时序正确性</strong>是当前最大的技术缺口，也是评测应当最先覆盖的地方。</div>
+  <div class="pageno">9 / 11</div>
+</section>
+
+<!-- ═══════════ P10 对我们的建议 ═══════════ -->
+<section class="slide">
+  <div class="header">
+    <h1><span class="hl">对我们的建议</span>：把状态做成接口、把策略做成参数、把评测做在模型前</h1>
+    <p class="subtitle">对接 phone‑assistant 双脑架构（前台 omni 全双工 + 后台深度大脑 + 打扰管理器）、latency / kv‑cache / reminder 讨论</p>
+  </div>
+  <div class="recs" style="grid-template-columns: repeat(3,1fr);">
+    <div class="rec">
+      <h3><span class="no">1</span>对外接口层一律显式，采用 10 态枚举</h3>
+      <p>模型内部可隐式，但必须能<strong>可靠读出</strong>当前状态（如 BayLing 的文本通道 / Freeze‑Omni 的分类头）。状态转移事件（尤其 YIELDING / INTERJECTING）进入<strong>权威记录</strong>，供分轮器、分析与安全审计；reminder 注入点对齐到状态边界。</p>
+    </div>
+    <div class="rec">
+      <h3><span class="no">2</span>状态归属：模型管"说不说"，编排层管"能不能"</h3>
+      <p>模型决定 SPEAKING / BACKCHANNEL / YIELDING / RESUMING / HOLDING；编排层持有 <strong>MUTED、INTERJECTING 最终放行、THINKING 超时</strong>，并维护委托中 / 切换中 / 分轮暂定三个影子状态。INTERJECTING 的放行就是打扰管理器的 <code>speak_now</code> / <code>speak_at_pause</code>。</p>
+    </div>
+    <div class="rec">
+      <h3><span class="no">3</span>转移守卫参数化：把"策略"做成可下发的指令</h3>
+      <p>借 Instruct‑FD 的五策略（Listen / Backchannel / Interrupt / Continue / Acknowledge）作为<strong>策略 profile</strong>：客服 = repair‑first、陪伴 / 辅导 = continuity‑first。第二代路线上先落到 <code>eagerness</code> 类旋钮；第三代路线上作为 system instruction 条件化训练目标。</p>
+    </div>
+    <div class="rec">
+      <h3><span class="no">4</span>评测集先于模型：FDB v1.0 + v1.5 + Instruct‑FD + 三时钟</h3>
+      <p>四维度（停顿 / 附和 / 交接 / 打断）+ 四重叠（打断 / 附和 / 旁人 / 背景）+ 五策略指令遵循（IAS / ΔIAS）+ 五个时间点。<strong>重点补主动性场景</strong>（子句边界附和、事实错误插话），并加真实网络损伤。中文场景需自建（现有基准均为英文）。</p>
+    </div>
+    <div class="rec">
+      <h3><span class="no">5</span>粒度与时延预算一起定</h3>
+      <p>帧级（80 ms）vs 块级（数百 ms）决定最小响应时延与轮次抖动。建议：<strong>状态决策粒度 ≤ 200 ms</strong>，内容生成可更粗；THINKING 的填充语在首音时钟 &lt; 1 s 内发出；后台大脑<strong>会话预建 + prefill</strong>（对应 GPT‑Live 委托预算）。</p>
+    </div>
+    <div class="rec">
+      <h3><span class="no">6</span>路线选择：先第二代 + 显式状态，再演进第三代</h3>
+      <p>短期：S2S 轮次制 + 语义 VAD + Easy Turn 式四态判定 + Flux 式投机开口，把 10 态接口与评测集先跑通。中期：Freeze‑Omni / BayLing 式显式 token 训练主动性状态（Backchannel / Interrupt），用 <strong>DPO 专调时机</strong>。长期：GPT‑Live API 落地后评估"前台接第三方全双工、后台自研"的边界。</p>
+    </div>
+  </div>
+  <div class="cols" style="flex:0 0 auto; margin-top:.6em; gap:.6em;">
+    <div class="callout red" style="flex:1;"><b>最大风险</b>：我们的双脑架构依赖前台"主动播报 / 插话"，而这正是业界 IAS 最低（≤ 11.7%）的能力。若不先在评测集上验证，打扰管理器的 <code>speak_now</code> 决策会落在一个模型做不到的动作上——<strong>要么做成"等用户停顿再说"（speak_at_pause 优先），要么专项训练</strong>。</div>
+    <div class="callout blue" style="flex:1;"><b>下一步</b>：① 定稿 10 态枚举与事件 schema；② 搭 FDB + Instruct‑FD 中文评测子集；③ 在现有 S2S 前台上实现 Easy Turn 四态 + 投机开口，跑出基线；④ 按基线决定主动性状态是训练还是绕开。</div>
+  </div>
+  <div class="pageno">10 / 11</div>
+</section>
+
+<!-- ═══════════ P11 附录：来源 Top 10 ═══════════ -->
+<section class="slide">
+  <div class="header">
+    <h1>附录：来源 <span class="hl">Top 10</span>——各自对"输出状态"问题的贡献与排序理由</h1>
+    <p class="subtitle">GPT‑Live 定目标 · Instruct‑FD / FDB 定量尺 · BayLing / Moshi / Freeze‑Omni 定实现路线<br>Sacks–Skantze 定边界 · 第二代实践层定短期可用件 · Qwen 系给反例与时延旁证</p>
+  </div>
+  <div class="cols">
+    <div class="col" style="flex:1;">
+      <div class="panel" style="flex:1;">
+        <table style="font-size:.72em;">
+          <tr><th>#</th><th>来源</th><th>贡献的核心洞察</th><th>排序理由（含扣分项）</th><th>①</th><th>②</th><th>③</th><th>④</th></tr>
+          <tr><td class="num">1</td><td><strong>GPT‑Live</strong>（公告 + 六个月工程文）</td><td>五动作 + 三个系统影子状态；"说 / 想"两时钟</td><td>唯一生产级第三代，即双脑架构的业界样本；扣分：机制不公开</td><td>◐</td><td>◐</td><td>●</td><td>●</td></tr>
+          <tr><td class="num">2</td><td><strong>Instruct‑FD</strong></td><td>状态从"有没有"变成"可不可控"；按 floor 分五策略；量化主动性短板</td><td>命中我们最大风险（主动插话）；排除 GPT‑Realtime 的理由说清两代分水岭</td><td>●</td><td>●</td><td>○</td><td>●</td></tr>
+          <tr><td class="num">3</td><td><strong>Full‑Duplex‑Bench</strong> v1.0 / v1.5</td><td>用期望行为反向定义正确状态；repair‑first vs continuity‑first</td><td>给出指标口径（TOR、stop / response latency）；不测可控性</td><td>●</td><td>●</td><td>○</td><td>◐</td></tr>
+          <tr><td class="num">4</td><td><strong>BayLing‑Duplex</strong></td><td>4 个状态 token、零新增模块、40 万样本 + DPO 调时机</td><td>"接口层显式、模型可读出"的最直接工程依据；可复制</td><td>●</td><td>●</td><td>○</td><td>●</td></tr>
+          <tr><td class="num">5</td><td><strong>Moshi</strong></td><td>全双工内生范式原型；PAD / EPAD 两步决策；PAD 占 65%</td><td>理论价值最高；IAS 21.1%、停顿接管率 1.0——涌现路线可控性差</td><td>◐</td><td>●</td><td>◐</td><td>◐</td></tr>
+          <tr><td class="num">6</td><td><strong>Sacks 1974 / Skantze 2021 / VAP</strong></td><td>hold / yield / abandon；四事件；重叠 10–20%</td><td>状态枚举的语言学锚点，防止发明伪状态；不给工程答案</td><td>●</td><td>●</td><td>—</td><td>◐</td></tr>
+          <tr><td class="num">7</td><td><strong>Freeze‑Omni</strong></td><td>分类头三态 + frozen LLM + "model as server"</td><td>最易落地的显式路线；IAS 10.7% 说明三态过粗——显式 ≠ 够用</td><td>●</td><td>●</td><td>◐</td><td>◐</td></tr>
+          <tr><td class="num">8</td><td><strong>第二代实践层</strong>：OpenAI Realtime · <strong>Qwen Realtime</strong>（<code>semantic_vad</code> / <code>smart_turn</code>）· Flux · Easy Turn / TEN</td><td>状态以事件暴露、外部驱动；投机开口再撤回；<code>wait</code> 单列</td><td>短期可用件；MUTED 与投机 SPEAKING 的来源；Qwen 在这一层</td><td>●</td><td>◐</td><td>●</td><td>●</td></tr>
+          <tr><td class="num">9</td><td><strong>Fun‑Audio‑Chat‑Duplex</strong>（通义，Qwen3 底座）</td><td>并行输入流 + <code>&lt;|SIL|&gt;</code>；Continue‑default 坍缩典型</td><td>反例：自报 turn‑taking 100% vs IAS 46.2%——评测必须含 Acknowledge / Backchannel</td><td>○</td><td>●</td><td>◐</td><td>◐</td></tr>
+          <tr><td class="num">10</td><td><strong>Qwen3‑Omni</strong>（Thinker‑Talker）</td><td>模型内想 / 说解耦；6 并发首包 234 → 1172 ms</td><td>对 THINKING 态时延预算有价值；对发言权状态无直接贡献</td><td>○</td><td>●</td><td>●</td><td>○</td></tr>
+        </table>
+      </div>
+    </div>
+  </div>
+  <div class="cols" style="flex:0 0 auto; margin-top:.5em; gap:.6em;">
+    <div class="callout blue" style="flex:1; font-size:.76em;"><b>Qwen 系为何拆成三条线</b>：Qwen3‑Omni 是轮次制 S2S（架构层，01 章谱系二）；Qwen Realtime API 是第二代表面（系统事件层）；Fun‑Audio‑Chat‑Duplex 才是原生全双工（模型表示层）。三者回答的是不同层的问题，不应合并成"Qwen 一行"。</div>
+    <div class="callout warn" style="flex:1; font-size:.76em;"><b>图例</b>：● 充分 · ◐ 部分 · ○ 弱 · — 不适用。①状态集合可枚举 ②数据可复现 ③生产 / 规模验证 ④与双脑架构相关度。排序是对"输出状态"这一问题的贡献，不是模型整体优劣。</div>
+  </div>
+  <div class="pageno">11 / 11</div>
+</section>
+
+</body>
+</html>
