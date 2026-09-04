@@ -64,3 +64,4 @@ target/
 # Intellij
 .idea/
 *.iml
+.DS_Store
