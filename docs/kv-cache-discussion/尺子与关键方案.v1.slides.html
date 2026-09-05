@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>应该命中什么 · 命中率 · 三个关键方案 · v1(单页)</title>
+<style>
+  :root {
+    --bg: #e9edf4;
+    --slide-bg: linear-gradient(135deg, #ffffff 0%, #f7f9fd 60%, #eef3fb 100%);
+    --card: #f7f9fc;
+    --card-border: #dfe5ee;
+    --text: #1f2a3d;
+    --muted: #5c6b84;
+    --accent: #2563eb;
+    --good: #059669;
+    --warn: #d97706;
+    --bad: #dc2626;
+    --mono: "SF Mono", "JetBrains Mono", Consolas, "Courier New", monospace;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { background: var(--bg); height: 100%; }
+  body {
+    font-family: "PingFang SC", "Microsoft YaHei", "Noto Sans SC", -apple-system, sans-serif;
+    color: var(--text);
+    display: flex; justify-content: center; align-items: center;
+    padding: 16px 12px; min-height: 100vh;
+  }
+  .deck { position: relative; width: min(96vw, calc((100vh - 32px) * 1.7778)); }
+  .slide {
+    width: 100%;
+    aspect-ratio: 16 / 9;
+    background: var(--slide-bg);
+    border: 1px solid var(--card-border);
+    border-radius: 18px;
+    box-shadow: 0 18px 50px rgba(31,42,61,.16);
+    padding: 1.7% 2.4%;
+    display: flex; flex-direction: column;
+    overflow: hidden; position: relative;
+    font-size: clamp(9.5px, min(1.08vw, 1.92vh), 22px);
+  }
+  .slide::before {
+    content: ""; position: absolute; inset: 0 0 auto 0; height: 5px;
+    background: linear-gradient(90deg, var(--accent), var(--good));
+    border-radius: 18px 18px 0 0;
+  }
+  h2 { font-size: 1.18em; font-weight: 700; margin-bottom: .28em; line-height: 1.3; }
+  h2 .hl { color: var(--accent); }
+  h2 small { font-size: .68em; font-weight: 500; color: var(--muted); margin-left: .55em; }
+  .card {
+    background: var(--card); border: 1px solid var(--card-border);
+    border-radius: 12px; padding: .48em .7em; overflow: hidden;
+  }
+  .card h3 { font-size: .84em; margin-bottom: .22em; color: var(--text); }
+  .card p, .card li { color: var(--muted); font-size: .72em; line-height: 1.4; }
+  .card b { color: var(--text); }
+  .goodc { color: var(--good) !important; }
+  .warnc { color: var(--warn) !important; }
+  .badc { color: var(--bad) !important; }
+  .mono { font-family: var(--mono); }
+
+  .kpi { display: flex; gap: .55em; margin-bottom: .4em; }
+  .kpi .card { flex: 1; text-align: left; padding: .4em .55em; }
+  .kpi .name { font-size: .62em; font-weight: 700; letter-spacing: .04em; color: var(--muted); text-transform: none; }
+  .kpi .eq { font-family: var(--mono); font-size: .86em; font-weight: 800; margin: .12em 0 .08em; }
+  .kpi .eq.g { color: var(--good); }
+  .kpi .eq.b { color: var(--accent); }
+  .kpi .eq.w { color: var(--warn); }
+  .kpi .eq.r { color: var(--bad); }
+  .kpi .desc { font-size: .62em; color: var(--muted); line-height: 1.35; }
+  .kpi .desc b { color: var(--text); }
+
+  .row { display: flex; gap: .55em; min-height: 0; }
+  .col { display: flex; flex-direction: column; gap: .45em; min-width: 0; }
+  .grow { flex: 1; min-height: 0; min-width: 0; }
+
+  table { border-collapse: collapse; width: 100%; font-size: .68em; }
+  th, td { text-align: left; padding: .22em .38em; border-bottom: 1px solid var(--card-border); vertical-align: top; }
+  th { color: var(--accent); font-weight: 700; white-space: nowrap; }
+  td { color: var(--muted); line-height: 1.35; }
+  td b { color: var(--text); }
+
+  .should { display: flex; gap: .4em; margin-top: .2em; }
+  .should .box { flex: 1; border-radius: 8px; padding: .35em .45em; background: #fff; border: 1px solid var(--card-border); }
+  .should .box .lv { font-size: .66em; font-weight: 800; }
+  .should .box p { font-size: .6em; margin-top: .1em; }
+  .should .prod .lv { color: #3b5bdb; }
+  .should .sess .lv { color: #7c3aed; }
+  .should .turn .lv { color: var(--warn); }
+
+  .schemes { display: flex; gap: .5em; }
+  .sch { flex: 1; border-radius: 10px; padding: .45em .55em; background: #fff; border: 1px solid var(--card-border); display: flex; flex-direction: column; gap: .22em; }
+  .sch .no { font-size: .62em; font-weight: 800; color: var(--accent); }
+  .sch h4 { font-size: .78em; font-weight: 800; color: var(--text); line-height: 1.3; }
+  .sch p { font-size: .64em; color: var(--muted); line-height: 1.4; }
+  .sch .gain { font-size: .64em; font-weight: 700; color: var(--good); }
+
+  .tl { display: flex; align-items: stretch; gap: .22em; margin-top: .15em; }
+  .tl .n { flex: 1; background: rgba(37,99,235,.06); border: 1px dashed rgba(37,99,235,.4); border-radius: 6px; padding: .22em .3em; text-align: center; }
+  .tl .n .t { font-size: .56em; font-weight: 800; color: var(--accent); }
+  .tl .n .d { font-size: .52em; color: var(--muted); line-height: 1.25; margin-top: .06em; }
+  .tl .arr { display: flex; align-items: center; color: var(--muted); font-size: .75em; flex: none; }
+
+  .banner {
+    border-radius: 10px; padding: .36em .8em; font-size: .72em;
+    background: linear-gradient(90deg, rgba(37,99,235,.08), rgba(5,150,105,.07));
+    border: 1px solid rgba(37,99,235,.28); color: var(--text); line-height: 1.4;
+    margin-top: .4em;
+  }
+  .banner b { color: var(--accent); }
+  .footer {
+    margin-top: auto; padding-top: .24em; display: flex;
+    justify-content: space-between; color: var(--muted); font-size: .58em; gap: 1em;
+  }
+  .footer b { color: var(--text); }
+</style>
+</head>
+<body>
+<div class="deck">
+<section class="slide">
+  <h2>两把尺子 + 三个方案:<span class="hl">该命中的都命中,命中率是比例,推理长度才是钱</span><small>P3–P6 每页同时报命中率与 miss;数字待 14 回填</small></h2>
+
+  <div class="kpi">
+    <div class="card">
+      <div class="name">① 该命中 / 命中量</div>
+      <div class="eq g">cached_tokens = d</div>
+      <div class="desc">前缀逐 token 一致的深度。目标态:<b>产品级全网命中</b>;<b>会话级首调后命中</b>(可预热提前算完);query / loop 只命中已写入的历史。</div>
+    </div>
+    <div class="card">
+      <div class="name">② 命中率 = 被 cache 的比例</div>
+      <div class="eq b">命中率 = d / 输入</div>
+      <div class="desc">健康度。分母随业务和轮数漂,<b>率折算不成钱</b>。目标态随轮数<b>上升</b>(分母变大、分子几乎只增当轮新增);当前从 Q2 起被橙带压住。</div>
+    </div>
+    <div class="card">
+      <div class="name">③ 推理长度 = miss</div>
+      <div class="eq w">miss = 输入 − d</div>
+      <div class="desc"><b>真实 prefill</b>,账单和 TTFT 跟它走。= 白算 + 新增。省的是 Q 首调里那条随轮数变长的橙带。</div>
+    </div>
+    <div class="card">
+      <div class="name">④ 验收</div>
+      <div class="eq r">白算 → 0</div>
+      <div class="desc">白算 = miss − 新增。<b>loop 白算恒为 0</b>是报警线;会话首调的会话级块算新增不白算(可预热挪走)。</div>
+    </div>
+  </div>
+
+  <div class="row grow">
+    <div class="col" style="flex:1.15;">
+      <div class="card grow">
+        <h3>该命中什么(目标态纪律)</h3>
+        <div class="should">
+          <div class="box prod"><div class="lv">产品级 · 全网</div><p>Tools + SP 固定 + 预置 skill。<b>任何用户任何会话都该命中</b>,只在版本发布时全网重算一次。</p></div>
+          <div class="box sess"><div class="lv">会话级 · 首调后</div><p>SP 会话块 + 历史 10 轮。会话创建时已确定;<b>首调算一次,其后全命中</b>。跨会话按超时失效。</p></div>
+          <div class="box turn"><div class="lv">轮次 · 只命中历史</div><p>query / loop 追加区。<b>已写入的 U/A/T 全命中</b>;当轮新增(Uₙ / A+T)必算,这是成本底线。</p></div>
+        </div>
+        <table style="margin-top:.35em;">
+          <tr><th>调用</th><th>当前 miss(推理长度)</th><th>目标 miss</th></tr>
+          <tr><td><b>会话首调 Q1</b></td><td>会话级 + Tools + 历史 10 轮 + 动态 4.5K + U1</td><td>会话级 + 历史 10 轮 + U1<br><span class="goodc">Tools 已命中;预热后再减会话级+历史</span></td></tr>
+          <tr><td><b>Q 首调 n≥2</b></td><td><b class="badc">动态 4.5K + Tools + 历史 10 轮 + 本会话全史</b> + 当轮新增</td><td><b class="goodc">仅当轮新增</b>(上轮 answer + Uₙ,含动态增量 ~2K)</td></tr>
+          <tr><td><b>loop</b></td><td>仅 A + T(两边相同)</td><td>仅 A + T</td></tr>
+        </table>
+      </div>
+    </div>
+
+    <div class="col" style="flex:1;">
+      <div class="card grow">
+        <h3>三个关键方案(把"该命中"变成真命中,再把 miss 压下去)</h3>
+        <div class="schemes">
+          <div class="sch">
+            <div class="no">方案 A · 时延</div>
+            <h4>会话级双次预热</h4>
+            <p>会话级内容<b>用户开口前就已知</b>,却是会话首调 miss 的大头。两次 prefill 把它从 TTFT 里挪走,推理时直接命中已灌好的 cache。</p>
+            <div class="tl">
+              <div class="n"><div class="t">① 会话创建</div><div class="d">后台 prefill<br>Tools+SP+会话级+历史10轮</div></div>
+              <div class="arr">→</div>
+              <div class="n"><div class="t">② query / ASR</div><div class="d">再 prefill 到当前前缀末<br>防逐出 + 灌上轮 answer</div></div>
+              <div class="arr">→</div>
+              <div class="n"><div class="t">③ 真正推理</div><div class="d">命中 ①②<br>只算当轮 U · TTFT↓</div></div>
+            </div>
+            <div class="gain">效果:会话首调 miss 从「会话级+历史+U1」降到只剩 U1;多轮 Q 首调再去掉上轮 answer。</div>
+          </div>
+        </div>
+        <div class="schemes" style="margin-top:.4em;">
+          <div class="sch">
+            <div class="no">方案 B · 减输入</div>
+            <h4>高频 skill 预置</h4>
+            <p>top-N 高频 skill 描述放进<b>产品级前缀</b>,日级攒批发布、不频繁变。available skills 不再每 Q 往 SP 里塞 3K。</p>
+            <div class="gain">效果:动态上下文 4.5K → ~2K 里,skill 段从 ~3K 压到引用;少一次 load 往返。N 由覆盖率曲线定(14 · A3)。</div>
+          </div>
+          <div class="sch">
+            <div class="no">方案 C · 减新增</div>
+            <h4>动态上下文只更新变化</h4>
+            <p>记忆 / 设备 / 前台应用<b>随 U 追加增量</b>,与上轮相同则省略。不回改历史、不每轮重贴全量。</p>
+            <div class="gain">效果:不破缓存(本来就在 U 尾部);输入不再线性膨胀。前台应用"有变化再加"即此条。</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="banner">
+    <b>怎么读后面的场景页</b>:每页同时给<b>命中率</b>(健康度,目标随 Q 上升、当前从 Q2 被压住)和<b>推理长度</b>(钱,当前随 Q 线性涨、目标钉死在当轮新增)。方案 A 改善的是 Q1 / 每 Q 的 TTFT,不改变 P3–P5 的"无预热"账本;方案 B+C 直接改动态长度,会进账本。预热吞吐与 ASR 窗口见 14 · E6–E8。
+  </div>
+  <div class="footer">
+    <div><b>口径</b>:无触顶、无驻留(会话内);跨会话按失效。v1 ΔS(n)≈7K+6.1K×(n−1) 系数待 Tools / 历史 10 轮实测后回填。</div>
+    <div style="white-space:nowrap;">尺子与关键方案 · v1 · P2</div>
+  </div>
+</section>
+</div>
+</body>
+</html>

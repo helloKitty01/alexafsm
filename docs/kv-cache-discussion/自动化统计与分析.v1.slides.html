@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>自动化统计与分析 · v1(单页)</title>
+<style>
+  :root {
+    --bg: #e9edf4;
+    --slide-bg: linear-gradient(135deg, #ffffff 0%, #f7f9fd 60%, #eef3fb 100%);
+    --card: #f7f9fc;
+    --card-border: #dfe5ee;
+    --text: #1f2a3d;
+    --muted: #5c6b84;
+    --accent: #2563eb;
+    --good: #059669;
+    --warn: #d97706;
+    --bad: #dc2626;
+    --mono: "SF Mono", "JetBrains Mono", Consolas, "Courier New", monospace;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { background: var(--bg); height: 100%; }
+  body {
+    font-family: "PingFang SC", "Microsoft YaHei", "Noto Sans SC", -apple-system, sans-serif;
+    color: var(--text);
+    display: flex; justify-content: center; align-items: center;
+    padding: 16px 12px; min-height: 100vh;
+  }
+  .deck { position: relative; width: min(96vw, calc((100vh - 32px) * 1.7778)); }
+  .slide {
+    width: 100%;
+    aspect-ratio: 16 / 9;
+    background: var(--slide-bg);
+    border: 1px solid var(--card-border);
+    border-radius: 18px;
+    box-shadow: 0 18px 50px rgba(31,42,61,.16);
+    padding: 1.7% 2.4%;
+    display: flex; flex-direction: column;
+    overflow: hidden; position: relative;
+    font-size: clamp(9.5px, min(1.08vw, 1.92vh), 22px);
+  }
+  .slide::before {
+    content: ""; position: absolute; inset: 0 0 auto 0; height: 5px;
+    background: linear-gradient(90deg, var(--accent), var(--good));
+    border-radius: 18px 18px 0 0;
+  }
+  h2 { font-size: 1.18em; font-weight: 700; margin-bottom: .28em; }
+  h2 .hl { color: var(--accent); }
+  .card {
+    background: var(--card); border: 1px solid var(--card-border);
+    border-radius: 12px; padding: .48em .65em; overflow: hidden;
+  }
+  .card h3 { font-size: .84em; margin-bottom: .2em; color: var(--text); }
+  .card p, .card li { color: var(--muted); font-size: .7em; line-height: 1.4; }
+  .card b { color: var(--text); font-weight: 700; }
+  .goodc { color: var(--good) !important; }
+  .warnc { color: var(--warn) !important; }
+  .badc { color: var(--bad) !important; }
+  .mono { font-family: var(--mono); }
+
+  .row { display: flex; gap: .55em; min-height: 0; }
+  .col { display: flex; flex-direction: column; gap: .42em; min-width: 0; }
+  .grow { flex: 1; min-height: 0; min-width: 0; }
+
+  .kpi { display: flex; gap: .5em; margin-bottom: .4em; }
+  .kpi .card { flex: 1; text-align: center; padding: .32em .28em; }
+  .kpi .big { font-size: 1.02em; font-weight: 800; color: var(--accent); font-family: var(--mono); }
+  .kpi .big.g { color: var(--good); }
+  .kpi .big.w { color: var(--warn); }
+  .kpi .lbl { color: var(--muted); font-size: .62em; margin-top: .08em; line-height: 1.3; }
+  .kpi .lbl b { color: var(--text); }
+
+  table { border-collapse: collapse; width: 100%; font-size: .68em; }
+  th, td { text-align: left; padding: .2em .36em; border-bottom: 1px solid var(--card-border); }
+  th { color: var(--accent); font-weight: 700; white-space: nowrap; }
+  td { color: var(--muted); line-height: 1.32; }
+  td b { color: var(--text); }
+  .tag { display: inline-block; border-radius: 999px; padding: .02em .42em; font-size: .86em; font-weight: 700; white-space: nowrap; }
+  .tag.ready { background: rgba(5,150,105,.12); color: var(--good); }
+  .tag.dev { background: rgba(217,119,6,.12); color: var(--warn); }
+
+  pre.attr {
+    font-family: var(--mono); background: #fff;
+    border: 1px solid var(--card-border); border-radius: 8px;
+    padding: .38em .55em; font-size: .64em; line-height: 1.45;
+    color: var(--text); overflow: hidden; white-space: pre;
+  }
+  pre.attr .c { color: var(--muted); }
+  pre.attr .b { color: var(--accent); font-weight: 700; }
+  pre.attr .r { color: var(--bad); font-weight: 700; }
+  pre.attr .g { color: var(--good); font-weight: 700; }
+
+  .abar { display: flex; height: 1.32em; border-radius: 6px; overflow: hidden; border: 1px solid var(--card-border); margin-top: .2em; }
+  .aseg { display: flex; align-items: center; justify-content: center; min-width: 0; }
+  .aseg span { font-size: .54em; font-weight: 700; color: #fff; white-space: nowrap; text-shadow: 0 1px 2px rgba(0,0,0,.3); }
+  .aseg.hit { background: rgba(5,150,105,.68); }
+  .aseg.waste { background: rgba(220,38,38,.85); }
+  .aseg.waste + .aseg.waste { border-left: 1px solid rgba(255,255,255,.85); }
+  .aseg.new { background: rgba(37,99,235,.8); }
+  .amarks { display: flex; font-size: .56em; color: var(--muted); margin-top: .08em; }
+
+  .schemes { display: flex; gap: .4em; margin-top: .18em; }
+  .scheme { flex: 1; border-radius: 8px; padding: .32em .48em; font-size: .68em; line-height: 1.38; }
+  .scheme b { display: block; margin-bottom: .06em; }
+  .scheme.cur { background: rgba(220,38,38,.07); border: 1px solid rgba(220,38,38,.3); color: var(--muted); }
+  .scheme.cur b { color: var(--bad); }
+  .scheme.tgt { background: rgba(5,150,105,.07); border: 1px solid rgba(5,150,105,.3); color: var(--muted); }
+  .scheme.tgt b { color: var(--good); }
+
+  .flow { display: flex; align-items: stretch; gap: .28em; margin-top: .18em; }
+  .fstep { flex: 1; background: #fff; border: 1px solid var(--card-border); border-radius: 8px; padding: .28em .32em; text-align: center; }
+  .fstep .fn { font-size: .66em; font-weight: 700; color: var(--accent); }
+  .fstep .fd { font-size: .56em; color: var(--muted); line-height: 1.28; margin-top: .06em; }
+  .farr { display: flex; align-items: center; color: var(--muted); font-size: .8em; flex: none; }
+
+  .reports { display: flex; gap: .35em; margin-top: .18em; }
+  .rep { flex: 1; background: #fff; border: 1px solid var(--card-border); border-radius: 8px; padding: .3em .4em; }
+  .rep .fn { font-size: .66em; font-weight: 800; color: var(--text); }
+  .rep .fd { font-size: .58em; color: var(--muted); line-height: 1.3; margin-top: .06em; }
+
+  .banner {
+    border-radius: 10px; padding: .34em .75em; font-size: .72em;
+    background: linear-gradient(90deg, rgba(37,99,235,.08), rgba(5,150,105,.07));
+    border: 1px solid rgba(37,99,235,.28); color: var(--text); line-height: 1.4;
+    margin-top: .38em;
+  }
+  .banner b { color: var(--accent); }
+  .footer {
+    margin-top: auto; padding-top: .22em; display: flex;
+    justify-content: space-between; color: var(--muted); font-size: .58em; gap: 1em;
+  }
+</style>
+</head>
+<body>
+<div class="deck">
+<section class="slide">
+  <h2>自动化统计与分析:<span class="hl">采断点、拆白算、按 Q × 业务出日报</span>——当前 / 目标同表,P3–P6 每格数字来自日志不是推演</h2>
+
+  <div class="kpi">
+    <div class="card"><div class="big g">2 字段</div><div class="lbl"><b>引擎现成</b> prompt / cached</div></div>
+    <div class="card"><div class="big w">4 类埋点</div><div class="lbl"><b>应用顺手记</b> bounds / new / 标签 / 预热</div></div>
+    <div class="card"><div class="big">3 张报表</div><div class="lbl"><b>命中率 · miss · 分桶</b>对应 P2–P6</div></div>
+    <div class="card"><div class="big" style="color:var(--bad);">3 条报警</div><div class="lbl"><b>防回退</b> loop 白算 / 验收线 / 公式漂移</div></div>
+  </div>
+
+  <div class="row grow">
+    <div class="col" style="flex:1;">
+      <div class="card">
+        <h3>采集:每次 LLM 调用一行明细</h3>
+        <table>
+          <tr><th>点位</th><th>字段</th><th>示例 / 枚举</th></tr>
+          <tr><td><b>① 输入</b> <span class="tag ready">现成</span></td><td class="mono">prompt_tokens</td><td class="mono">56200</td></tr>
+          <tr><td><b>② 命中</b> <span class="tag ready">现成</span></td><td class="mono">cached_tokens = d</td><td>断点深度;命中率 = d/输入</td></tr>
+          <tr><td><b>③ 边界</b> <span class="tag dev">埋点</span></td><td class="mono">bounds[]</td><td><b>当前</b>:[SP固定, 动态, Tools, 历史10轮, 本会话]<br><b>目标</b>:[Tools, SP固定+预置, 会话级, 历史10轮, 本会话]</td></tr>
+          <tr><td><b>④ 新增</b> <span class="tag dev">埋点</span></td><td class="mono">new + 分量</td><td class="mono">{u:800, dynamic:2000, tool:3000}</td></tr>
+          <tr><td><b>⑤ 标签</b> <span class="tag dev">埋点</span></td><td class="mono">biz/call/q/scheme</td><td>biz∈{闲聊,问答,任务} call∈{<b>会话首调</b>,Q首调,loop}<br>scheme∈{当前,目标} q=1,2,3…</td></tr>
+          <tr><td><b>⑥ 预热</b> <span class="tag dev">埋点</span></td><td class="mono">warmup</td><td>∈{none, session_create, asr} · 方案 A 单独切片,不混进无预热账本</td></tr>
+          <tr><td><b>⑦ 输出/时延</b> <span class="tag ready">现成</span></td><td class="mono">completion / ttft_ms</td><td>沉淀速率对账 + TTFT;回复命运由下一条 ②③ 覆盖</td></tr>
+        </table>
+        <p style="margin-top:.22em;">开发量在 ③⑤⑥:构造器本来就知道边界和是否预热。tokenizer 与推理侧一致。</p>
+      </div>
+      <div class="card grow">
+        <h3>一条明细</h3>
+        <pre class="attr">{"session":"s-889","biz":"问答","q":2,"call":"q_first",
+ "scheme":"目标","warmup":"asr",
+ "prompt":42000,"cached":39800,     <span class="c">← 引擎 · 命中率=94.8%</span>
+ "bounds":[4400,32300,33800,41000], <span class="c">← 目标序 Tools→SP→会话级→历史</span>
+ "new":2200, "ttft_ms":380}</pre>
+      </div>
+    </div>
+
+    <div class="col" style="flex:1.15;">
+      <div class="card">
+        <h3>分析:断点拆段 → 三张报表自动出</h3>
+        <pre class="attr"><span class="b">命中率</span> = cached / prompt          <span class="c">← P2 尺子②</span>
+<span class="b">miss</span>   = prompt − cached = <span class="r">白算</span> + <span class="g">新增</span>   <span class="c">← P2 尺子③</span>
+白算段 = 按 bounds 把 [d, 历史末] 切开</pre>
+        <div class="abar">
+          <div class="aseg hit" style="flex:26;"><span>SP·固定</span></div>
+          <div class="aseg waste" style="flex:8;"><span>SP·动态</span></div>
+          <div class="aseg waste" style="flex:8;"><span>Tools</span></div>
+          <div class="aseg waste" style="flex:16;"><span>历史+本会话</span></div>
+          <div class="aseg new" style="flex:10;"><span>新增</span></div>
+        </div>
+        <div class="amarks"><span style="flex:26; text-align:right;">↑d 停在固定末</span><span style="flex:32; text-align:center;">当前:动态/Tools/历史全白算</span><span style="flex:10;"></span></div>
+        <div class="abar" style="margin-top:.28em;">
+          <div class="aseg hit" style="flex:8;"><span>Tools</span></div>
+          <div class="aseg hit" style="flex:26; border-left:1px solid rgba(255,255,255,.85);"><span>SP·固定+预置</span></div>
+          <div class="aseg hit" style="flex:8; border-left:1px solid rgba(255,255,255,.85);"><span>会话级</span></div>
+          <div class="aseg hit" style="flex:16; border-left:1px solid rgba(255,255,255,.85);"><span>历史+本会话</span></div>
+          <div class="aseg new" style="flex:10;"><span>新增</span></div>
+        </div>
+        <div class="amarks"><span style="flex:58; text-align:right;">↑d 推到本会话历史末</span><span style="flex:10; text-align:center;">目标:只剩新增</span></div>
+        <div class="reports">
+          <div class="rep"><div class="fn">报表 1 · 命中率</div><div class="fd">按 Q × 业务 × 方案:目标应随 Q 上升,当前从 Q2 被压住</div></div>
+          <div class="rep"><div class="fn">报表 2 · 推理长度</div><div class="fd">miss 均值 / 会话合计;白算 vs 新增拆开。对应 P3–P5 每格</div></div>
+          <div class="rep"><div class="fn">报表 3 · 分桶加权</div><div class="fd">轮数分布 × 业务占比 → P6 整体 −xx%;6Q+ 贡献单独一列</div></div>
+        </div>
+      </div>
+      <div class="card">
+        <h3>怎么比 / 怎么守</h3>
+        <div class="schemes">
+          <div class="scheme cur"><b>当前(对照)</b>动态在 SP 每 Q 重写 → 连带 Tools + 全部历史</div>
+          <div class="scheme tgt"><b>目标(实验)</b>Tools 最前 + 动态下沉增量 + 可选双次预热</div>
+        </div>
+        <p style="margin-top:.2em;">按<b>会话粒度</b>打 scheme,避免同会话混排布打脏缓存;灰度 1% → 10% → 50%;质量护栏(回复质量 / 任务成功率)不劣化。预热调用(<code class="mono">warmup≠none</code>)单独切片,P3–P5 默认报无预热账,P2 方案 A 的 TTFT 用预热切片。</p>
+        <div class="flow">
+          <div class="fstep"><div class="fn">① 采集</div><div class="fd">每调用一行</div></div>
+          <div class="farr">→</div>
+          <div class="fstep"><div class="fn">② 归因</div><div class="fd">d 切白算段</div></div>
+          <div class="farr">→</div>
+          <div class="fstep"><div class="fn">③ 聚合</div><div class="fd">Q × 业务 × 方案</div></div>
+          <div class="farr">→</div>
+          <div class="fstep"><div class="fn">④ 日报</div><div class="fd">三张报表 + 报警</div></div>
+        </div>
+        <p style="margin-top:.2em;">报警:<b class="badc">loop 白算 &gt; 0</b>(回归) | <b class="badc">目标白算 &gt; 1K/调用</b>(验收线) | <b class="warnc">每 Q 节省偏离通式超限</b>(基线漂移,回填 14)。</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="banner">一句话:<b>引擎给断点 d,应用给边界和标签,相减即归因</b>——命中率看健康、miss 算钱、分桶看整体;P3–P6 的格子上线后由日报替换推演,不靠人工估算。</div>
+  <div class="footer">
+    <span>自动化统计与分析 · v1 · P7(配合 v2 P1–P6;点位继承统计 v1.2,bounds 改为 Tools 最前 + 会话首调 / 预热标签)</span>
+    <span>prefix cache 块粒度误差 ~0.5K 计入报警裕量</span>
+  </div>
+</section>
+</div>
+</body>
+</html>
