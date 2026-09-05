@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>上下文组成对比:当前 vs 目标 · v1.1(单页)</title>
+<style>
+  :root {
+    --bg: #e9edf4;
+    --slide-bg: linear-gradient(135deg, #ffffff 0%, #f7f9fd 60%, #eef3fb 100%);
+    --card: #f7f9fc;
+    --card-border: #dfe5ee;
+    --text: #1f2a3d;
+    --muted: #5c6b84;
+    --accent: #2563eb;
+    --good: #059669;
+    --warn: #d97706;
+    --bad: #dc2626;
+    --lvl-prod: #3b5bdb;   /* 产品级 */
+    --lvl-sess: #7c3aed;   /* 会话级 */
+    --lvl-q:    #d97706;   /* query 级 */
+    --lvl-loop: #0891b2;   /* loop 级 */
+    --mono: "SF Mono", "JetBrains Mono", Consolas, "Courier New", monospace;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { background: var(--bg); height: 100%; }
+  body {
+    font-family: "PingFang SC", "Microsoft YaHei", "Noto Sans SC", -apple-system, sans-serif;
+    color: var(--text);
+    display: flex; justify-content: center; align-items: center;
+    padding: 16px 12px; min-height: 100vh;
+  }
+  .deck { position: relative; width: min(96vw, calc((100vh - 32px) * 1.7778)); }
+  .slide {
+    width: 100%;
+    aspect-ratio: 16 / 9;
+    background: var(--slide-bg);
+    border: 1px solid var(--card-border);
+    border-radius: 18px;
+    box-shadow: 0 18px 50px rgba(31,42,61,.16);
+    padding: 1.8% 2.6%;
+    display: flex; flex-direction: column;
+    overflow: hidden; position: relative;
+    font-size: clamp(9.5px, min(1.08vw, 1.92vh), 22px);
+  }
+  .slide::before {
+    content: ""; position: absolute; inset: 0 0 auto 0; height: 5px;
+    background: linear-gradient(90deg, var(--accent), var(--good));
+    border-radius: 18px 18px 0 0;
+  }
+  h2 { font-size: 1.2em; font-weight: 700; margin-bottom: .3em; line-height: 1.3; }
+  h2 .hl { color: var(--accent); }
+  h2 small { font-size: .7em; font-weight: 500; color: var(--muted); margin-left: .6em; }
+  .card {
+    background: var(--card); border: 1px solid var(--card-border);
+    border-radius: 12px; padding: .5em .75em;
+    overflow: hidden;
+  }
+  .card h3 { font-size: .86em; margin-bottom: .25em; color: var(--text); display: flex; align-items: center; gap: .8em; flex-wrap: wrap; }
+  .card h3 .sub { font-size: .78em; font-weight: 500; color: var(--muted); }
+  .mono { font-family: var(--mono); }
+  .goodc { color: var(--good) !important; }
+  .badc { color: var(--bad) !important; }
+  .warnc { color: var(--warn) !important; }
+
+  /* 图例 */
+  .legend { display: flex; gap: .9em; font-size: .64em; color: var(--muted); align-items: center; flex-wrap: wrap; margin-left: auto; }
+  .legend i { display: inline-block; width: 1.15em; height: .78em; border-radius: 3px; margin-right: .28em; vertical-align: -.08em; border: 1px solid rgba(0,0,0,.08); }
+  .legend i.prod { background: var(--lvl-prod); }
+  .legend i.sess { background: var(--lvl-sess); }
+  .legend i.q    { background: var(--lvl-q); }
+  .legend i.loop { background: var(--lvl-loop); }
+  .legend i.dyn  { background: var(--bad); }
+  .legend i.hit  { background: rgba(5,150,105,.72); }
+  .legend i.rw   { background: rgba(220,38,38,.9); }
+  .legend i.drag { background: rgba(245,158,11,.85); }
+  .legend i.new  { background: rgba(37,99,235,.85); }
+  .legend i.first{ background: repeating-linear-gradient(135deg, rgba(37,99,235,.85) 0 3px, rgba(37,99,235,.35) 3px 6px); }
+  .legend i.na   { background: transparent; border: 1px dashed #b9c3d3; }
+
+  /* 上半:结构条 */
+  .bars { display: flex; flex-direction: column; gap: .3em; }
+  .barrow { display: flex; align-items: stretch; gap: .5em; }
+  .barrow .who { width: 3.4em; flex: none; display: flex; flex-direction: column; justify-content: center; font-size: .78em; font-weight: 800; line-height: 1.2; }
+  .barrow .who small { font-size: .72em; font-weight: 500; color: var(--muted); }
+  .bar { flex: 1; display: flex; gap: 2px; min-width: 0; }
+  .seg { display: flex; flex-direction: column; min-width: 0; }
+  .seg .top {
+    height: 1.55em; border-radius: 5px; display: flex; align-items: center; justify-content: center;
+    color: #fff; font-size: .62em; font-weight: 700; white-space: nowrap; overflow: hidden; padding: 0 .35em;
+    text-shadow: 0 1px 2px rgba(0,0,0,.25);
+  }
+  .seg .sub { font-size: .54em; color: var(--muted); line-height: 1.22; margin-top: .14em; text-align: center; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+  .seg .sub b { color: var(--text); }
+  .seg .sub .r { color: var(--bad); font-weight: 700; }
+  .seg .sub .o { color: var(--warn); font-weight: 700; }
+  .seg .sub .g { color: var(--good); font-weight: 700; }
+  .seg.prod .top { background: var(--lvl-prod); }
+  .seg.sess .top { background: var(--lvl-sess); }
+  .seg.dyn  .top { background: var(--bad); }
+  .seg.todo .top { background: transparent; border: 2px dashed var(--lvl-sess); color: var(--lvl-sess); text-shadow: none; }
+  .seg.todo.prod .top { border-color: var(--lvl-prod); color: var(--lvl-prod); }
+  .seg.uat .top {
+    background: linear-gradient(90deg, var(--lvl-q) 0%, var(--lvl-loop) 100%);
+    clip-path: polygon(0 0, 95% 0, 100% 50%, 95% 100%, 0 100%);
+    border-radius: 5px 0 0 5px; justify-content: flex-start; padding-left: .6em;
+  }
+
+  /* 下半:逐次调用矩阵 */
+  .mats { display: flex; flex-direction: column; gap: .35em; min-height: 0; }
+  .mat { display: grid; grid-template-columns: 3.8em repeat(5, 1fr) repeat(8, 1fr) 19em; gap: 2px 2px; align-items: stretch; }
+  .mat .g { font-size: .56em; color: var(--muted); text-align: center; font-weight: 700; padding: .05em 0; border-bottom: 1px solid var(--card-border); letter-spacing: .02em; }
+  .mat .g.sp { color: var(--lvl-prod); }
+  .mat .g.tl { color: var(--lvl-prod); }
+  .mat .g.ua { grid-column: 6 / span 9; color: var(--lvl-q); }
+  .mat .g.tl.first-col { border-bottom-color: var(--lvl-prod); }
+  .mat .g.ms { grid-column: 15; text-align: left; padding-left: .5em; color: var(--text); }
+  .mat .g.blank { border-bottom: none; }
+  .mat .h { font-size: .56em; color: var(--muted); text-align: center; line-height: 1.2; padding: .05em 0 .12em; white-space: nowrap; overflow: hidden; }
+  .mat .h b { color: var(--text); }
+  .mat .h .q { color: var(--bad); }
+  .mat .h .todo { color: var(--lvl-sess); font-weight: 700; }
+  .mat .rl { font-size: .62em; font-weight: 700; color: var(--text); display: flex; align-items: center; white-space: nowrap; }
+  .mat .rl small { color: var(--muted); font-weight: 500; margin-left: .25em; }
+  .mat .c { height: 1.62em; border-radius: 3px; min-width: 0; }
+  .mat .c.hit  { background: rgba(5,150,105,.72); }
+  .mat .c.rw   { background: rgba(220,38,38,.9); }
+  .mat .c.drag { background: rgba(245,158,11,.85); }
+  .mat .c.new  { background: rgba(37,99,235,.85); }
+  .mat .c.first{ background: repeating-linear-gradient(135deg, rgba(37,99,235,.85) 0 3px, rgba(37,99,235,.35) 3px 6px); }
+  .mat .c.na   { background: transparent; border: 1px dashed #d3dae5; }
+  .mat .uatstart { position: relative; }
+  .mat .uatstart::before { content: ""; position: absolute; left: -2px; top: -1px; bottom: -1px; width: 2px; background: var(--lvl-q); opacity: .55; }
+  .mat .miss { font-size: .58em; color: var(--muted); display: flex; align-items: center; padding-left: .5em; line-height: 1.22; overflow: hidden; }
+  .mat .miss b { color: var(--text); }
+  .mat .miss .r { color: var(--bad); font-weight: 700; }
+  .mat .miss .o { color: var(--warn); font-weight: 700; }
+  .mat .miss .bl { color: var(--accent); font-weight: 700; }
+  .mat .miss .ok { color: var(--good); font-weight: 700; }
+  .mat .miss .st { background: rgba(37,99,235,.10); border: 1px dashed var(--accent); color: var(--accent); padding: 0 .3em; border-radius: 3px; font-weight: 700; white-space: nowrap; }
+
+  .banner {
+    border-radius: 10px; padding: .38em .85em; font-size: .74em;
+    background: linear-gradient(90deg, rgba(37,99,235,.08), rgba(5,150,105,.07));
+    border: 1px solid rgba(37,99,235,.28); color: var(--text); line-height: 1.42;
+  }
+  .banner b { color: var(--accent); }
+  .footer {
+    margin-top: auto; padding-top: .28em; display: flex;
+    justify-content: space-between; color: var(--muted); font-size: .6em; gap: 1em; line-height: 1.35;
+  }
+  .footer b { color: var(--text); }
+</style>
+</head>
+<body>
+<div class="deck">
+
+<section class="slide">
+  <h2>上下文组成对比:<span class="hl">当前 vs 目标</span>——Tools 移到最前成为产品级,动态上下文下沉并精简<small>会话级只在会话首调算一次(可预热),其后每次调用只算当轮新增</small></h2>
+
+  <!-- 上半:结构对照 -->
+  <div class="card" style="margin-bottom:.4em;">
+    <h3>结构对照:按"变化频率"分四级 <span class="sub">物理序:当前 SP → Tools → UAT,目标 <b>Tools → SP → UAT</b>;段宽近似 token 长度,虚框 = 待实测</span>
+      <span class="legend">
+        <span><i class="prod"></i>产品级 · 版本发布才变</span>
+        <span><i class="sess"></i>会话级 · 会话创建时定、会话内不变</span>
+        <span><i class="q"></i>query 级 · 每 Q 追加</span>
+        <span><i class="loop"></i>loop 级 · 每次迭代追加</span>
+        <span><i class="dyn"></i>每 Q 原位重写(病灶)</span>
+      </span>
+    </h3>
+    <div class="bars">
+      <div class="barrow">
+        <div class="who">当前<small>38.5K/调用</small></div>
+        <div class="bar">
+          <div class="seg prod" style="flex:25.9 1 0;"><div class="top">SP·固定 25.9K</div><div class="sub">角色 / 原则 / 规范 · 产品级 · <span class="g">命中</span></div></div>
+          <div class="seg sess" style="flex:1 0 3.6em;"><div class="top">user.md .3K</div><div class="sub">会话级</div></div>
+          <div class="seg dyn" style="flex:4.5 1 0;"><div class="top">SP·动态⚡ 4.5K</div><div class="sub">skills 3 · memory 1 · device .5 · <span class="r">每 Q 重写</span></div></div>
+          <div class="seg prod" style="flex:4.4 1 0;"><div class="top">Tools 4.4K</div><div class="sub">工具全集 · <span class="o">被连带</span></div></div>
+          <div class="seg sess todo" style="flex:8 1 0;"><div class="top">UAT·历史 10 轮 ?K</div><div class="sub">完整 U/A/T · 会话创建载入 · <span class="o">被连带</span></div></div>
+          <div class="seg uat" style="flex:14 1 0;"><div class="top">UAT·本会话 U / A / T(随轮增长)</div><div class="sub">U 仅 query · 追加 · <span class="o">每 Q 首调被连带重算</span></div></div>
+        </div>
+      </div>
+      <div class="barrow">
+        <div class="who">目标<small>前缀纯稳定</small></div>
+        <div class="bar">
+          <div class="seg prod todo" style="flex:2 0 4.4em;"><div class="top">Tools ?K</div><div class="sub">固定工具集 · 产品级 · <span class="g">全网命中</span></div></div>
+          <div class="seg prod" style="flex:25.9 1 0;"><div class="top">SP·固定 25.9K</div><div class="sub">不变 · 产品级 · <span class="g">命中</span></div></div>
+          <div class="seg prod todo" style="flex:2 0 5.2em;"><div class="top">预置 skill ~2K</div><div class="sub">高频 <b>N=?</b> 个 desc · 日级攒批</div></div>
+          <div class="seg sess todo" style="flex:1.5 0 5.2em;"><div class="top">SP·会话级 ?K</div><div class="sub">记忆快照 · 已安装应用 · 会话内冻结</div></div>
+          <div class="seg sess todo" style="flex:8 1 0;"><div class="top">UAT·历史 10 轮 ?K</div><div class="sub">完整 U/A/T · 会话创建载入 · <span class="g">首调后命中</span></div></div>
+          <div class="seg uat" style="flex:14 1 0;"><div class="top">UAT·本会话 U / A / T(随轮增长)</div><div class="sub">U = query + <b>动态增量 ~2K</b>(前台应用/记忆/知识/skill 引用)· <span class="g">纯追加</span></div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 下半:逐次调用展开 -->
+  <div class="card" style="flex:1; min-height:0; display:flex; flex-direction:column;">
+    <h3>同一会话逐次调用展开:行 = 一次模型调用,列 = 上下文位置,格色 = 该段在该次调用的缓存命运
+      <span class="sub">示例:3 个 Q · Q1 两次 loop(load skill、调工具)· Q2 一次 loop · Q3 直接回答,共 6 次调用</span>
+      <span class="legend">
+        <span><i class="hit"></i>命中</span>
+        <span><i class="rw"></i>原位重写</span>
+        <span><i class="drag"></i>被连带白算</span>
+        <span><i class="new"></i>新增必算</span>
+        <span><i class="first"></i>会话首调一次(可预热)</span>
+        <span><i class="na"></i>尚不存在</span>
+      </span>
+    </h3>
+    <div class="mats">
+      <div class="mat" id="mat-cur"></div>
+      <div class="mat" id="mat-tgt"></div>
+    </div>
+  </div>
+
+  <div class="banner" style="margin-top:.4em;">
+    <b>读法</b>:Q1 首调两边都是"会话首调必算",目标少算一个 Tools(已成产品级);loop 内两边全命中、只算 T;<b>差别全在 Q2 起的每个 Q 首调</b>——当前从"动态"起一条红橙带贯穿到底、随历史增长(动态 4.5K + Tools 4.4K + 历史 10 轮 + 本会话全史),目标只剩阶梯边缘的新增(上轮回复 + 当轮 U)。
+    <b>改造四句</b>:①按变化频率分四级,前缀区只放会话创建时已确定的内容;②动态上下文从 SP 下沉 UAT 随 U 追加;③动态上下文精简 4.5K→2K(高频 skill 预置、记忆/设备增量化);④Tools 移到最前(Tools → SP → UAT),成为产品级、会话首调即命中。
+  </div>
+
+  <div class="footer">
+    <div><b>待补(虚框)</b>:① SP·会话级块内容与长度 ② 历史 10 轮均值/p90(实测 history 样本 7.2K–13.5K,含本会话)③ 预置 skill N 与长度 ④ 目标 Tools 长度 ⑤ SP 固定内部构成(见 14 数据需求)。口径:历史完整保留 U/A/T、不折叠;上次会话缓存按已超时计,会话首调必算;目标序 Tools → SP 需 chat template 支持(自建集群可控,DeepSeek V4 / GLM 5.2 默认模板为 SP → Tools,见 06)。</div>
+    <div style="white-space:nowrap;">上下文组成对比 · v1.1 · P1</div>
+  </div>
+</section>
+
+</div>
+
+<script>
+(function () {
+  // 列:5 段前缀 + 8 段 UAT;格色码:H 命中 R 原位重写 D 被连带 N 新增 F 会话首调一次 . 尚不存在
+  var uatHead = ['U1', 'A₁T₁', 'A₁T₁', 'ans₁', 'U2', 'A₂T₂', 'ans₂', 'U3'];
+  var rows = [
+    ['Q1 调①', '首调'], ['Q1 调②', 'loop'], ['Q1 调③', 'loop'],
+    ['Q2 调①', '首调'], ['Q2 调②', 'loop'], ['Q3 调①', '首调']
+  ];
+  var cur = {
+    title: '当前',
+    groups: '<div class="g sp" style="grid-column:2 / span 3;">SP</div><div class="g tl" style="grid-column:5;">Tools</div>',
+    head: ['<b>固定</b><br>25.9K', '<b>user.md</b><br>.3K', '<b class="q">动态⚡</b><br>4.5K', '<b>Tools</b><br>4.4K', '<b>历史10轮</b><br><span class="todo">?K</span>'],
+    cells: [
+      'H F N F F N . . . . . . .',
+      'H H H H H H N . . . . . .',
+      'H H H H H H H N . . . . .',
+      'H H R D D D D D N N . . .',
+      'H H H H H H H H H H N . .',
+      'H H R D D D D D D D D N N'
+    ],
+    miss: [
+      '<span class="st">会话级 + Tools + 历史</span> + <span class="bl">动态 4.5K + U1</span>',
+      '<span class="bl">A₁ + T₁(skill 正文)</span>',
+      '<span class="bl">A₁ + T₁(工具结果)</span>',
+      '<span class="r">动态 4.5K</span> + <span class="o">Tools 4.4K + 历史 10 轮 + 本会话全史</span> + <span class="bl">ans₁ + U2</span>',
+      '<span class="bl">A₂ + T₂</span>',
+      '<span class="r">动态 4.5K</span> + <span class="o">Tools + 历史 + 更长的全史</span> + <span class="bl">ans₂ + U3</span>'
+    ]
+  };
+  var tgt = {
+    title: '目标',
+    groups: '<div class="g tl" style="grid-column:2;">Tools</div><div class="g sp" style="grid-column:3 / span 3;">SP</div>',
+    head: ['<b>Tools</b><br><span class="todo">?K</span>', '<b>固定</b><br>25.9K', '<b>预置skill</b><br>~2K · N=<span class="todo">?</span>', '<b>会话级</b><br><span class="todo">?K</span>', '<b>历史10轮</b><br><span class="todo">?K</span>'],
+    cells: [
+      'H H H F F N . . . . . . .',
+      'H H H H H H N . . . . . .',
+      'H H H H H H H N . . . . .',
+      'H H H H H H H H N N . . .',
+      'H H H H H H H H H H N . .',
+      'H H H H H H H H H H H N N'
+    ],
+    miss: [
+      '<span class="st">会话级 + 历史 10 轮</span>(可预热挪走)+ <span class="bl">U1</span> · <span class="ok">Tools 已命中</span>',
+      '<span class="bl">A₁ + T₁(skill 正文)</span>',
+      '<span class="bl">A₁ + T₁(工具结果)</span>',
+      '<span class="bl">ans₁ + U2</span>(含动态增量 ~2K)· <span class="ok">其余全命中</span>',
+      '<span class="bl">A₂ + T₂</span>',
+      '<span class="bl">ans₂ + U3</span> · <span class="ok">其余全命中</span>'
+    ]
+  };
+  var cls = { H: 'hit', R: 'rw', D: 'drag', N: 'new', F: 'first', '.': 'na' };
+
+  function render(id, m) {
+    var el = document.getElementById(id), h = '';
+    // 组标题行:三层物理块
+    h += '<div class="g blank"></div>' + m.groups + '<div class="g ua">UAT</div><div class="g ms">本次调用 miss(= 输入 − 命中)</div>';
+    // 列头
+    h += '<div class="rl">' + m.title + '</div>';
+    m.head.forEach(function (t) { h += '<div class="h">' + t + '</div>'; });
+    uatHead.forEach(function (t, i) { h += '<div class="h' + (i === 0 ? ' uatstart' : '') + '"><b>' + t + '</b></div>'; });
+    h += '<div class="h"></div>';
+    // 数据行
+    m.cells.forEach(function (line, r) {
+      h += '<div class="rl">' + rows[r][0] + '<small>' + rows[r][1] + '</small></div>';
+      line.split(' ').forEach(function (k, i) {
+        h += '<div class="c ' + cls[k] + (i === 5 ? ' uatstart' : '') + '"></div>';
+      });
+      h += '<div class="miss">' + m.miss[r] + '</div>';
+    });
+    el.innerHTML = h;
+  }
+  render('mat-cur', cur);
+  render('mat-tgt', tgt);
+})();
+</script>
+</body>
+</html>
