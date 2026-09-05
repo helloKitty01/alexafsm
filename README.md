@@ -15,7 +15,7 @@
 | 目录 | 内容 |
 | --- | --- |
 | [docs/latency-discussion/](./docs/latency-discussion/) | Agent loop 端到端时延优化讨论（单 loop 成本、loop 次数、快慢双系统、工具接入要求与共建倡议） |
-| [docs/kv-cache-discussion/](./docs/kv-cache-discussion/) | KV cache 命中率与 agent 上下文工程（分层排布、渐进式加载、压缩策略）的设计讨论 |
+| [docs/kv-cache-discussion/](./docs/kv-cache-discussion/) | KV cache 命中率与 agent 上下文工程（分层排布、渐进式加载、压缩策略）的设计讨论；含 v1 整合汇报 9 页、v2 汇报大纲（13）与 v2 P1 上下文组成对比单页（四级分级 × UAT 按 Q/loop 展开矩阵） |
 | [docs/reminder-discussion/](./docs/reminder-discussion/) | reminder 机制（内部代号 notion 方案）的业界洞察：Claude Code system-reminder、Manus recitation、Anthropic 官方模式 |
 | [docs/agent-variable-scheme/](./docs/agent-variable-scheme/) | Agent 变量句柄方案（当前版本 v4 文档 + v6 幻灯片，v1–v5 留档于 history/） |
 | [docs/variable-resolution/](./docs/variable-resolution/) | 工具参数变量解析机制方案（含单页幻灯片：深色原版、浅色版及同款 PPTX） |
