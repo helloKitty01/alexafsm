@@ -21,6 +21,8 @@
 | [12-上下文长度实测需求.md](./12-上下文长度实测需求.md) | 交给内部模型的测量需求:模块定义与识别方法 + token 统计口径 + JSON 输出 schema,用于替换假设值 |
 | [13-汇报大纲.md](./13-汇报大纲.md) | **v2 整合汇报大纲**:P1 组成对比(Q1–Q4,loop 只演示一次)→ P2 该命中/命中率/推理长度 + 三方案(双次预热、高频 skill 预置、动态只更新变化)→ P3–P5 闲聊/问答/任务 → P6 轮数×业务加权 → P7 自动化统计与分析 → 附录 |
 | [14-上下文组成实测数据需求.md](./14-上下文组成实测数据需求.md) | 填充 P1 虚框与 P2–P7 参数的数据需求(12 的续篇,按四级分级重定义模块):A 产品级(Tools 清单与变体 / SP 固定构成与伪静态 diff / 预置 skill 覆盖率)、B 会话级(SP 块 / 历史 10 轮)、C/D query 与 loop 级各消息长度、E 会话形态与引擎侧(cached_tokens、prefill 吞吐、ASR 时长);统一口径 + JSON 填写模板 + 优先级 |
+| [token_breakdown.csv](./token_breakdown.csv) | **14 的逐调用实测回填**(73 行):before/after 对照,字段对齐 14 的 A2/B1/C2/A1/C1/UAT/input/cache_read;覆盖 task/qa/chat(Q1–Q6、Q8–Q11),模型含 GLM-5 与 DeepSeek-V4 |
+| [prompt段内容变化对照.md](./prompt段内容变化对照.md) | **优化前后 prompt 各段内容对照**(Q8 闲聊首调,同模型 DS-V4-Flash-0731):逐段原来/现在/为何变 + 变化类型(不变/更新/迁移/填充) + 量化(SP −7.6%、动态内容移出 SP、Q2 起 miss 钉在 ~8K);配套 slides 数据底稿 |
 | [上下文组成对比.v1.2.slides.html](./上下文组成对比.v1.2.slides.html) | **v2 汇报 P1(当前 v1.2)**:目标态 Tools → SP → UAT;上半四级结构条;下半矩阵改为 4 个 Q、loop 只演示一次(Q1 调②),Q2–Q4 只画首调以体现多轮收益。v1 / v1.1 留档 history/ |
 | [尺子与关键方案.v1.slides.html](./尺子与关键方案.v1.slides.html) | **v2 汇报 P2**:该命中(产品级/会话级/轮次) + 命中率 + 推理长度通式;三个方案——A 会话创建+query/ASR 双次预热、B 高频 skill 预置、C 动态只更新变化 |
 | [自动化统计与分析.v1.slides.html](./自动化统计与分析.v1.slides.html) | **v2 汇报 P7**:点位(含会话首调/预热标签、目标 bounds Tools 最前) + 断点拆段 + 三张报表(命中率/miss/分桶) + 报警;旧版统计 v1.2 仍配合收益闭环 v7.2 |
