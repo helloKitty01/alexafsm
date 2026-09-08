@@ -1,0 +1,1384 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>KV Cache 方案(汇报版)· v1.4 · 9 页 + 附录 3 页 · 数据基线驱动</title>
+<style>
+  :root {
+    --bg: #e9edf4;
+    --slide-bg: linear-gradient(135deg, #ffffff 0%, #f7f9fd 60%, #eef3fb 100%);
+    --card: #f7f9fc;
+    --card-border: #dfe5ee;
+    --text: #1f2a3d;
+    --muted: #5c6b84;
+    --accent: #2563eb;
+    --good: #059669;
+    --warn: #d97706;
+    --bad: #dc2626;
+    --lvl-prod: #3b5bdb;
+    --lvl-sess: #7c3aed;
+    --lvl-q:    #d97706;
+    --lvl-loop: #0891b2;
+    --mono: "SF Mono", "JetBrains Mono", Consolas, "Courier New", monospace;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { background: var(--bg); height: 100%; }
+  body {
+    font-family: "PingFang SC", "Microsoft YaHei", "Noto Sans SC", -apple-system, sans-serif;
+    color: var(--text);
+    display: flex; justify-content: center; align-items: center;
+    padding: 16px 12px; min-height: 100vh;
+  }
+  .deck { position: relative; width: min(96vw, calc((100vh - 32px) * 1.7778)); }
+  .slide {
+    width: 100%;
+    aspect-ratio: 16 / 9;
+    background: var(--slide-bg);
+    border: 1px solid var(--card-border);
+    border-radius: 18px;
+    box-shadow: 0 18px 50px rgba(31,42,61,.16);
+    padding: 1.8% 2.6%;
+    display: none; flex-direction: column;
+    overflow: hidden; position: relative;
+    font-size: clamp(9.5px, min(1.08vw, 1.92vh), 22px);
+  }
+  .slide.active { display: flex; }
+  /* 内容较稀的页放大字号,标题保持同一绝对大小 */
+  .slide.dense  { font-size: clamp(11px, min(1.40vw, 2.50vh), 28px); }
+  .slide.denser { font-size: clamp(12px, min(1.53vw, 2.72vh), 31px); }
+  .slide.dense h2  { font-size: .91em; }
+  .slide.denser h2 { font-size: .83em; }
+  .slide.dense .footer, .slide.denser .footer { font-size: .5em; }
+  .slide::before {
+    content: ""; position: absolute; inset: 0 0 auto 0; height: 5px;
+    background: linear-gradient(90deg, var(--accent), var(--good));
+    border-radius: 18px 18px 0 0;
+  }
+  h2 { font-size: 1.18em; font-weight: 700; margin-bottom: .3em; line-height: 1.3; }
+  h2 .hl { color: var(--accent); }
+  h2 .num { color: var(--muted); font-weight: 600; margin-right: .4em; font-size: .78em; }
+  h2 small { font-size: .68em; font-weight: 500; color: var(--muted); margin-left: .55em; }
+  .card {
+    background: var(--card); border: 1px solid var(--card-border);
+    border-radius: 12px; padding: .5em .75em; overflow: hidden;
+  }
+  .card h3 { font-size: .86em; margin-bottom: .25em; color: var(--text); display: flex; align-items: center; gap: .8em; flex-wrap: wrap; }
+  .card h3 .sub { font-size: .78em; font-weight: 500; color: var(--muted); }
+  .card p, .card li { color: var(--muted); font-size: .72em; line-height: 1.42; }
+  .card li { margin-left: 1.15em; margin-bottom: .2em; }
+  .card b { color: var(--text); font-weight: 700; }
+  .mono { font-family: var(--mono); }
+  .goodc { color: var(--good) !important; }
+  .badc { color: var(--bad) !important; }
+  .warnc { color: var(--warn) !important; }
+  .accc { color: var(--accent) !important; }
+  .row { display: flex; gap: .6em; min-height: 0; }
+  .col { display: flex; flex-direction: column; gap: .45em; min-width: 0; }
+  .grow { flex: 1; min-height: 0; min-width: 0; }
+  .tag { display: inline-block; border-radius: 999px; padding: .02em .45em; font-size: .86em; font-weight: 700; white-space: nowrap; }
+  .tag.real { background: rgba(5,150,105,.12); color: var(--good); }
+  .tag.mid  { background: rgba(37,99,235,.12); color: var(--accent); }
+  .tag.est  { background: rgba(217,119,6,.12); color: var(--warn); }
+  .tag.bad  { background: rgba(220,38,38,.12); color: var(--bad); }
+  .p2t td:nth-child(1), .p2t td:nth-child(2), .p2t td:nth-child(5) { white-space: nowrap; }
+  .p2t td:nth-child(6) { min-width: 9em; }
+
+  table { border-collapse: collapse; width: 100%; font-size: .7em; }
+  th, td { text-align: left; padding: .24em .4em; border-bottom: 1px solid var(--card-border); vertical-align: top; }
+  th { color: var(--accent); font-weight: 700; white-space: nowrap; }
+  td { color: var(--muted); line-height: 1.35; }
+  td b { color: var(--text); }
+  td.blk { font-weight: 700; color: var(--text); white-space: nowrap; }
+  td.n, th.n { text-align: right; font-family: var(--mono); white-space: nowrap; }
+
+  .kpi { display: flex; gap: .6em; margin-bottom: .45em; }
+  .kpi .card { flex: 1; text-align: center; padding: .38em .32em; }
+  .kpi .big { font-size: 1.12em; font-weight: 800; color: var(--accent); font-family: var(--mono); white-space: nowrap; }
+  .kpi .big.g { color: var(--good); }
+  .kpi .big.w { color: var(--warn); }
+  .kpi .big.r { color: var(--bad); }
+  .kpi .lbl { color: var(--muted); font-size: .64em; margin-top: .1em; line-height: 1.3; }
+  .kpi .lbl b { color: var(--text); }
+
+  .banner {
+    border-radius: 10px; padding: .38em .85em; font-size: .74em;
+    background: linear-gradient(90deg, rgba(37,99,235,.08), rgba(5,150,105,.07));
+    border: 1px solid rgba(37,99,235,.28); color: var(--text); line-height: 1.42; margin-top: .4em;
+  }
+  .banner b { color: var(--accent); }
+  .footer {
+    margin-top: auto; padding-top: .28em; display: flex;
+    justify-content: space-between; color: var(--muted); font-size: .58em; gap: 1em; line-height: 1.35;
+  }
+  .footer b { color: var(--text); }
+
+  /* ===== P1:结构条 + 矩阵(继承 上下文组成对比 v1.2) ===== */
+  .legend { display: flex; gap: .9em; font-size: .64em; color: var(--muted); align-items: center; flex-wrap: wrap; margin-left: auto; }
+  .legend i { display: inline-block; width: 1.15em; height: .78em; border-radius: 3px; margin-right: .28em; vertical-align: -.08em; border: 1px solid rgba(0,0,0,.08); }
+  .legend i.prod { background: var(--lvl-prod); }
+  .legend i.sess { background: var(--lvl-sess); }
+  .legend i.q    { background: var(--lvl-q); }
+  .legend i.loop { background: var(--lvl-loop); }
+  .legend i.dyn  { background: var(--bad); }
+  .legend i.hit  { background: rgba(5,150,105,.72); }
+  .legend i.rw   { background: rgba(220,38,38,.9); }
+  .legend i.drag { background: rgba(245,158,11,.85); }
+  .legend i.new  { background: rgba(37,99,235,.85); }
+  .legend i.first{ background: repeating-linear-gradient(135deg, rgba(37,99,235,.85) 0 3px, rgba(37,99,235,.35) 3px 6px); }
+  .legend i.na   { background: transparent; border: 1px dashed #b9c3d3; }
+  .bars { display: flex; flex-direction: column; gap: .3em; }
+  .barrow { display: flex; align-items: stretch; gap: .5em; }
+  .barrow .who { width: 4.2em; flex: none; display: flex; flex-direction: column; justify-content: center; font-size: .78em; font-weight: 800; line-height: 1.2; }
+  .barrow .who small { font-size: .7em; font-weight: 500; color: var(--muted); }
+  .bar { flex: 1; display: flex; gap: 2px; min-width: 0; }
+  .bars .seg { display: flex; flex-direction: column; min-width: 0; }
+  .bars .seg .top {
+    height: 1.55em; border-radius: 5px; display: flex; align-items: center; justify-content: center;
+    color: #fff; font-size: .62em; font-weight: 700; white-space: nowrap; overflow: hidden; padding: 0 .35em;
+    text-shadow: 0 1px 2px rgba(0,0,0,.25);
+  }
+  .bars .seg .sub { font-size: .54em; color: var(--muted); line-height: 1.22; margin-top: .14em; text-align: center; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+  .bars .seg .sub b { color: var(--text); }
+  .bars .seg .sub .r { color: var(--bad); font-weight: 700; }
+  .bars .seg .sub .o { color: var(--warn); font-weight: 700; }
+  .bars .seg .sub .g { color: var(--good); font-weight: 700; }
+  .bars .seg.prod .top { background: var(--lvl-prod); }
+  .bars .seg.sess .top { background: var(--lvl-sess); }
+  .bars .seg.dyn  .top { background: var(--bad); }
+  .bars .seg.todo .top { background: transparent; border: 2px dashed var(--lvl-sess); color: var(--lvl-sess); text-shadow: none; }
+  .bars .seg.todo.prod .top { border-color: var(--lvl-prod); color: var(--lvl-prod); }
+  /* 目标态:动态下沉到 UAT、只追加增量——与当前 dyn 同色系但不再是病灶 */
+  .bars .seg.dynt .top { background: #fff; border: 2px solid var(--bad); color: var(--bad); text-shadow: none; }
+  .legend i.dynt { background: #fff; border: 2px solid var(--bad); }
+  /* P1 三尺子对比条 */
+  .rulers { display: grid; grid-template-columns: repeat(3, 1fr) 1.5fr; gap: .45em; margin-top: .35em; }
+  .ruler { background: var(--card); border: 1px solid var(--card-border); border-radius: 10px; padding: .3em .55em; min-width: 0; }
+  .ruler .t { font-size: .6em; font-weight: 700; color: var(--text); white-space: nowrap; overflow: hidden; }
+  .ruler .t small { font-weight: 500; color: var(--muted); margin-left: .3em; }
+  .ruler .v { display: flex; align-items: baseline; gap: .3em; font-family: var(--mono); font-size: .78em; font-weight: 800; white-space: nowrap; margin: .05em 0; }
+  .ruler .v .cur { color: var(--bad); }
+  .ruler .v .arr { color: var(--muted); font-weight: 500; font-size: .8em; }
+  .ruler .v .tgt { color: var(--good); }
+  .ruler .v .pct { font-size: .7em; color: var(--good); background: rgba(5,150,105,.1); border-radius: 4px; padding: 0 .3em; }
+  .ruler .n { font-size: .5em; color: var(--muted); line-height: 1.3; }
+  .ruler .n b { color: var(--text); }
+  .ruler.how { background: linear-gradient(90deg, rgba(37,99,235,.08), rgba(5,150,105,.07)); border-color: rgba(37,99,235,.28); }
+  .ruler.how .t { color: var(--accent); }
+  .ruler.how .n { font-size: .54em; color: var(--text); }
+  .bars .seg.uat .top {
+    background: linear-gradient(90deg, var(--lvl-q) 0%, var(--lvl-loop) 100%);
+    clip-path: polygon(0 0, 95% 0, 100% 50%, 95% 100%, 0 100%);
+    border-radius: 5px 0 0 5px; justify-content: flex-start; padding-left: .6em;
+  }
+  .mats { display: flex; flex-direction: column; gap: .35em; min-height: 0; }
+  .mat { display: grid; grid-template-columns: 3.8em repeat(5, 1fr) repeat(8, 1fr) 21em; gap: 2px 2px; align-items: stretch; }
+  .mat .g { font-size: .56em; color: var(--muted); text-align: center; font-weight: 700; padding: .05em 0; border-bottom: 1px solid var(--card-border); letter-spacing: .02em; }
+  .mat .g.sp { color: var(--lvl-prod); }
+  .mat .g.tl { color: var(--lvl-prod); }
+  .mat .g.ua { grid-column: 7 / span 8; color: var(--lvl-q); }
+  .mat .g.ms { grid-column: 15; text-align: left; padding-left: .5em; color: var(--text); }
+  .mat .g.blank { border-bottom: none; }
+  .mat .h { font-size: .56em; color: var(--muted); text-align: center; line-height: 1.2; padding: .05em 0 .12em; white-space: nowrap; overflow: hidden; }
+  .mat .h b { color: var(--text); }
+  .mat .h .q { color: var(--bad); }
+  .mat .h .todo { color: var(--lvl-sess); font-weight: 700; }
+  .mat .rl { font-size: .62em; font-weight: 700; color: var(--text); display: flex; align-items: center; white-space: nowrap; }
+  .mat .rl small { color: var(--muted); font-weight: 500; margin-left: .25em; }
+  .mat .c { height: 1.8em; border-radius: 3px; min-width: 0; }
+  .mat .c.hit  { background: rgba(5,150,105,.72); }
+  .mat .c.rw   { background: rgba(220,38,38,.9); }
+  .mat .c.drag { background: rgba(245,158,11,.85); }
+  .mat .c.new  { background: rgba(37,99,235,.85); }
+  .mat .c.first{ background: repeating-linear-gradient(135deg, rgba(37,99,235,.85) 0 3px, rgba(37,99,235,.35) 3px 6px); }
+  .mat .c.na   { background: transparent; }
+  .mat .uatstart { position: relative; }
+  .mat .uatstart::before { content: ""; position: absolute; left: -2px; top: -1px; bottom: -1px; width: 2px; background: var(--lvl-q); opacity: .55; }
+  .mat .miss { font-size: .58em; color: var(--muted); display: flex; align-items: center; padding-left: .5em; line-height: 1.22; overflow: hidden; }
+  .mat .miss b { color: var(--text); }
+  .mat .miss .r { color: var(--bad); font-weight: 700; }
+  .mat .miss .o { color: var(--warn); font-weight: 700; }
+  .mat .miss .bl { color: var(--accent); font-weight: 700; }
+  .mat .miss .ok { color: var(--good); font-weight: 700; }
+  .mat .miss .st { background: rgba(37,99,235,.10); border: 1px dashed var(--accent); color: var(--accent); padding: 0 .3em; border-radius: 3px; font-weight: 700; white-space: nowrap; }
+  .mat .miss .re { background: rgba(5,150,105,.10); border: 1px solid rgba(5,150,105,.4); color: var(--good); padding: 0 .3em; border-radius: 3px; font-weight: 700; white-space: nowrap; margin-left: .3em; font-family: var(--mono); }
+
+  /* ===== P3:尺子(继承 尺子与关键方案 v1) ===== */
+  .kpi2 { display: flex; gap: .55em; margin-bottom: .4em; }
+  .kpi2 .card { flex: 1; text-align: left; padding: .4em .55em; }
+  .kpi2 .name { font-size: .62em; font-weight: 700; color: var(--muted); }
+  .kpi2 .eq { font-family: var(--mono); font-size: .86em; font-weight: 800; margin: .12em 0 .08em; }
+  .kpi2 .eq.g { color: var(--good); } .kpi2 .eq.b { color: var(--accent); } .kpi2 .eq.w { color: var(--warn); } .kpi2 .eq.r { color: var(--bad); }
+  .kpi2 .desc { font-size: .62em; color: var(--muted); line-height: 1.35; }
+  .kpi2 .desc b { color: var(--text); }
+  .should { display: flex; gap: .4em; margin-top: .2em; }
+  .should .box { flex: 1; border-radius: 8px; padding: .35em .45em; background: #fff; border: 1px solid var(--card-border); }
+  .should .box .lv { font-size: .66em; font-weight: 800; }
+  .should .box p { font-size: .6em; margin-top: .1em; }
+  .should .prod .lv { color: var(--lvl-prod); }
+  .should .sess .lv { color: var(--lvl-sess); }
+  .should .turn .lv { color: var(--warn); }
+  .schemes { display: flex; gap: .5em; }
+  .sch { flex: 1; border-radius: 10px; padding: .42em .55em; background: #fff; border: 1px solid var(--card-border); display: flex; flex-direction: column; gap: .2em; }
+  .sch .no { font-size: .62em; font-weight: 800; color: var(--accent); }
+  .sch h4 { font-size: .78em; font-weight: 800; color: var(--text); line-height: 1.3; }
+  .sch p { font-size: .64em; color: var(--muted); line-height: 1.4; }
+  .sch .gain { font-size: .64em; font-weight: 700; color: var(--good); }
+  .sch .ev { font-size: .62em; color: var(--accent); line-height: 1.35; }
+  .tl { display: flex; align-items: stretch; gap: .22em; margin-top: .15em; }
+  .tl .n { flex: 1; background: rgba(37,99,235,.06); border: 1px dashed rgba(37,99,235,.4); border-radius: 6px; padding: .22em .3em; text-align: center; }
+  .tl .n .t { font-size: .56em; font-weight: 800; color: var(--accent); }
+  .tl .n .d { font-size: .52em; color: var(--muted); line-height: 1.25; margin-top: .06em; }
+  .tl .arr { display: flex; align-items: center; color: var(--muted); font-size: .75em; flex: none; }
+
+  /* ===== P4/P5:横向 miss 拆解(继承 收益闭环 v7.2) ===== */
+  .mchart { flex: 1; display: flex; flex-direction: column; justify-content: space-evenly; gap: .4em; min-height: 0; margin-top: .3em; }
+  .mgrp { display: flex; align-items: center; gap: .6em; }
+  .mgrp .glb { flex: none; width: 6.4em; text-align: right; line-height: 1.3; }
+  .mgrp .glb .t1 { font-size: .78em; font-weight: 700; color: var(--text); display: block; }
+  .mgrp .glb .t2 { font-size: .58em; color: var(--muted); display: block; }
+  .mgrp .bars2 { flex: 1; display: flex; flex-direction: column; gap: .2em; min-width: 0; }
+  .hb { display: flex; align-items: center; gap: .45em; }
+  .hb .who { flex: none; width: 5.2em; font-size: .6em; color: var(--muted); text-align: right; white-space: nowrap; }
+  .hb .who b { color: var(--text); }
+  .hb .htrack { flex: 1; height: 1.35em; border-radius: 5px; background: #eceff5; display: flex; overflow: hidden; }
+  .hb .hv { flex: none; width: 5.6em; font-family: var(--mono); font-size: .66em; white-space: nowrap; }
+  .hseg { height: 100%; display: flex; align-items: center; justify-content: center; overflow: hidden; flex: none; }
+  .hseg + .hseg { border-left: 1px solid rgba(255,255,255,.85); }
+  .hseg span { font-size: .6em; white-space: nowrap; color: #fff; font-weight: 700; text-shadow: 0 1px 2px rgba(0,0,0,.3); }
+  .hseg.gh { background: rgba(5,150,105,.68); }
+  .hseg.wr { background: rgba(220,38,38,.85); }
+  .hseg.nw { background: rgba(37,99,235,.8); }
+  .hseg.gr { background: rgba(148,163,184,.75); }
+  .hseg.cold { background: repeating-linear-gradient(135deg, rgba(220,38,38,.75) 0 4px, rgba(220,38,38,.35) 4px 8px); }
+  .mgrp .mbadge { flex: none; width: 6.2em; text-align: center; }
+  .mgrp .mbadge .pv { font-family: var(--mono); font-weight: 800; font-size: .86em; color: var(--good); display: block; white-space: nowrap; }
+  .mgrp .mbadge .pl { font-size: .56em; color: var(--muted); line-height: 1.3; display: block; margin-top: .08em; }
+  .mlegend { display: flex; gap: .9em; font-size: .64em; color: var(--muted); flex-wrap: wrap; margin-left: auto; }
+  .mlegend i { display: inline-block; width: .82em; height: .55em; border-radius: 3px; margin-right: .24em; }
+  .mlegend .l-wr i { background: rgba(220,38,38,.85); }
+  .mlegend .l-nw i { background: rgba(37,99,235,.8); }
+  .mlegend .l-gr i { background: rgba(148,163,184,.75); }
+  .mlegend .l-cold i { background: repeating-linear-gradient(135deg, rgba(220,38,38,.75) 0 3px, rgba(220,38,38,.35) 3px 6px); }
+  .segnote { font-size: .64em; color: var(--muted); line-height: 1.48; margin-top: .3em; }
+  .segnote b { color: var(--text); }
+
+  /* ===== P3–P5:逐 Q 账本(继承 收益闭环 v7.2 P2–P4)===== */
+  .caps { display: flex; align-items: center; gap: .26em; flex-wrap: wrap; min-width: 0; row-gap: .3em; }
+  .chip { border-radius: 999px; padding: .18em .5em; font-size: .66em; white-space: nowrap; border: 1px solid var(--card-border); background: #fff; color: var(--text); font-family: var(--mono); }
+  .chip.u { border-color: rgba(37,99,235,.5); color: var(--accent); }
+  .chip.a { border-color: #c3ccda; }
+  .chip.t { border-color: rgba(5,150,105,.5); color: var(--good); }
+  .chip.req { border-color: rgba(217,119,6,.55); color: var(--warn); background: rgba(217,119,6,.07); font-weight: 700; }
+  .caps .arr { color: var(--muted); font-size: .74em; flex: none; }
+  .acct .mchart { gap: .3em; }
+  .acct .mgrp .glb { width: 7.2em; }
+  .acct .hb .who small { color: var(--muted); font-weight: 500; margin-left: .2em; }
+  .acct .hb .hv { width: 6.2em; }
+  .acct .mgrp .mbadge { width: 7.4em; }
+  .hseg.gh.fix { border-right: 2px dashed #fff; }
+  .hseg.first { background: repeating-linear-gradient(135deg, rgba(37,99,235,.85) 0 4px, rgba(37,99,235,.35) 4px 8px); }
+  .hb.loopr .htrack { opacity: .82; }
+  .mgrp .mbadge .pv2 { font-family: var(--mono); font-weight: 800; font-size: .8em; color: var(--good); display: block; margin-top: .04em; }
+  .mlegend .l-gh i { background: rgba(5,150,105,.68); }
+  .mlegend .l-first i { background: repeating-linear-gradient(135deg, rgba(37,99,235,.85) 0 3px, rgba(37,99,235,.35) 3px 6px); }
+  .apx h2 .num { color: var(--warn); }
+
+  /* ===== v1.4:数据基线页 + 账目页版式修正 ===== */
+  table.bl { font-size: .8em; }
+  #bl-k table.bl { font-size: .72em; }
+  table.bl th, table.bl td { padding: .2em .35em; }
+  table.bl td.id { font-family: var(--mono); font-weight: 800; color: var(--accent); white-space: nowrap; }
+  table.bl td.nm { font-weight: 700; color: var(--text); min-width: 7em; }
+  table.bl td small { display: block; color: var(--muted); font-size: .9em; }
+  table.bl td.beh { min-width: 8em; }
+  table.bl td.nt { min-width: 11em; }
+  table.bl .lv { display: inline-block; border-radius: 4px; padding: 0 .35em; font-weight: 700; color: #fff; font-size: .92em; white-space: nowrap; }
+  table.bl .lv.prod { background: var(--lvl-prod); } table.bl .lv.sess { background: var(--lvl-sess); } table.bl .lv.dyn { background: var(--bad); }
+  table.bl .lv.q { background: var(--lvl-q); } table.bl .lv.loop { background: var(--lvl-loop); } table.bl .lv.na { background: #b9c3d3; }
+  .acct .hb .who { width: 4.4em; }
+  .acct .hb .hp { flex: none; width: 3.2em; font-size: .56em; color: var(--muted); font-family: var(--mono); text-align: right; white-space: nowrap; }
+  .hseg.first span { color: #0f2a6b; text-shadow: 0 0 2px #fff, 0 0 2px #fff; }
+  .hseg.first { background: repeating-linear-gradient(135deg, rgba(37,99,235,.55) 0 4px, rgba(37,99,235,.18) 4px 8px); }
+  .mlegend .l-first i { background: repeating-linear-gradient(135deg, rgba(37,99,235,.55) 0 3px, rgba(37,99,235,.18) 3px 6px); }
+  .footer > div:last-child { margin-right: 10em; }
+  .bars .seg .top { gap: .22em; }
+  .steps { display: grid; grid-template-columns: 1fr 1fr; gap: .4em; }
+  .step { border-radius: 10px; padding: .4em .55em; background: #fff; border: 1px solid var(--card-border); display: flex; flex-direction: column; gap: .15em; }
+  .step .no { font-size: .62em; font-weight: 800; color: var(--accent); }
+  .step .no .tag { margin-left: .4em; }
+  .step h4 { font-size: .76em; font-weight: 800; color: var(--text); line-height: 1.3; }
+  .step p { font-size: .62em; color: var(--muted); line-height: 1.4; }
+  .step .acc { font-size: .6em; color: var(--good); font-weight: 700; line-height: 1.35; }
+  .step .acc b { color: var(--text); }
+
+  /* ===== P7:统计(继承 自动化统计与分析 v1) ===== */
+  pre.attr {
+    font-family: var(--mono); background: #fff; border: 1px solid var(--card-border); border-radius: 8px;
+    padding: .38em .55em; font-size: .62em; line-height: 1.45; color: var(--text); overflow: hidden; white-space: pre;
+  }
+  pre.attr .c { color: var(--muted); } pre.attr .b { color: var(--accent); font-weight: 700; }
+  pre.attr .r { color: var(--bad); font-weight: 700; } pre.attr .g { color: var(--good); font-weight: 700; }
+  .abar { display: flex; height: 1.3em; border-radius: 6px; overflow: hidden; border: 1px solid var(--card-border); margin-top: .2em; }
+  .aseg { display: flex; align-items: center; justify-content: center; min-width: 0; }
+  .aseg span { font-size: .54em; font-weight: 700; color: #fff; white-space: nowrap; text-shadow: 0 1px 2px rgba(0,0,0,.3); }
+  .aseg.hit { background: rgba(5,150,105,.68); }
+  .aseg.waste { background: rgba(220,38,38,.85); }
+  .aseg.waste + .aseg.waste, .aseg.hit + .aseg.hit { border-left: 1px solid rgba(255,255,255,.85); }
+  .aseg.new { background: rgba(37,99,235,.8); }
+  .amarks { display: flex; font-size: .56em; color: var(--muted); margin-top: .08em; }
+  .flow { display: flex; align-items: stretch; gap: .28em; margin-top: .18em; }
+  .fstep { flex: 1; background: #fff; border: 1px solid var(--card-border); border-radius: 8px; padding: .28em .32em; text-align: center; }
+  .fstep .fn { font-size: .66em; font-weight: 700; color: var(--accent); }
+  .fstep .fd { font-size: .56em; color: var(--muted); line-height: 1.28; margin-top: .06em; }
+  .farr { display: flex; align-items: center; color: var(--muted); font-size: .8em; flex: none; }
+  .reports { display: flex; gap: .35em; margin-top: .18em; }
+  .rep { flex: 1; background: #fff; border: 1px solid var(--card-border); border-radius: 8px; padding: .3em .4em; }
+  .rep .fn { font-size: .66em; font-weight: 800; color: var(--text); }
+  .rep .fd { font-size: .58em; color: var(--muted); line-height: 1.3; margin-top: .06em; }
+  .pair { display: flex; gap: .4em; margin-top: .18em; }
+  .pair .box { flex: 1; border-radius: 8px; padding: .32em .48em; font-size: .66em; line-height: 1.38; color: var(--muted); }
+  .pair .box b { display: block; margin-bottom: .06em; }
+  .pair .cur { background: rgba(220,38,38,.07); border: 1px solid rgba(220,38,38,.3); } .pair .cur b { color: var(--bad); }
+  .pair .tgt { background: rgba(5,150,105,.07); border: 1px solid rgba(5,150,105,.3); } .pair .tgt b { color: var(--good); }
+
+  /* 公式框 */
+  .formula { background: #fff; border: 1px solid var(--card-border); border-radius: 8px; padding: .4em .6em; font-size: .7em; line-height: 1.55; color: var(--muted); }
+  .formula .big2 { font-family: var(--mono); font-size: 1.2em; font-weight: 800; color: var(--accent); }
+  .formula .r { color: var(--bad); font-weight: 700; } .formula .o { color: var(--warn); font-weight: 700; } .formula .g { color: var(--good); font-weight: 700; }
+
+  .nav { position: absolute; bottom: 3.2%; right: 3%; display: flex; gap: .5em; align-items: center; z-index: 10; font-size: clamp(9.5px, min(1.08vw, 1.92vh), 22px); }
+  .nav button { background: #fff; border: 1px solid var(--card-border); color: var(--text); border-radius: 8px; width: 2.1em; height: 2.1em; cursor: pointer; font-size: 1em; }
+  .nav button:hover { border-color: var(--accent); color: var(--accent); }
+  .nav .pg { color: var(--muted); font-family: var(--mono); font-size: .88em; padding: 0 .35em; }
+  .dots { position: absolute; bottom: 3.9%; left: 3%; display: flex; gap: .42em; z-index: 10; }
+  .dots i { width: .52em; height: .52em; border-radius: 50%; background: #c9d2e0; cursor: pointer; }
+  .dots i.on { background: var(--accent); }
+</style>
+</head>
+<body>
+<div class="deck">
+
+<!-- ============ P1 数据基线 ============ -->
+<section class="slide active">
+  <h2><span class="num">01</span>数据基线:<span class="hl">上下文模块 × 长度 × 状态</span>——全稿唯一事实来源,每个数字都回指到编号<small>K token,DS-V4 tokenizer(GLM 另标);<span class="tag real">实测</span> CSV 直接读出 · <span class="tag mid">已定</span> 已拍板 · <span class="tag est">估算</span> 有依据推演 · <span class="tag bad">待定</span> 需确认</small></h2>
+  <div class="row grow">
+    <div class="card" style="flex:1.62; display:flex; flex-direction:column; min-height:0;">
+      <h3>模块表 <span class="sub">当前 = token_breakdown.csv 当前侧 21 次调用;目标 = 你已定的排布;"级"= 变化频率</span></h3>
+      <div id="bl" style="flex:1; min-height:0; overflow:hidden;"></div>
+    </div>
+    <div class="col" style="flex:1;">
+      <div class="card" style="flex:1; min-height:0; overflow:hidden;">
+        <h3>常量与规则 <span class="sub">P2–P9 只允许用这些公式;R 值由 M/K 自动算出</span></h3>
+        <div id="bl-k"></div>
+      </div>
+      <div class="card">
+        <h3>怎么用这一页</h3>
+        <p>① 稿内所有长度、目标 miss、节省率都由这里的对象算出并绑定到各页(改一处、全稿同步);② P5–P7 账目页的当前列为逐调用实测,目标列按 R2 / R3 / R4 推演;③ 标 <span class="tag bad">待定</span> 的项一旦确认,只改这一页。<b>四步改造</b>(P3)对应的模块:① 动态下沉 → M5 位置;② Tools 前移 → M1 位置;③ skill 预置 → M3;④ 只更新变化 → M5 增量。</p>
+      </div>
+    </div>
+  </div>
+  <div class="footer">
+    <div><b>来源</b>:token_breakdown.csv(当前侧 3 会话 21 次调用,上线后 13 次调用)、prompt段内容变化对照.md、14 实测数据需求;业务占比与轮数分布来自 v7.2。<b>本页也以 15-上下文模块与长度基线.md 落档</b>,供数据方按 ID 回填。</div>
+    <div style="white-space:nowrap;">KV Cache 方案(汇报版)· v1.4 · P1 数据基线</div>
+  </div>
+</section>
+
+<!-- ============ P2 上下文组成对比 ============ -->
+<section class="slide">
+  <h2><span class="num">02</span>上下文组成对比:<span class="hl">当前 vs 目标</span>——Tools 移到最前成为产品级,动态上下文下沉并精简<small>数字为实测(DS-V4 tokenizer);会话级只在会话首调算一次,其后只算当轮新增</small></h2>
+
+  <div class="card" style="margin-bottom:.4em;">
+    <h3>结构对照:按"变化频率"分四级 <span class="sub">物理序:当前 SP → Tools → UAT,目标 <b>Tools → SP → UAT</b>;两行同名块一一对应;<b>段宽为示意、不按比例</b></span>
+      <span class="legend">
+        <span><i class="prod"></i>产品级 · 版本发布才变</span>
+        <span><i class="sess"></i>会话级 · 会话创建时定、会话内不变</span>
+        <span><i class="q"></i>query 级 · 每 Q 追加</span>
+        <span><i class="loop"></i>loop 级 · 每次迭代追加</span>
+        <span><i class="dyn"></i>动态 · 当前每 Q 原位重写(病灶)</span>
+        <span><i class="dynt"></i>动态 · 目标下沉 UAT 只追加增量</span>
+      </span>
+    </h3>
+    <div class="bars">
+      <div class="barrow">
+        <div class="who">当前<small>实测 ~49K/调用 · M1–M7</small></div>
+        <div class="bar">
+          <div class="seg prod" style="flex:28.7 1 0;"><div class="top">SP·固定 <span data-b="m.M2.cur"></span></div><div class="sub">14 段:~45% 工具与技能规范(TOOLS.md)· 20% AGENTS.md · 其余人格风格 / 回复合成 · 产品级 · <span class="g">命中</span>(断点实测停在这里)</div></div>
+          <div class="seg sess" style="flex:1.5 0 5.4em;"><div class="top">SP·会话级 <span data-b="m.M4.curLo|K2"></span>–<span data-b="m.M4.curHi|K2"></span></div><div class="sub">user.md(占位)+ device · 会话级</div></div>
+          <div class="seg dyn" style="flex:3 0 7em;"><div class="top">SP·动态⚡ <span data-b="m.M5.cur"></span></div><div class="sub">query 相关 skills / memory / knowledge · <span class="r">每 Q 原位重写</span></div></div>
+          <div class="seg prod" style="flex:5.8 1 0;"><div class="top">Tools <span data-b="m.M1.cur"></span></div><div class="sub">12 个工具 · 产品级 · <span class="o">被连带</span></div></div>
+          <div class="seg sess" style="flex:8 1 0;"><div class="top">UAT·历史 10 轮 <span data-b="m.M6.lo"></span>–<span data-b="m.M6.hi"></span></div><div class="sub">完整 U/A/T · 会话创建载入 · <span class="o">被连带</span></div></div>
+          <div class="seg uat" style="flex:12 1 0;"><div class="top">UAT·本会话 U / A / T(随轮增长)</div><div class="sub">U 仅 query · 追加 · <span class="o">每 Q 首调被连带重算</span></div></div>
+        </div>
+      </div>
+      <div class="barrow">
+        <div class="who">目标<small>前缀纯稳定 · P1 基线</small></div>
+        <div class="bar">
+          <div class="seg prod" style="flex:5.9 0 4.6em;"><div class="top">Tools <span data-b="m.M1.tgt"></span></div><div class="sub">全量 12 个工具全部预置 · 产品级 · <span class="g">全网命中</span></div></div>
+          <div class="seg prod" style="flex:22 1 0;"><div class="top">SP·固定 <span data-b="m.M2.tgt"></span></div><div class="sub">14 段不变 · 产品级 · <span class="g">命中</span></div></div>
+          <div class="seg prod" style="flex:4.5 0 6.2em;"><div class="top">SP·预置 skill <span data-b="m.M3.n|raw"></span> 个 <span data-b="m.M3.tgt"></span></div><div class="sub">高频 15 个 desc · 产品级 · 日级攒批 · <span class="g">全网命中</span></div></div>
+          <div class="seg sess" style="flex:1.5 0 5.4em;"><div class="top">SP·会话级 ~<span data-b="m.M4.tgt"></span></div><div class="sub">user.md .4 + 私域原则 .3 + device .3 + 记忆快照 · 会话内冻结</div></div>
+          <div class="seg sess" style="flex:8 1 0;"><div class="top">UAT·历史 10 轮 <span data-b="m.M6.lo"></span>–<span data-b="m.M6.hi"></span></div><div class="sub">完整 U/A/T · 会话创建载入 · <span class="g">首调后命中</span></div></div>
+          <div class="seg dynt" style="flex:3 0 7em;"><div class="top">UAT·动态增量 ≤<span data-b="m.M5.tgtDelta|K0"></span></div><div class="sub">↑动态⚡ 下沉:非预置 skill 引用 / memory / knowledge · <span class="g">随 U 追加、只更新变化</span></div></div>
+          <div class="seg uat" style="flex:9 1 0;"><div class="top">UAT·本会话 U / A / T(随轮增长)</div><div class="sub">U 仅 query · <span class="g">纯追加,前缀永不改写</span></div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card" style="flex:1; min-height:0; display:flex; flex-direction:column;">
+    <h3>同一会话逐次调用展开:行 = 一次模型调用,列 = 上下文位置,格色 = 该段在该次调用的缓存命运
+      <span class="sub">示例:4 个 Q · loop 只演示一次(Q1 调②)· Q2–Q4 只画首调;右列绿框为闲聊会话实测 / 目标推演</span>
+      <span class="legend">
+        <span><i class="hit"></i>命中</span>
+        <span><i class="rw"></i>原位重写</span>
+        <span><i class="drag"></i>被连带白算</span>
+        <span><i class="new"></i>新增必算</span>
+        <span><i class="first"></i>会话级首次载入(每会话一次)</span>
+      </span>
+    </h3>
+    <div class="mats">
+      <div class="mat" id="mat-cur"></div>
+      <div class="mat" id="mat-tgt"></div>
+    </div>
+  </div>
+
+  <div class="rulers">
+    <div class="ruler">
+      <div class="t">KV 命中率<small>命中 ÷ 输入 · 健康度</small></div>
+      <div class="v"><span class="cur">65.5%</span><span class="arr">→</span><span class="tgt">≥95%</span><span class="pct">Q 首调 / loop · 结构上限</span></div>
+      <div class="n">当前 21 次调用加权,断点恒在 SP·固定末;目标 Q 首调 / loop 结构上限 ≥95%,<b>DS 按 4K 块上报实测约 91–95%</b>;会话首调 75–80%,依赖产品级前缀常驻</div>
+    </div>
+    <div class="ruler">
+      <div class="t">硬算 token / 调用<small>miss = 输入 − 命中 · 账单与 TTFT</small></div>
+      <div class="v"><span class="cur">17.2K</span><span class="arr">→</span><span class="tgt">~<span data-b="R2"></span></span><span class="pct">Q 首调 · R2</span></div>
+      <div class="n">当前 Q 首调 14–34K、九成以上是白算;目标 Q 首调 = 上轮 A + U + Δ动态 ≈ <span data-b="R2"></span>(R2);会话首调 = 会话级 + 历史 10 轮 + U1 + Δ,<span data-b="R3lo"></span>–<span data-b="R3hi"></span> 随历史(R3)</div>
+    </div>
+    <div class="ruler">
+      <div class="t">一条 4Q 闲聊会话合计 miss<small>P6 同一批 query,<span data-calc="S.chat.nCalls|raw"></span> 次调用</small></div>
+      <div class="v"><span class="cur" data-calc="S.chat.totCur|K0"></span><span class="arr">→</span><span class="tgt">~<span data-calc="S.chat.totTgt|K0"></span></span><span class="pct">−<span data-calc="S.chat.saveRate|raw"></span>%</span></div>
+      <div class="n">当前 19.5 + 18.6 + 14.0 + 1.8 + 12.4K;目标 R3 + R2 × 3 + loop 同值(该会话历史近空;历史满载首调再 +6–11K);<b>miss 与轮数脱钩</b>,会话越长省得越多(P7)</div>
+    </div>
+    <div class="ruler how">
+      <div class="t">四步改造(P3 展开;读法:差别全在 Q2→Q4 每个首调)</div>
+      <div class="n">前缀区只放会话创建时已确定的内容,按变化频率分四级:<b>①</b> 动态上下文从 SP 下沉 UAT 随 U 追加(<b>已上线,附录 A</b>);<b>②</b> 全量 12 个工具预置并移到最前(Tools → SP → UAT);<b>③</b> <span data-b="m.M3.n|raw"></span> 个高频 skill 预置进产品级;<b>④</b> 动态只更新变化,<span data-b="m.M5.cur"></span> → ≤<span data-b="m.M5.tgtDelta|K0"></span>。</div>
+    </div>
+  </div>
+  <div class="footer">
+    <div><b>数字全部来自 P1 基线</b>(M1–M7,目标列按 R2 / R3 推演;两行同名块一一对应)。GLM tokenizer 下 SP·固定 29.9K、Tools 5.1K,只用于任务会话。<b>待定项见 P1</b>:记忆快照长度(M4)、动态增量 ≤2K(M5)、历史 10 轮列口径(M6)、未归段归属(M11)。目标序 Tools → SP 需 chat template 支持(见 06)。</div>
+    <div style="white-space:nowrap;">KV Cache 方案(汇报版)· v1.4 · P2</div>
+  </div>
+</section>
+
+<!-- ============ P4 两把尺子 + 三个方案 ============ -->
+<section class="slide denser">
+  <h2><span class="num">03</span>两把尺子 + 四步改造:<span class="hl">该命中的都命中,命中率是比例,推理长度才是钱</span><small>每把尺子都给了实测锚点;四步与 P2 四句一一对应,P5–P7 每页同时报命中率与 miss</small></h2>
+
+  <div class="kpi2">
+    <div class="card">
+      <div class="name">① 该命中 / 命中量</div>
+      <div class="eq g">cached_tokens = d</div>
+      <div class="desc">前缀逐 token 一致的深度。目标态:<b>产品级全网命中</b>;<b>会话级首调后命中</b>;query / loop 只命中已写入的历史。<b>实测</b>:当前 d 恒停在 SP·固定末(24.6 / 26.6 / 29.6K)。</div>
+    </div>
+    <div class="card">
+      <div class="name">② 命中率 = 被 cache 的比例</div>
+      <div class="eq b">命中率 = d / 输入</div>
+      <div class="desc">健康度,分母漂、折算不成钱。<b>实测</b>:当前 21 次调用加权 65.5%(首调 53–58%);前缀稳定的 loop 已达 95–99%。目标随 Q 上升、当前从 Q2 被压住。</div>
+    </div>
+    <div class="card">
+      <div class="name">③ 推理长度 = miss</div>
+      <div class="eq w">miss = 输入 − d = 白算 + 新增</div>
+      <div class="desc"><b>真实 prefill</b>,账单和 TTFT 跟它走。<b>实测</b>:当前首调后 miss 里<b>白算占 90–99%</b>;前缀一稳定,miss 就只剩新增(附录 A 已验证)。</div>
+    </div>
+    <div class="card">
+      <div class="name">④ 验收</div>
+      <div class="eq r">白算 → 0(裕量 1 块)</div>
+      <div class="desc">白算 = miss − 新增,新增 ≈ 本次输入 − 上次输入。<b>loop 白算恒为 0 是报警线</b>——当前任务 / 问答会话各有 1 次 loop 全 miss 20–21K(P4 / P5),这类调用都该被自动抓出来(P8)。</div>
+    </div>
+  </div>
+
+  <div class="row grow">
+    <div class="col" style="flex:1.15;">
+      <div class="card grow">
+        <h3>该命中什么(目标态纪律)· 三类调用的 miss 账本</h3>
+        <div class="should">
+          <div class="box prod"><div class="lv">产品级 · 全网</div><p>Tools + SP 固定 + 预置 skill。<b>任何用户任何会话都该命中</b>,只在版本发布时全网重算一次。</p></div>
+          <div class="box sess"><div class="lv">会话级 · 首调后</div><p>SP 会话块 + 历史 10 轮。会话创建时已确定;<b>每会话首调算一次,其后全命中</b>。跨会话按超时失效。</p></div>
+          <div class="box turn"><div class="lv">轮次 · 只命中历史</div><p>query / loop 追加区。<b>已写入的 U/A/T 全命中</b>;当轮新增(Uₙ / A+T)必算,这是成本底线。</p></div>
+        </div>
+        <table style="margin-top:.35em;">
+          <tr><th>调用</th><th>当前 <span class="tag real">实测</span></th><th>目标 <span class="tag est">推演</span></th><th>目标的实测校核 <span class="tag mid">附录 A</span></th></tr>
+          <tr><td><b>会话首调</b></td><td>19.5–23.2K(产品级 SP 已命中,其后全算)</td><td>R3 = M4 <span data-b="m.M4.tgt"></span> + 历史 10 轮 + U1 + Δ ≈ <span data-b="R3lo"></span>–<span data-b="R3hi"></span>;<span class="goodc">Tools 已命中</span></td><td>—(第一步测试环境冷缓存,不可比)</td></tr>
+          <tr><td><b>Q 首调 n≥2</b></td><td><b class="badc">14–34K</b>:动态 <span data-b="m.M5.cur"></span> + Tools <span data-b="m.M1.cur"></span> + 历史 + 本会话全史(R1)</td><td><b class="goodc">仅当轮新增</b>:R2 = 上轮 A + Uₙ + 动态增量 ≤<span data-b="m.M5.tgtDelta|K0"></span> ≈ <span data-b="R2"></span></td><td>前缀稳定后 miss ≈ 新增已成立;剩余 skills 全量重注 ~5K 即第 ③④ 步要拿掉的</td></tr>
+          <tr><td><b>loop</b></td><td>0.75–1.8K 正常;<b class="badc">任务 / 问答会话各 1 次 loop 全 miss 20–21K</b></td><td>R4:仅 A + T;白算恒 0</td><td>loop 白算 0.5–1.3K(≤1 块),97.8–99.6% ✓</td></tr>
+        </table>
+      </div>
+    </div>
+
+    <div class="col" style="flex:1;">
+      <div class="card grow">
+        <h3>四步改造(与 P2 四句同序)<span class="sub">每步标出它在 P5–P7 账目里对应的哪一段"红转绿"</span></h3>
+        <div class="steps">
+          <div class="step">
+            <div class="no">① 动态下沉 <span class="tag real">已上线</span></div>
+            <h4>动态上下文从 SP 迁到 UAT 随 U 追加</h4>
+            <p>M5 不再在 SP 里每 Q 原位重写,前缀从此不被改写。</p>
+            <div class="acc">账目:<b>历史 10 轮 + 本会话史 转命中</b>(每 Q 首调最大的一段红);已上线实测前缀稳定后 miss ≈ 新增(附录 A)。</div>
+          </div>
+          <div class="step">
+            <div class="no">② Tools 前移 <span class="tag est">待做 · 需 chat template</span></div>
+            <h4>全量 12 个工具预置,排到 SP 之前</h4>
+            <p>M1 <span data-b="m.M1.cur"></span> → <span data-b="m.M1.tgt"></span>,位置从"动态之后"到"最前",不再被会话级 / 动态连带。</p>
+            <div class="acc">账目:<b>Tools <span data-b="m.M1.cur"></span> 转命中</b>,每 Q 首调都省;P7 固定项的大头。</div>
+          </div>
+          <div class="step">
+            <div class="no">③ skill 预置 <span class="tag mid">N=15 已定</span></div>
+            <h4><span data-b="m.M3.n|raw"></span> 个高频 skill desc 进产品级前缀</h4>
+            <p>M3 = ~<span data-b="m.M3.tgt"></span>,日级攒批发布;UAT 只带非预置 skill 引用。名单与实测总长待定(P1)。</p>
+            <div class="acc">账目:让 M5 的增量能压到 ≤<span data-b="m.M5.tgtDelta|K0"></span>;<b>前缀多 <span data-b="m.M3.tgt"></span> 但全网命中,不计入 miss</b>。</div>
+          </div>
+          <div class="step">
+            <div class="no">④ 只更新变化 <span class="tag est">待做</span></div>
+            <h4>动态增量只带与上轮不同的部分</h4>
+            <p>非预置 skill 引用 / 记忆增量 / 前台应用随 U 追加,与上轮相同则省略,不回改历史。device 归会话级(M4),不在此列。</p>
+            <div class="acc">账目:<b>动态 <span data-b="m.M5.cur"></span> → ≤<span data-b="m.M5.tgtDelta|K0"></span></b>,目标 Q 首调 = R2 ≈ <span data-b="R2"></span>;已上线实测每 Q 全量重注 4.5–5.4K 而内容基本没变(附录 A)。</div>
+          </div>
+        </div>
+        <p style="margin-top:.4em; font-size:.62em;">会话级预热(会话创建时后台 prefill,把 R3 从 TTFT 挪走)只改首调时延、不改账本,不列入四步,见附录 B。</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="banner">
+    <b>怎么读后面的场景页</b>:P4 任务 / P5 问答 / P6 闲聊,每页按 v7.2 账本版式——<b>逐 Q、逐调用,当前(实测)与目标(推演)同位对照</b>;目标列只按 P1 的 R2 / R3 / R4 推演:①② 让红段转绿,③④ 让新增压到 R2;Q 边界按 K4(U 列变化,待定)。
+  </div>
+  <div class="footer">
+    <div><b>口径</b>:无触顶、无驻留(会话内);跨会话按失效。新增 ≈ 本次输入 − 上次输入(Δinput),块粒度 DS 4 096 / GLM 128。</div>
+    <div style="white-space:nowrap;">KV Cache 方案(汇报版)· v1.4 · P3 尺子与四步</div>
+  </div>
+</section>
+
+
+<!-- ============ P4 任务(25%) ============ -->
+<section class="slide">
+  <h2><span class="num">04</span>任务型(占 25%)三 Q 账目:<span class="hl">Q 首调 miss 实测 21–23K、九成白算,目标钉在 R2 ≈ <span data-b="R2"></span></span>——会话省 ~<span data-calc="S.task.totCur-S.task.totTgt|K0"></span>(−<span data-calc="S.task.saveRate|raw"></span>%)<small>当前 = GLM-5 任务会话实测(Q1–Q3,4 调);目标 = 推演</small></h2>
+  <div class="card" style="margin-bottom:.45em; padding:.4em .8em;">
+    <div class="caps"><span style="font-size:.74em; color:var(--text); font-weight:700; margin-right:.2em;">一轮 = 1–2 次调用:</span><span class="chip u">U + Δ动态</span><span class="arr">→</span><span class="chip req">调①</span><span class="arr">→</span><span class="chip a">A 工具调用</span><span class="arr">→</span><span class="chip t">T 工具结果</span><span class="arr">→</span><span class="chip req">调②</span><span class="arr">→</span><span class="chip a">A 融合回复</span><span style="font-size:.66em; color:var(--muted); margin-left:.5em;">skill 正文首次 load ~5K(M10)入史后复用;<b>loop 那一调两边相同,节省全在每个 Q 的首调</b></span></div>
+  </div>
+  <div class="card grow acct" style="display:flex; flex-direction:column;">
+    <div class="row" style="align-items:center;">
+      <h3 style="margin-bottom:0;">逐调用拆解 —— <b class="goodc">全局规则:目标态除"当轮新增"外全部命中</b>(绿色前缀连续;当前 / 目标同位对照)</h3>
+      <div class="mlegend" style="margin-top:0; margin-left:auto;"><span class="l-gh"><i></i>命中(免费)</span><span class="l-wr"><i></i>白算(目标转绿 / 精简)</span><span class="l-first"><i></i>会话级首次载入(每会话一次)</span><span class="l-nw"><i></i>新增(必算)</span><span class="l-cold"><i></i>异常白算(目标归零)</span></div>
+    </div>
+    <div class="mchart" id="acct-task"></div>
+    <p class="segnote"><b>怎么读</b>:三次首调的命中量 d 恒 = 29 568 = SP·固定 29.9K 按 128 块对齐(K2)——<b>断点钉在 SP·固定末,其后 Tools 5.1K、历史 10 轮 9.8K、本会话史全部白算</b>;Q1 的 loop 也全 miss 21.3K(d 没动),是 R4 要抓的异常;Q3 首调 99.8% 偶发命中(动态恰好没变)证明结构上能命中、只是不可控。目标态 Q1 只付会话级首次载入 + 当轮新增(R3),Q2 起只付 R2;skill 正文首次 load 两边同为新增、做差消掉。<b>规律:每 Q 省 = Tools + 历史 + 本会话史 + 动态精简,随轮数单调涨。</b></p>
+  </div>
+  <div class="footer">
+    <div><b>数据</b>:token_breakdown.csv 当前侧 <span data-calc="S.task.model|raw"></span>;Q 边界按 P1 K4(U 列变化,待定);目标列按 P1 R2 / R3 / R4 自动推演;Q 行 <span data-calc="S.task.scaleQ|raw"></span>K 满刻度、合计行 <span data-calc="S.task.scaleT|raw"></span>K;绿色固定段压缩显示;&lt;6% 的段不印文字。</div>
+    <div style="white-space:nowrap;">KV Cache 方案(汇报版)· v1.4 · P4 任务(25%)</div>
+  </div>
+</section>
+
+<!-- ============ P5 问答(47%) ============ -->
+<section class="slide">
+  <h2><span class="num">05</span>问答型(占 47%,流量最大):<span class="hl">Q 首调 miss 实测 23–34K → 目标 R2,检索结果只在 loop 算一次</span>——会话省 ~<span data-calc="S.qa.totCur-S.qa.totTgt|K0"></span>(−<span data-calc="S.qa.saveRate|raw"></span>%)<small>当前 = DS-V4 问答会话实测(Q4–Q6,6 调);目标 = 推演</small></h2>
+  <div class="card" style="margin-bottom:.45em; padding:.4em .8em;">
+    <div class="caps"><span style="font-size:.74em; color:var(--text); font-weight:700; margin-right:.2em;">一轮 = 2 次调用:</span><span class="chip u">U + Δ动态</span><span class="arr">→</span><span class="chip req">调①</span><span class="arr">→</span><span class="chip a">A webSearch 调用</span><span class="arr">→</span><span class="chip t">T 检索结果(M9)</span><span class="arr">→</span><span class="chip req">调②</span><span class="arr">→</span><span class="chip a">A 融合回复</span><span style="font-size:.66em; color:var(--muted); margin-left:.5em;">检索结果留史、随轮沉淀;<b>结果越大,当前每个 Q 首调被连带重算的就越多</b>,目标态它入史后全命中</span></div>
+  </div>
+  <div class="card grow acct" style="display:flex; flex-direction:column;">
+    <div class="row" style="align-items:center;">
+      <h3 style="margin-bottom:0;">逐调用拆解 —— <b class="goodc">全局规则:目标态除"当轮新增"外全部命中</b>(绿色前缀连续;当前 / 目标同位对照)</h3>
+      <div class="mlegend" style="margin-top:0; margin-left:auto;"><span class="l-gh"><i></i>命中(免费)</span><span class="l-wr"><i></i>白算(目标转绿 / 精简)</span><span class="l-first"><i></i>会话级首次载入(每会话一次)</span><span class="l-nw"><i></i>新增(必算)</span><span class="l-cold"><i></i>异常白算(目标归零)</span></div>
+    </div>
+    <div class="mchart" id="acct-qa"></div>
+    <p class="segnote"><b>怎么读</b>:三次首调的 d 都退回 24.6–26.6K(= SP·固定,K2),Q6 首调 33.5K 是本会话史已积到 12.7K 后被整段连带;Q5 第二次 loop 20.4K 是 <b>loop 全 miss</b>(d 从 53.2K 退到 36.9K),R4 报警要抓的就是它。目标态每 Q 只付 R2,检索结果 T 在 loop 那一调作为新增算一次(两边相同,不计入节省),入史后下一 Q 全命中。<b>规律:问答沉淀最快(检索结果大时),当前白算随轮数涨得最快,绝对节省三类之最。</b>本会话检索结果偏小(0.75–2.4K,M9),webSearch 大结果时 loop 新增可达 ~10K,两边相同。</p>
+  </div>
+  <div class="footer">
+    <div><b>数据</b>:token_breakdown.csv 当前侧 <span data-calc="S.qa.model|raw"></span>;Q 边界按 P1 K4(U 列变化,待定);目标列按 P1 R2 / R3 / R4 自动推演;Q 行 <span data-calc="S.qa.scaleQ|raw"></span>K 满刻度、合计行 <span data-calc="S.qa.scaleT|raw"></span>K;绿色固定段压缩显示;&lt;6% 的段不印文字。</div>
+    <div style="white-space:nowrap;">KV Cache 方案(汇报版)· v1.4 · P5 问答(47%)</div>
+  </div>
+</section>
+
+<!-- ============ P6 闲聊(28%) ============ -->
+<section class="slide">
+  <h2><span class="num">06</span>闲聊型(占 28%):<span class="hl">当前每轮 12–20K 几乎纯白算,目标只付 R2 ≈ <span data-b="R2"></span></span>——会话省 ~<span data-calc="S.chat.totCur-S.chat.totTgt|K0"></span>(−<span data-calc="S.chat.saveRate|raw"></span>%)<small>当前 = DS-V4-Flash 闲聊会话实测(Q8–Q11,5 调);目标 = 推演</small></h2>
+  <div class="card" style="margin-bottom:.45em; padding:.4em .8em;">
+    <div class="caps"><span style="font-size:.74em; color:var(--text); font-weight:700; margin-right:.2em;">一轮 = 1 次调用(偶有 1 次 loop):</span><span class="chip u">U + Δ动态</span><span class="arr">→</span><span class="chip req">调①</span><span class="arr">→</span><span class="chip a">A 融合回复 ~0.25K(M8)</span><span style="font-size:.66em; color:var(--muted); margin-left:.5em;">无检索,沉淀实测 ~0.25K/轮——<b class="badc">当前却每轮重算 12–20K</b>,白算占比三类最高</span></div>
+  </div>
+  <div class="card grow acct" style="display:flex; flex-direction:column;">
+    <div class="row" style="align-items:center;">
+      <h3 style="margin-bottom:0;">逐调用拆解 —— <b class="goodc">全局规则:目标态除"当轮新增"外全部命中</b>(每轮 1 次调用;当前 / 目标同位对照)</h3>
+      <div class="mlegend" style="margin-top:0; margin-left:auto;"><span class="l-gh"><i></i>命中(免费)</span><span class="l-wr"><i></i>白算(目标转绿 / 精简)</span><span class="l-first"><i></i>会话级首次载入(每会话一次)</span><span class="l-nw"><i></i>新增(必算)</span><span class="l-cold"><i></i>异常白算(目标归零)</span></div>
+    </div>
+    <div class="mchart" id="acct-chat"></div>
+    <p class="segnote"><b>怎么读</b>:闲聊每轮真正的新内容只有 U + 上轮回复 ~0.3K,当前 miss 12–20K 里 98% 是白算(Tools 5.8 + 动态 2.8–3.2 + 未归段 ~1–9K);Q10 那次 loop 95.3% 正常命中。<b>该会话历史 10 轮列近空(0.1K),会话首调按 R3 只付 ~<span data-calc="fmtK(B.R3(B.m.M6.chat))"></span>;但 Q8 / Q9 有 6–9K 未归段(M11 待定),若其实是历史 10 轮,首调应为 ~9K、Q2 起不受影响。</b>时延视角:闲聊用户期待秒回,Q9 首调 prefill 18.6K → <span data-b="R2"></span>,TTFT 感知最强。</p>
+  </div>
+  <div class="footer">
+    <div><b>数据</b>:token_breakdown.csv 当前侧 <span data-calc="S.chat.model|raw"></span>;Q 边界按 P1 K4(U 列变化,待定);目标列按 P1 R2 / R3 / R4 自动推演;Q 行 <span data-calc="S.chat.scaleQ|raw"></span>K 满刻度、合计行 <span data-calc="S.chat.scaleT|raw"></span>K;绿色固定段压缩显示;&lt;6% 的段不印文字。</div>
+    <div style="white-space:nowrap;">KV Cache 方案(汇报版)· v1.4 · P6 闲聊(28%)</div>
+  </div>
+</section>
+
+<!-- ============ P7 整体收益 ============ -->
+<section class="slide denser">
+  <h2><span class="num">07</span>整体收益:<span class="hl">目标态每轮恒 ~7.5K,省 ≈ 7K + 6K×(n−1)</span>——固定项 7K 被实测证实,6Q+ 会话贡献近六成节省<small>公式与分桶沿用 v7.2 框架,系数按 P4–P6 实测校核;整表待 P8 日报替换</small></h2>
+
+  <div class="row grow">
+    <div class="card" style="flex:1.3; display:flex; flex-direction:column;">
+      <h3>按会话长度分桶的收益与贡献 <span class="tag est">推演</span> <span class="sub">业务 47/28/25 加权,每会话 prefill,无触顶,6Q+ 按 8Q</span></h3>
+      <table style="font-size:.74em;">
+        <tr><th>会话长度</th><th>会话占比</th><th class="n">现状/会话</th><th class="n">目标/会话</th><th class="n">节省率</th><th class="n">占现状算力</th><th class="n">占总节省</th></tr>
+        <tr><td><b>1Q</b></td><td>51%</td><td class="n">15.7K</td><td class="n">8.7K</td><td class="n">−45%</td><td class="n">12%</td><td class="n"><b>8%</b></td></tr>
+        <tr><td><b>2Q</b></td><td>20%</td><td class="n">37.5K</td><td class="n">16.2K</td><td class="n">−57%</td><td class="n">12%</td><td class="n">10%</td></tr>
+        <tr><td><b>3Q</b></td><td>9%</td><td class="n">65.1K</td><td class="n">23.6K</td><td class="n">−64%</td><td class="n">9%</td><td class="n">8%</td></tr>
+        <tr><td><b>4Q</b></td><td>5.5%</td><td class="n">98.9K</td><td class="n">31.1K</td><td class="n">−69%</td><td class="n">9%</td><td class="n">8%</td></tr>
+        <tr><td><b>5Q</b></td><td>3.5%</td><td class="n">138.7K</td><td class="n">38.5K</td><td class="n">−72%</td><td class="n">8%</td><td class="n">8%</td></tr>
+        <tr><td><b>6Q+</b></td><td>11%</td><td class="n">296.1K</td><td class="n">60.9K</td><td class="n goodc"><b>−79%</b></td><td class="n"><b>51%</b></td><td class="n goodc"><b>58%</b></td></tr>
+        <tr style="background:rgba(37,99,235,.06);"><td><b>合计</b></td><td>100%</td><td class="n"><b>均 64.2K</b></td><td class="n"><b>均 19.6K</b></td><td class="n goodc"><b>−69%</b></td><td class="n">100%</td><td class="n">100%</td></tr>
+      </table>
+      <table style="margin-top:.4em; font-size:.7em;">
+        <tr><th>按 Q 序号(业务加权)</th><th class="n">Q1</th><th class="n">Q2</th><th class="n">Q3</th><th class="n">Q4</th><th class="n">Q5</th><th>Qn</th></tr>
+        <tr><td>现状 / 轮</td><td class="n">15.7K</td><td class="n">21.8K</td><td class="n">27.9K</td><td class="n">34K</td><td class="n">40.1K</td><td class="mono">≈15.7 + 6.1(n−1)</td></tr>
+        <tr><td>目标 / 轮</td><td class="n">8.7K</td><td class="n">7.5K</td><td class="n">7.5K</td><td class="n">7.5K</td><td class="n">7.5K</td><td class="mono goodc"><b>≈7.5 恒定</b></td></tr>
+        <tr><td>省 / 轮</td><td class="n">7K</td><td class="n">14.3K</td><td class="n">20.4K</td><td class="n">26.5K</td><td class="n">32.6K</td><td class="mono goodc"><b>≈7 + 6.1(n−1)</b></td></tr>
+      </table>
+      <p style="margin-top:.35em;">节省率随会话长度单调上升(−45% → −79%);<b>6Q+ 会话独占一半算力、贡献近六成节省</b>;固定项让 1Q 会话也有 −45%。</p>
+    </div>
+    <div class="col" style="flex:1;">
+      <div class="card">
+        <h3>公式与实测校核</h3>
+        <div class="formula">
+          混合每轮节省:<span class="big2">ΔS(n) ≈ 7K + 6K×(n−1)</span><br>
+          <span class="o">7K 固定项</span> = Tools 解除连带 <b><span data-b="m.M1.cur"></span></b>(M1,原假设 4.5)+ 动态精简 <span data-b="m.M5.cur|raw"></span> → <span data-b="m.M5.tgtDelta|raw"></span> = <b><span data-calc="B.m.M5.cur-B.m.M5.tgtDelta"></span></b>(M5,原假设 2.5)≈ <span data-b="R5fixed"></span>(R5)<span class="g">✓ 成立</span><br>
+          <span class="r">6K 沉淀速率</span> = 47%×<span data-b="m.M9.sedQa|raw"></span>(问答,M9 取 webSearch 大结果口径,<b>待定</b>)+ 28%×<span data-b="m.M9.sedChat|raw"></span>(闲聊,实测)+ 25%×<span data-b="m.M9.sedTask|raw"></span>(任务,实测 0.1–8K)≈ <span data-b="R5sed"></span>(R5)<br>
+          目标态恒 ≈7.5K/轮 = 动态增量 ≤<span data-b="m.M5.tgtDelta|K0"></span> + 加权当轮新内容 5.5K
+        </div>
+      </div>
+      <div class="card grow">
+        <h3>实测 vs 推演对账 <span class="sub">Q 首调 miss,P4–P6 汇总</span></h3>
+        <table style="font-size:.64em;">
+          <tr><th></th><th class="n">Q1 首调</th><th class="n">Q2</th><th class="n">Q3</th><th>说明</th></tr>
+          <tr><td style="white-space:nowrap;">v7.2 推演</td><td class="n">12–14K</td><td class="n">10–17.5K</td><td class="n">11–21K</td><td>Tools 4.5 + 动态 4.5 + 史</td></tr>
+          <tr><td style="white-space:nowrap;"><b>实测任务</b> P4</td><td class="n badc">21.1K</td><td class="n badc">23.0K</td><td class="n warnc">0.1K*</td><td rowspan="3">Tools 5.1–5.8 + 历史 10 轮也被连带 + 未归段 → <b>三类都比推演更差</b>;*任务 Q3 偶发命中;Q 边界按 K4</td></tr>
+          <tr><td style="white-space:nowrap;"><b>实测问答</b> P5</td><td class="n badc">23.2K</td><td class="n badc">30.2K</td><td class="n badc">33.5K</td></tr>
+          <tr><td style="white-space:nowrap;"><b>实测闲聊</b> P6</td><td class="n badc">19.5K</td><td class="n badc">18.6K</td><td class="n badc">14.0K</td></tr>
+          <tr><td style="white-space:nowrap;">目标(三类同)</td><td class="n goodc"><span data-b="R3lo"></span>–<span data-b="R3hi"></span></td><td class="n goodc">~<span data-b="R2"></span></td><td class="n goodc">~<span data-b="R2"></span></td><td>R3 随历史;Q2 起 R2 恒定</td></tr>
+        </table>
+        <p style="margin-top:.25em;">现状比推演还差 → −69% 是<b>下限</b>;三条实测会话合计 −<span data-calc="S.task.saveRate|raw"></span> / −<span data-calc="S.qa.saveRate|raw"></span> / −<span data-calc="S.chat.saveRate|raw"></span>%(P4–P6)。整表待 P8 日报替换。</p>
+      </div>
+    </div>
+  </div>
+  <div class="banner">一句话:<b>目标态把每轮成本钉死在 ~7.5K,现状每深一轮多烧 ~6K</b>——固定项 7K 已被实测证实(甚至更大),沉淀速率与假设同量级;三条实测会话逐调用对账 −<span data-calc="Math.min(S.task.saveRate,S.qa.saveRate,S.chat.saveRate)|raw"></span>~−<span data-calc="Math.max(S.task.saveRate,S.qa.saveRate,S.chat.saveRate)|raw"></span>%,<b>整体 −69% 是下限,数字待日报重算</b>。</div>
+  <div class="footer">
+    <div><b>口径</b>:业务占比 问答 47 / 闲聊 28 / 任务 25;轮数分布 51/20/9/5.5/3.5/11;无触顶、无预热账本(预热只影响首调 TTFT,附录 B)。</div>
+    <div style="white-space:nowrap;">KV Cache 方案(汇报版)· v1.4 · P7 整体收益</div>
+  </div>
+</section>
+
+<!-- ============ P8 自动化统计与分析 ============ -->
+<section class="slide dense">
+  <h2><span class="num">08</span>自动化统计与分析:<span class="hl">采断点、拆白算、按 Q × 业务出日报</span>——本页的判定规则已在 P4–P6 和附录 A 上手工跑过一遍<small>当前 / 目标同表;上线后 P4–P7 每格数字来自日志不是推演</small></h2>
+
+  <div class="kpi">
+    <div class="card"><div class="big g">2 字段</div><div class="lbl"><b>引擎现成</b> prompt / cached</div></div>
+    <div class="card"><div class="big w">4 类埋点</div><div class="lbl"><b>应用顺手记</b> bounds / new / 标签 / 预热</div></div>
+    <div class="card"><div class="big">3 张报表</div><div class="lbl"><b>命中率 · miss · 分桶</b>对应 P3–P7</div></div>
+    <div class="card"><div class="big r">3 条报警</div><div class="lbl"><b>防回退</b> loop 白算 / 验收线 / 公式漂移</div></div>
+  </div>
+
+  <div class="row grow">
+    <div class="col" style="flex:1;">
+      <div class="card">
+        <h3>采集:每次 LLM 调用一行明细</h3>
+        <table style="font-size:.66em;">
+          <tr><th>点位</th><th>字段</th><th>示例 / 枚举</th></tr>
+          <tr><td><b>① 输入</b> <span class="tag real">现成</span></td><td class="mono">prompt_tokens</td><td class="mono">58 446</td></tr>
+          <tr><td><b>② 命中</b> <span class="tag real">现成</span></td><td class="mono">cached_tokens = d</td><td>断点深度,<b>按块上报</b>(DS 4 096 / GLM 128)</td></tr>
+          <tr><td><b>③ 边界</b> <span class="tag est">埋点</span></td><td class="mono">bounds[]</td><td><b>当前</b>:[SP固定, 动态, Tools, 历史10轮, 本会话]<br><b>目标</b>:[Tools, SP固定+预置, 会话级, 历史10轮, 本会话]</td></tr>
+          <tr><td><b>④ 新增</b> <span class="tag est">埋点</span></td><td class="mono">new + 分量</td><td class="mono">{u:30, dynamic:5400, tool:9700}</td></tr>
+          <tr><td><b>⑤ 标签</b> <span class="tag est">埋点</span></td><td class="mono">biz/call/q/scheme</td><td>call∈{<b>会话首调</b>,Q首调,loop} scheme∈{当前,目标} q=1,2…</td></tr>
+          <tr><td><b>⑥ 预热 / 冷启</b> <span class="tag est">埋点</span></td><td class="mono">warmup / cold</td><td>warmup∈{none, session_create, asr};<b>cold = 首调且 d=0</b>,单独切片</td></tr>
+          <tr><td><b>⑦ 输出/时延</b> <span class="tag real">现成</span></td><td class="mono">completion / ttft_ms</td><td>沉淀速率对账 + TTFT</td></tr>
+        </table>
+      </div>
+      <div class="card grow">
+        <h3>一条明细(对应附录 A2 的 c7)</h3>
+        <pre class="attr">{"session":"s-01","biz":"问答","q":5,"call":"q_first",
+ "scheme":"目标","warmup":"none","cold":false,
+ "prompt":82453,"cached":49152,     <span class="c">← 命中率 59.6%</span>
+ "new":16659,                       <span class="c">← webSearch 11K + skills 6.2K</span>
+ "waste":16642}                     <span class="r">← 白算 &gt; 1 块 → 报警</span></pre>
+      </div>
+    </div>
+
+    <div class="col" style="flex:1.15;">
+      <div class="card">
+        <h3>分析:断点拆段 → 三张报表自动出</h3>
+        <pre class="attr"><span class="b">命中率</span> = cached / prompt                    <span class="c">← P3 尺子②</span>
+<span class="b">miss</span>   = prompt − cached = <span class="r">白算</span> + <span class="g">新增</span>   <span class="c">← P3 尺子③</span>
+<span class="r">白算</span>   = miss − new;≤ 1 块视为 0        <span class="c">← 块粒度裕量</span></pre>
+        <div class="abar">
+          <div class="aseg hit" style="flex:28.7;"><span>SP·固定 28.7K</span></div>
+          <div class="aseg waste" style="flex:3;"><span>动态</span></div>
+          <div class="aseg waste" style="flex:5.8;"><span>Tools</span></div>
+          <div class="aseg waste" style="flex:12;"><span>历史 + 本会话</span></div>
+          <div class="aseg new" style="flex:3;"><span>新增</span></div>
+        </div>
+        <div class="amarks"><span style="flex:28.7; text-align:right;">↑d 实测停在 24.6–29.6K</span><span style="flex:20.8; text-align:center;">当前:动态 / Tools / 历史全白算</span><span style="flex:3;"></span></div>
+        <div class="abar" style="margin-top:.28em;">
+          <div class="aseg hit" style="flex:5.9;"><span>Tools</span></div>
+          <div class="aseg hit" style="flex:30.9;"><span>SP·固定 + 预置</span></div>
+          <div class="aseg hit" style="flex:4;"><span>会话级</span></div>
+          <div class="aseg hit" style="flex:12;"><span>历史 + 本会话</span></div>
+          <div class="aseg new" style="flex:3;"><span>新增</span></div>
+        </div>
+        <div class="amarks"><span style="flex:52.8; text-align:right;">↑d 推到本会话历史末(第一步实测 c6 已做到:99.6%,附录 A2)</span><span style="flex:3;"></span></div>
+        <div class="reports">
+          <div class="rep"><div class="fn">报表 1 · 命中率</div><div class="fd">按 Q × 业务 × 方案:目标应随 Q 上升,当前从 Q2 被压住</div></div>
+          <div class="rep"><div class="fn">报表 2 · 推理长度</div><div class="fd">miss 均值 / 会话合计;白算 vs 新增 vs 冷启拆开。对应 P4–P6 每格</div></div>
+          <div class="rep"><div class="fn">报表 3 · 分桶加权</div><div class="fd">轮数分布 × 业务占比 → P7 整体 −xx%;6Q+ 单独一列</div></div>
+        </div>
+      </div>
+      <div class="card">
+        <h3>怎么比 / 怎么守</h3>
+        <div class="pair">
+          <div class="box cur"><b>当前(对照)</b>动态在 SP 每 Q 重写 → 连带 Tools + 全部历史</div>
+          <div class="box tgt"><b>目标(实验)</b>四步改造(P3):① 动态下沉 ② Tools 前移 ③ skill 预置 ④ 只更新变化</div>
+        </div>
+        <div class="flow">
+          <div class="fstep"><div class="fn">① 采集</div><div class="fd">每调用一行</div></div><div class="farr">→</div>
+          <div class="fstep"><div class="fn">② 归因</div><div class="fd">d 切白算段</div></div><div class="farr">→</div>
+          <div class="fstep"><div class="fn">③ 聚合</div><div class="fd">Q × 业务 × 方案</div></div><div class="farr">→</div>
+          <div class="fstep"><div class="fn">④ 日报</div><div class="fd">三张报表 + 报警</div></div>
+        </div>
+        <p style="margin-top:.22em;">报警:<b class="badc">loop 白算 &gt; 1 块</b>(P4 的 21.3K、P5 的 20.4K、附录 A2 的 c3 47.5K 这类)| <b class="badc">目标白算 &gt; 1 块/调用</b>(验收线)| <b class="warnc">每 Q 节省偏离通式</b>(基线漂移)。按<b>会话粒度</b>打 scheme;灰度 1% → 10% → 50%;质量护栏不劣化。</p>
+      </div>
+    </div>
+  </div>
+  <div class="banner">一句话:<b>引擎给断点 d,应用给边界和标签,相减即归因</b>——P4–P6 的"白算 ≈ miss − Δ输入"就是这套规则的手工版;上线后 P4–P7 的格子由日报替换,异常调用(P4 / P5 loop 全 miss、附录 A2 c3 / c7 类)自动进报警而不是靠人翻 CSV。</div>
+  <div class="footer">
+    <div>点位继承统计 v1.2;新增 cold 标签与块粒度裕量(由实测得出:DS 4 096 / GLM 128)。</div>
+    <div style="white-space:nowrap;">KV Cache 方案(汇报版)· v1.4 · P8 自动化统计</div>
+  </div>
+</section>
+
+<!-- ============ P9 结论 ============ -->
+<section class="slide denser">
+  <h2><span class="num">09</span>结论与下一步:<span class="hl">当前 Q 首调 miss 14–34K、九成白算;目标钉在 R2 ≈ <span data-b="R2"></span>/轮,三类会话 −<span data-calc="Math.min(S.task.saveRate,S.qa.saveRate,S.chat.saveRate)|raw"></span>~−<span data-calc="Math.max(S.task.saveRate,S.qa.saveRate,S.chat.saveRate)|raw"></span>%</span>,全部数字由日报闭环验证</h2>
+
+  <div class="kpi">
+    <div class="card"><div class="big r">90–99%</div><div class="lbl"><b>当前</b>首调后 miss 中白算占比(实测)<br>断点钉在 SP·固定末</div></div>
+    <div class="card"><div class="big r">14–34K → ~<span data-b="R2"></span></div><div class="lbl"><b>Q 首调 miss</b>(当前实测 → 目标 R2)<br>任务 21–23 · 问答 23–34 · 闲聊 12–19K</div></div>
+    <div class="card"><div class="big g">−<span data-calc="S.task.saveRate|raw"></span> / −<span data-calc="S.qa.saveRate|raw"></span> / −<span data-calc="S.chat.saveRate|raw"></span>%</div><div class="lbl"><b>三条实测会话</b>逐调用对账(P4–P6)<br>任务 / 问答 / 闲聊</div></div>
+    <div class="card"><div class="big g">−69%</div><div class="lbl"><b>整体 prefill</b>(推演,实测显示为下限)<br>6Q+ 会话 −79%、贡献 58%</div></div>
+  </div>
+
+  <div class="row grow">
+    <div class="col" style="flex:1.05;">
+      <div class="card grow">
+        <h3>给领导的三句</h3>
+        <ul>
+          <li><b>问题在哪</b>:当前每次 Q 首调的缓存断点都停在 SP 固定段末尾(K2),其后 Tools、历史 10 轮、本会话全部白算——三类会话实测 Q 首调 miss 14–34K,9 成以上是白算,且随对话变深涨。</li>
+          <li><b>目标态多省</b>:前缀只放会话创建时已确定的内容,Q2 起每轮只付 R2 = 上轮 A + U + Δ动态 ≈ <span data-b="R2"></span>;三条实测会话逐调用对账,任务 −<span data-calc="S.task.saveRate|raw"></span>%、问答 −<span data-calc="S.qa.saveRate|raw"></span>%、闲聊 −<span data-calc="S.chat.saveRate|raw"></span>%,整体 −69% 为下限(P7)。</li>
+          <li><b>做到哪、还差什么</b>:四步改造(P3)第 ① 步动态下沉已上线,前缀稳定后 miss ≈ 新增已被证实(附录 A);还差 ② Tools 前移(chat template)、③ 预置 <span data-b="m.M3.n|raw"></span> 个高频 skill、④ 只更新变化;排布之外的失效(任务 / 问答各 1 次 loop 全 miss、逐出 / 路由)靠 P8 报警抓。</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>改造动作(对应收益来源)</h3>
+        <p><span class="tag real">已上线</span> ① 动态上下文下沉 UAT 随 U 追加 → 消灭每 Q 重写连带(附录 A)<br>
+        <span class="tag est">待做</span> ② Tools 全量预置并移到最前(需 chat template)&nbsp; ③ <span data-b="m.M3.n|raw"></span> 个高频 skill 预置(M3)&nbsp; ④ 动态只更新变化:<span data-b="m.M5.cur"></span> → ≤<span data-b="m.M5.tgtDelta|K0"></span>/Q(M5)<br>
+        <span class="tag mid">不进账本</span> 会话级预热(只影响首调 TTFT,附录 B)· 检索结果指针化 / 裁剪攒批</p>
+      </div>
+    </div>
+    <div class="col" style="flex:1;">
+      <div class="card grow">
+        <h3>统计闭环:怎么证明(不靠估算)</h3>
+        <table>
+          <tr><th>动作</th><th>说明</th></tr>
+          <tr><td><b>① 引擎实报</b></td><td>逐调用透传 cached_tokens → miss = 输入 − 命中(本次 CSV 已具备)</td></tr>
+          <tr><td><b>② 应用记账</b></td><td>当轮新增 tokenize 计数(替代 Δ输入近似)→ 白算 = ① − ②,验收 = ≤1 块</td></tr>
+          <tr><td><b>③ 四维打标</b></td><td>业务 × 调用类型(会话首调 / Q 首调 / loop / 冷启)× Q 序号 × 方案</td></tr>
+          <tr><td><b>④ 灰度 A/B</b></td><td>同期同流量对比每调用 miss 与 TTFT;异常调用自动报警</td></tr>
+        </table>
+      </div>
+      <div class="card">
+        <h3>待确认(影响精度,不影响方向)</h3>
+        <p>全部收敛到 P1 基线的待定项:K4 调用 → Q 边界(P4–P6 按 U 列变化分,与 CSV 分组不一致);M11 三条当前会话 1–9K 未归段的归属;M6 历史 10 轮列口径;任务 / 问答会话各 1 次 loop 全 miss 与附录 A2 c3 / c7 的引擎侧原因(逐出 / 路由 / TTL);M3 预置 skill 名单与实测总长;M4 记忆快照长度;M2 14 段 token 拆分;M9 问答沉淀系数;K3 业务占比来源。</p>
+      </div>
+    </div>
+  </div>
+  <div class="banner">结论:<b>排布改造的因果链已被实测证实</b>(断点位置、白算占比、前缀稳定后 miss ≈ 新增);<b>目标态 Q2 起 R2 ≈ <span data-b="R2"></span>/轮,三类实测会话 −<span data-calc="Math.min(S.task.saveRate,S.qa.saveRate,S.chat.saveRate)|raw"></span>~−<span data-calc="Math.max(S.task.saveRate,S.qa.saveRate,S.chat.saveRate)|raw"></span>%</b>;整体 −69% 为下限,数字由"引擎实报 + 应用记账 + 四维打标 + 灰度 A/B"日报替换。</div>
+  <div class="footer">
+    <div>数据基线:P1;组成对比:P2;尺子与四步:P3;任务:P4;问答:P5;闲聊:P6;整体收益:P7;统计:P8;附录 A 已上线第一步实测、附录 B 预热。数据:token_breakdown.csv · prompt段内容变化对照.md · 13 汇报大纲 · 收益闭环 v7.2。</div>
+    <div style="white-space:nowrap;">KV Cache 方案(汇报版)· v1.4 · P9 结论</div>
+  </div>
+</section>
+<!-- ============ 附录 A1 已上线第一步:各段内容怎么变 ============ -->
+<section class="slide dense apx">
+  <h2><span class="num">附录 A1</span>已上线第一步的实测:<span class="hl">动态内容从 SP 迁到 user message</span>——各段原来是什么、现在是什么、缓存效果怎么变<small>作为目标推演的校核证据;同模型 DS-V4-Flash-0731 · 闲聊会话 Q8–Q11 · 数据见 prompt段内容变化对照.md</small></h2>
+
+  <div class="kpi">
+    <div class="card"><div class="big g">−7.6%</div><div class="lbl"><b>SP 总量</b> 54.1K → 50.0K chars<br>动态段 5.7K chars 完全移出</div></div>
+    <div class="card"><div class="big">41 → 7 020</div><div class="lbl"><b>user message</b>(chars)<br>skills + MEMORY 进 &lt;system-reminder&gt;</div></div>
+    <div class="card"><div class="big g">57–64% → 85%</div><div class="lbl"><b>Q2–Q4 命中率</b>(引擎实报)<br>Q2 起稳定在 84.5–85.1%</div></div>
+    <div class="card"><div class="big g">18.6K → 7.5K</div><div class="lbl"><b>Q2 首调 miss</b>(推理长度)<br>Q3 14.0 → 7.9K · Q4 1.8 → 8.6K</div></div>
+  </div>
+
+  <div class="row grow">
+    <div class="card" style="flex:1.9; display:flex; flex-direction:column;">
+      <h3>逐段对照(段名与 P2 一致)</h3>
+      <table class="p2t">
+        <tr><th>段</th><th>位置</th><th>原来(before)</th><th>现在(after)</th><th>类型</th><th>对缓存</th></tr>
+        <tr><td class="blk">SP·固定(14 段)</td><td>SP → SP</td><td>43 478 chars(AGENTS.md 9.4K / TOOLS.md 20.5K / 回复策略 7.1K…)</td><td>44 019 chars;13 段逐字相同,仅 TOOLS.md +369</td><td><span class="tag real">不变</span></td><td class="goodc">前缀稳定,命中</td></tr>
+        <tr style="background:rgba(220,38,38,.05);"><td class="blk">SP·动态⚡ skills</td><td><b class="badc">SP → UM</b></td><td>5 640 chars · 12 个 skill · 每 Q 原位重写</td><td>6 925 chars · 14 个 skill · 随 U 追加(7 个两边都有)</td><td><span class="tag bad">迁移</span></td><td><b>核心动作</b>:SP 不再因它重写</td></tr>
+        <tr style="background:rgba(220,38,38,.05);"><td class="blk">SP·动态⚡ MEMORY.md</td><td><b class="badc">SP → UM</b></td><td>18 chars(占位)</td><td>34 chars(本次为空)</td><td><span class="tag bad">迁移</span></td><td>随 U 追加</td></tr>
+        <tr><td class="blk">user.md(会话级)</td><td>SP 尾(不变)</td><td>26 chars 占位符</td><td>1 151 chars 真实画像 + 私域原则 469</td><td><span class="tag mid">填充</span></td><td>会话内不变,首调后命中</td></tr>
+        <tr><td class="blk">DEVICE_INFO(会话级)</td><td>SP 尾(不变)</td><td>369 chars · Mate 70 Pro+ · 56 应用</td><td>395 chars · Pura X · 63 应用(换了测试机)</td><td><span class="tag est">更新</span></td><td>会话级数据,位置合理</td></tr>
+        <tr><td class="blk">Tools(API 字段)</td><td>不变</td><td>12 498 chars / 5 806 tok</td><td>12 727 chars / 5 944 tok;顺序变,+138 tok</td><td><span class="tag est">更新</span></td><td>发版全网重算一次,正常</td></tr>
+        <tr><td class="blk">UAT·本会话 U</td><td>UM → UM</td><td>41 chars,纯 query</td><td>7 020 chars = system-reminder(skills + MEMORY)+ query</td><td><span class="tag bad">结构变</span></td><td>每 Q 追加而非重写</td></tr>
+        <tr><td class="blk">UAT·历史 10 轮</td><td>UAT → UAT</td><td>102 chars(样本几乎无历史)</td><td>5 597 chars(样本不同,非优化所致)</td><td><span class="tag real">不变</span></td><td>首调后命中</td></tr>
+      </table>
+    </div>
+    <div class="col" style="flex:1;">
+      <div class="card grow">
+        <h3>实测暴露的三件事(决定后面三个方案)</h3>
+        <ul>
+          <li><b>动态段没精简,反而变大</b>:skills 12 → 14 个,token 3.0K → 5.8K(均值;问答/任务会话 6.9K),且<b>每个 Q 全量重注</b>——上线后 Q2–Q4 miss 7.5–8.6K 里 4.5–5.4K 是它。→ 第 ③ 步(skill 预置)+ 第 ④ 步(只更新变化)。</li>
+          <li><b>首调 0% 不是方案代价</b>:优化前首调能命中 24.6K(正是产品级 SP 前缀,跨用户共享);优化后测试集群冷缓存、无人预热才 0%。生产态产品级前缀本应命中,剩余会话级 + 历史(R3)可由预热挪走(附录 B)。</li>
+          <li><b>命中量按块上报</b>:DS 侧 cache_read 全是 4 096 的整数倍,GLM 侧 128 的整数倍。miss 里天然含最多 1 块的"假白算",报警裕量按 1 块设。</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>一句话</h3>
+        <p><b>搬家已经生效</b>:SP 稳定、Q2 起 miss 从"随历史涨"变成"钉在 ~8K";<b>但 8K 里一多半是全量重注的 skills</b>,离目标 ≤2K 还差第 ③④ 步。</p>
+      </div>
+    </div>
+  </div>
+  <div class="footer">
+    <div><b>口径</b>:chars 为原始字符数(段落对照用),token 为 DS-V4 tokenizer 计数;命中率 / miss 为引擎实报(cache_read / input)。优化前闲聊会话 5 次调用对应 4 个 Q(多出一次 12.4K / 68%,映射待确认),本页按数据方给的 Q2–Q4 = 第 2–4 次调用。</div>
+    <div style="white-space:nowrap;">KV Cache 方案(汇报版)· v1.4 · 附录 A1</div>
+  </div>
+</section>
+
+<!-- ============ 附录 A2 已上线第一步:问答 + 任务会话逐调用审计 ============ -->
+<section class="slide dense apx">
+  <h2><span class="num">附录 A2</span>已上线第一步的实测:<span class="hl">问答 + 任务会话 9 次调用里 7 次 miss ≈ 新增</span>,2 次异常白算 64K,首调冷缓存 51K<small>一条会话 Q1–Q6(任务 3 + 问答 3),DS-V4-Flash-0731</small></h2>
+
+  <div class="row grow">
+    <div class="card" style="flex:1.5; display:flex; flex-direction:column;">
+      <h3>上线后逐调用账本 <span class="sub">新增 ≈ Δ输入(本次 − 上次),白算 ≈ miss − 新增;≤4K 视为块粒度</span></h3>
+      <table style="font-size:.72em;">
+        <tr><th>#</th><th>Q</th><th>类型</th><th class="n">输入</th><th class="n">命中 d</th><th class="n">miss</th><th class="n">新增≈Δ</th><th class="n">白算</th><th>判定</th></tr>
+        <tr><td>c1</td><td>Q1 任务</td><td>会话首调</td><td class="n">51 403</td><td class="n">0</td><td class="n badc">51 403</td><td class="n">—</td><td class="n">—</td><td><span class="tag bad">冷缓存</span> 产品级 34.8K 本应命中 → 应 ~16.6K</td></tr>
+        <tr><td>c2</td><td>Q2 任务</td><td>首调</td><td class="n">51 646</td><td class="n">49 152</td><td class="n">2 494</td><td class="n">243</td><td class="n">2.3K</td><td><span class="tag real">正常</span> 块粒度内</td></tr>
+        <tr style="background:rgba(220,38,38,.06);"><td>c3</td><td>Q3 任务</td><td>首调</td><td class="n">58 446</td><td class="n badc">4 096</td><td class="n badc">54 350</td><td class="n">6 800</td><td class="n badc">47.5K</td><td><span class="tag bad">异常</span> d 只剩 1 块:逐出 / 路由到别的实例?</td></tr>
+        <tr><td>c4</td><td>Q3</td><td>loop</td><td class="n">58 621</td><td class="n">57 344</td><td class="n">1 277</td><td class="n">175</td><td class="n">1.1K</td><td><span class="tag real">正常</span> 97.8%</td></tr>
+        <tr><td>c5</td><td>Q3</td><td>loop</td><td class="n">65 621</td><td class="n">57 344</td><td class="n">8 277</td><td class="n">7 000</td><td class="n">1.3K</td><td><span class="tag real">正常</span> 新增 = skill 正文 / 工具结果</td></tr>
+        <tr><td>c6</td><td>Q4 问答</td><td>首调</td><td class="n">65 794</td><td class="n">65 536</td><td class="n goodc">258</td><td class="n">173</td><td class="n">0.1K</td><td><span class="tag real">正常</span> 99.6%,目标态的样子</td></tr>
+        <tr style="background:rgba(220,38,38,.06);"><td>c7</td><td>Q5 问答</td><td>首调</td><td class="n">82 453</td><td class="n">49 152</td><td class="n badc">33 301</td><td class="n">16 659</td><td class="n badc">16.6K</td><td><span class="tag bad">异常</span> webSearch 11K 入史后前缀丢了 16K</td></tr>
+        <tr><td>c8</td><td>Q5</td><td>loop</td><td class="n">97 024</td><td class="n">81 920</td><td class="n">15 104</td><td class="n">14 571</td><td class="n">0.5K</td><td><span class="tag real">正常</span> 新增 = webSearch 9.7K + skills 5.7K</td></tr>
+        <tr><td>c9</td><td>Q6 问答</td><td>首调</td><td class="n">101 538</td><td class="n">94 208</td><td class="n">7 330</td><td class="n">4 514</td><td class="n">2.8K</td><td><span class="tag real">正常</span> 92.8%</td></tr>
+        <tr style="background:rgba(37,99,235,.06);"><td colspan="3"><b>会话合计 9 次</b></td><td class="n"><b>632.5K</b></td><td class="n"><b>458.8K(72.5%)</b></td><td class="n"><b>173.8K</b></td><td class="n"><b>50.1K</b></td><td class="n"><b>72.3K</b></td><td>miss = 冷启 51.4 + 新增 50.1 + 异常 64.2 + 块粒度 ~8</td></tr>
+      </table>
+      <p class="segnote"><b>结论</b>:<b>正常调用 miss 就是新增</b>(c6 首调 99.6%、c8 loop 白算 0.5K)——P4–P6 目标列的实测依据;冷启动 51K → 测试环境冷缓存;异常 64K → 非排布因素(逐出 / 路由 / TTL),P8 报警抓;新增 50K 里 skills 重注 ~30K → 第 ③④ 步。</p>
+    </div>
+    <div class="col" style="flex:1;">
+      <div class="card">
+        <h3>对 P4–P6 目标列的三点校核</h3>
+        <ul>
+          <li><b>"Q 首调只付新增"成立</b>:c2 首调 miss 2.5K(块粒度内)、c6 首调 0.26K / 99.6%——前缀不被重写,Q 首调就是 P4–P6 目标列的样子。</li>
+          <li><b>"loop 只付 A + T"成立</b>:c4 / c5 / c8 白算 0.5–1.3K(≤1 块),新增 = skill 正文 / 工具结果 / webSearch 9.7K。</li>
+          <li><b>目标 2.3K 还差两步</b>:本会话 Q 首调新增里 skills 每 Q 全量重注 4.5–6.2K(第 ③ 步预置 15 个 + 第 ④ 步只更新变化后 ≤2K)。</li>
+        </ul>
+      </div>
+      <div class="card grow">
+        <h3>目标态每 Q 账本 <span class="tag est">推演</span> <span class="sub">P4–P6 目标列的通式</span></h3>
+        <table>
+          <tr><th>场景</th><th>Q 首调 miss</th><th>loop miss</th></tr>
+          <tr><td><b>问答</b> 2 调</td><td>ans + U + Δ动态 ≤2K ≈ <b class="goodc">2.3K</b></td><td>A + 检索结果(实测 0.1–11K),两边相同</td></tr>
+          <tr><td><b>任务</b> 1–2 调</td><td>≈ 2.3K(+ skill 正文首次 5K,两边同为新增)</td><td>A + T(实测 0.1–8K),两边相同</td></tr>
+          <tr><td><b>闲聊</b> 1 调</td><td>≈ 2.3K</td><td>—</td></tr>
+          <tr><td><b>会话首调</b></td><td colspan="2">会话级 1K + 历史 10 轮(实测 0.1–10.9K)+ U1 + Δ动态 ≈ 3–14K;<span class="goodc">Tools 已命中</span></td></tr>
+        </table>
+        <p style="margin-top:.3em;">再降靠检索结果指针化(10K → 3–5K)与 skill 正文裁剪。</p>
+      </div>
+    </div>
+  </div>
+  <div class="footer">
+    <div><b>数据</b>:token_breakdown.csv after 侧去重后(每个 Q 组重复列出会话前序调用)。Q 与调用的映射按 CSV 分组,c4 / c6 的 U 段为 167–169 tok 且无动态段,与"Q 首调"标签不完全自洽,<b>待数据方确认 Call# 口径并补 A / T 分列</b>。</div>
+    <div style="white-space:nowrap;">KV Cache 方案(汇报版)· v1.4 · 附录 A2</div>
+  </div>
+</section>
+
+
+<!-- ============ 附录 B 方案 C 会话级预热 ============ -->
+<section class="slide denser apx">
+  <h2><span class="num">附录 B</span>会话级预热(不进账本):<span class="hl">把会话首调 3–14K 从 TTFT 里挪走</span>——只影响首调时延,不改变 P4–P7 的 miss 账<small>锦上添花;前提是产品级前缀(Tools + SP·固定 + 预置 skill)已全网常驻</small></h2>
+
+  <div class="row grow">
+    <div class="col" style="flex:1.15;">
+      <div class="card">
+        <h3>为什么能预热</h3>
+        <p>目标态会话首调 miss = <b>会话级 ~1K + 历史 10 轮 0.1–10.9K + U1 + Δ动态</b>(P4–P6 目标列 Q1 行)。其中会话级与历史在<b>用户开口之前就已确定</b>,却要等到首调才进 prefill、直接计入首 token 等待——这部分可以提前算。</p>
+      </div>
+      <div class="card grow">
+        <h3>两次 prefill</h3>
+        <div class="tl">
+          <div class="n"><div class="t">① 会话创建</div><div class="d">后台 prefill<br>Tools + SP + 会话级 + 历史 10 轮</div></div>
+          <div class="arr">→</div>
+          <div class="n"><div class="t">② query / ASR 开始</div><div class="d">再 prefill 到当前前缀末<br>防逐出 + 灌上轮 answer</div></div>
+          <div class="arr">→</div>
+          <div class="n"><div class="t">③ 真正推理</div><div class="d">命中 ①②<br>只算当轮 U + Δ动态 · TTFT↓</div></div>
+        </div>
+        <ul style="margin-top:.4em;">
+          <li><b>① 覆盖会话首调</b>:首调 prefill 从 3–14K 降到 U1 + Δ动态 ≈ 2K;历史越长收益越大(问答会话历史 10.7K → 首调 ~14K → ~2K)。</li>
+          <li><b>② 覆盖 Q2 起的首调</b>:ASR 期间把上轮 answer 灌进缓存,Q 首调只剩 U + Δ;同时起"保活"作用,降低 P5 那种 loop 全 miss(逐出)的概率。</li>
+          <li><b>不进账本</b>:预热的 prefill 仍要算一次,总算力不变,只是从用户等待路径挪到后台;P4–P7 的 miss / 节省口径都按"无预热"计。</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>三条实测会话的首调 prefill(用户等待路径上的部分)<span class="tag est">推演</span></h3>
+        <table>
+          <tr><th>会话</th><th class="n">当前实测</th><th class="n">目标 · 无预热</th><th class="n">目标 · 预热后</th><th>说明</th></tr>
+          <tr><td><b>任务</b>(P4 Q1)</td><td class="n badc">21.1K</td><td class="n">~<span data-calc="fmtK(B.R3(B.m.M6.task))"></span></td><td class="n goodc">~2K</td><td>历史 10 轮 9.8K 被预热挪走</td></tr>
+          <tr><td><b>问答</b>(P5 Q4)</td><td class="n badc">23.2K</td><td class="n">~<span data-calc="fmtK(B.R3(B.m.M6.qa))"></span></td><td class="n goodc">~2K</td><td>历史 10.7K 被预热挪走</td></tr>
+          <tr><td><b>闲聊</b>(P6 Q8)</td><td class="n badc">19.5K</td><td class="n">~<span data-calc="fmtK(B.R3(B.m.M6.chat))"></span></td><td class="n goodc">~2K</td><td>历史近空,预热收益小</td></tr>
+        </table>
+      </div>
+    </div>
+    <div class="col" style="flex:1;">
+      <div class="card">
+        <h3>实测依据 <span class="tag real">附录 A2</span></h3>
+        <p>上线后会话首调 43–51K 全算(测试集群冷缓存),历史 10 轮 5.6–10.9K 全在其中;当前侧三条会话首调 19.5–23.2K 中,会话级 + 历史占 0.4–11K(P4–P6 Q1 行条纹段)。</p>
+      </div>
+      <div class="card">
+        <h3>代价与条件</h3>
+        <ul>
+          <li>每会话多 1–2 次 prefill 请求(不产出 token),并发高峰需限流;历史近空的会话(闲聊样本 0.1K)收益小,可按历史长度阈值触发。</li>
+          <li>依赖<b>会话粘性</b>:预热与真正推理要落到同一缓存实例;多实例路由下预热无效——这也是 P8 要打 warmup / cold 标签的原因。</li>
+          <li>P8 埋点 ⑥ warmup∈{none, session_create, asr} 已预留,收益按 TTFT 单独报,不与 miss 账混算。</li>
+        </ul>
+      </div>
+      <div class="card grow">
+        <h3>优先级</h3>
+        <p>排在四步改造(P3)之后:那四步改的是每个 Q 的账;预热只改首调体感,且在前缀稍有不稳时(逐出 / 路由)收益归零。</p>
+      </div>
+    </div>
+  </div>
+  <div class="footer">
+    <div><b>口径</b>:预热收益只计 TTFT,不计入 P4–P7 的 miss 与节省;数字取自 P4–P6 目标列 Q1 行与附录 A2。</div>
+    <div style="white-space:nowrap;">KV Cache 方案(汇报版)· v1.4 · 附录 B</div>
+  </div>
+</section>
+
+</div>
+
+<div class="dots" id="dots"></div>
+<div class="nav">
+  <button id="prev">‹</button>
+  <span class="pg" id="pg">1 / 12</span>
+  <button id="next">›</button>
+</div>
+
+<script>
+/* =====================================================================
+   数据基线(单一事实来源)—— 全稿数字只能从这里取。
+   单位:K token(DS-V4 tokenizer;GLM 另标)。status: real 实测 / fixed 已定 / est 估算 / tbd 待定
+   ===================================================================== */
+var BASELINE = {
+  ver: 'v1.4',
+  M: [
+    { id: 'M1', name: 'Tools(12 个)', lvl: 'prod',
+      cur: 5.8, curGLM: 5.1, tgt: 5.9,
+      curPos: 'SP 之后', tgtPos: '最前(全量预置)',
+      beh: '每 Q 被连带白算 → 全网命中',
+      st: 'real', st2: 'fixed', note: '上线后另见 5.7K 变体,取哪个待定' },
+    { id: 'M2', name: 'SP·固定(14 段)', lvl: 'prod',
+      cur: 28.7, curGLM: 29.9, tgt: 28.9,
+      curPos: 'SP 头', tgtPos: 'Tools 之后,不变',
+      beh: '命中 → 命中;当前断点恒停在它末尾(K2)',
+      st: 'real', st2: 'real', note: '14 段逐段 token 拆分待定(只有 chars)' },
+    { id: 'M3', name: 'SP·预置 skill(15 个 desc)', lvl: 'prod',
+      cur: 0, tgt: 4.5, n: 15,
+      curPos: '无', tgtPos: 'SP·固定之后',
+      beh: '新增段,全网命中',
+      st: 'fixed', st2: 'est', note: 'N=15 已定;4.5K 按 .3K/条估,名单与实测总长待定' },
+    { id: 'M4', name: 'SP·会话级', lvl: 'sess',
+      curLo: 0.26, curHi: 0.56, tgt: 1.0,
+      curPos: 'SP 尾', tgtPos: 'SP 尾',
+      beh: '会话内不变;每会话首调算一次',
+      st: 'real', st2: 'real', note: 'user.md 占位 / 私域原则 / device / 记忆快照;目标 = .39 + .31 + .27(上线后实测 968 tok)+ 记忆快照待定' },
+    { id: 'M5', name: '动态上下文(skills 引用 / memory / knowledge)', lvl: 'dyn',
+      cur: 3.0, curLo: 2.5, curHi: 3.6, tgtDelta: 2.0,
+      curPos: 'SP 内(12 个 skill)', tgtPos: '下沉 UAT 随 U 追加',
+      beh: '每 Q 原位重写 → 只追加变化(增量 ≤2K)',
+      st: 'real', st2: 'tbd', note: '≤2K 为 v7.2 假设;上线后未预置前实测 4.0–6.9K(附录 A),预置 15 个后需重测' },
+    { id: 'M6', name: 'UAT·历史 10 轮', lvl: 'sess',
+      lo: 0.1, hi: 10.7, task: 9.8, qa: 10.7, chat: 0.1,
+      curPos: 'UAT 头', tgtPos: '同位同长',
+      beh: '被连带白算 → 每会话首调算一次',
+      st: 'real', st2: 'tbd', note: 'CSV 该列跨行不自洽(同一次调用 9 825 vs 94);闲聊 6K 未归段(M11)疑为此项' },
+    { id: 'M7', name: 'UAT·U(query)', lvl: 'q',
+      lo: 0.022, hi: 0.051, typ: 0.03,
+      curPos: 'UAT 尾', tgtPos: '同',
+      beh: '新增必算', st: 'real', st2: 'real', note: '22–51 tok' },
+    { id: 'M8', name: 'UAT·A(回复)', lvl: 'q',
+      chat: 0.25,
+      curPos: 'UAT', tgtPos: '同',
+      beh: '新增必算,两边相同', st: 'real', st2: 'real', note: '闲聊实测 ~0.25K/轮;问答 / 任务并入 M9' },
+    { id: 'M9', name: 'UAT·T(工具 / 检索结果)', lvl: 'loop',
+      taskLo: 0.1, taskHi: 8.3, qaLo: 0.75, qaHi: 1.6, webLo: 9.7, webHi: 11,
+      sedQa: 10.5, sedChat: 0.25, sedTask: 3.5,
+      curPos: 'UAT', tgtPos: '同',
+      beh: '新增必算,两边相同;决定沉淀速率', st: 'real', st2: 'tbd', note: '离散大:问答本会话 0.75–1.6K,上线后 webSearch 9.7–11K;P7 沉淀系数 10.5 / .25 / 3.5 待定' },
+    { id: 'M10', name: 'skill 正文首次 load', lvl: 'q',
+      v: 5,
+      curPos: 'UAT', tgtPos: '同(两边同为新增)',
+      beh: '只在首次 load 出现', st: 'est', st2: 'est', note: 'v7.2 估 ~5K;上线后 c5 新增 7K 含工具结果,待定' },
+    { id: 'M11', name: '未归段(input − 已归段)', lvl: 'na',
+      task: 2.0, qa: 0.8, chat: 6.0,
+      curPos: '—', tgtPos: '—',
+      beh: '目前计入白算', st: 'tbd', st2: 'tbd', note: '任务 ~2K / 问答 0.7–0.8K / 闲聊 ~6K;闲聊的 6K 很可能是 M6 被抽取漏掉' }
+  ],
+  K: [
+    { id: 'K1', name: '块粒度', v: 'DS 4 096 / GLM 128;白算 ≤1 块视为 0', st: 'real' },
+    { id: 'K2', name: '当前断点', v: 'd 恒 = M2 末按块对齐(24.6 / 26.6 / 29.6K)', st: 'real' },
+    { id: 'K3', name: '业务占比 / 轮数分布', v: '问答 47 / 闲聊 28 / 任务 25;51 / 20 / 9 / 5.5 / 3.5 / 11(1Q…6Q+)', st: 'tbd' },
+    { id: 'K4', name: '调用 → Q 的边界', v: '以 CSV 的 U 列变化为 Q 边界;首调特征 = d 退回 M2 末。CSV 分组与 U 列不一致', st: 'tbd' }
+  ],
+  mix: { qa: 0.47, chat: 0.28, task: 0.25 }
+};
+
+/* 派生量(R 规则)—— 只能由 BASELINE 计算,不许手写 */
+(function () {
+  var B = BASELINE, m = {};
+  B.M.forEach(function (x) { m[x.id] = x; });
+  B.m = m;
+  B.R2 = m.M8.chat + m.M7.typ + m.M5.tgtDelta;                 // 目标 Q 首调 ≈ 2.3K
+  B.R3 = function (hist) { return m.M4.tgt + hist + m.M7.typ + m.M5.tgtDelta; };  // 目标会话首调
+  B.R3lo = B.R3(m.M6.lo); B.R3hi = B.R3(m.M6.hi);
+  B.R5fixed = m.M1.cur + (m.M5.cur - m.M5.tgtDelta);             // P7 固定项
+  B.R5sed = B.mix.qa * m.M9.sedQa + B.mix.chat * m.M9.sedChat + B.mix.task * m.M9.sedTask;  // 沉淀速率
+  B.prodPrefix = m.M1.tgt + m.M2.tgt + m.M3.tgt;                 // 目标产品级前缀
+})();
+
+/* =====================================================================
+   实测会话(当前侧,token_breakdown.csv 去重后)。Q 边界按 K4(U 列变化)。
+   kind: sfirst 会话首调 | qfirst Q 首调 | loop 正常 loop | loopx loop 全 miss(异常) | qhit Q 首调偶发命中
+   parts(K):tools / dyn / sess / hist / own(本会话史)/ unacc / u / at(A+T 新增)
+   ===================================================================== */
+var SESSIONS = {
+  task: {
+    title: '任务', pct: 25, model: 'GLM-5 · Cluster-1(GLM tokenizer:SP·固定 29.9K、Tools 5.1K)', glm: true,
+    hitBase: 29.6, scaleQ: 24, scaleT: 70, histK: 9.8,
+    groups: [
+      { t1: 'Q1 · 会话首调 + loop', t2: '输入 50.7K / 50.9K', calls: [
+        { kind: 'sfirst', input: 50.7, pct: 58.3, miss: 21.1, p: { tools: 5.1, dyn: 3.4, unacc: 2.3, sess: 0.4, hist: 9.8, u: 0.1 } },
+        { kind: 'loopx', input: 50.9, pct: 58.1, miss: 21.3, p: { at: 0.2 } } ] },
+      { t1: 'Q2 · Q 首调', t2: '输入 52.6K', calls: [
+        { kind: 'qfirst', input: 52.6, pct: 56.3, miss: 23.0, p: { sess: 0.4, dyn: 3.6, tools: 5.1, hist: 9.8, own: 2.2, unacc: 1.8, u: 0.1 } } ] },
+      { t1: 'Q3 · Q 首调', t2: '输入 52.6K', calls: [
+        { kind: 'qhit', input: 52.6, pct: 99.8, miss: 0.1, hitAt: 52.5, p: { u: 0.05 } } ] }
+    ]
+  },
+  qa: {
+    title: '问答', pct: 47, model: 'DS-V4-Flash · Cluster-3(DS tokenizer:SP·固定 28.7K、Tools 5.8K)',
+    hitBase: 26.6, scaleQ: 34, scaleT: 115, histK: 10.7,
+    groups: [
+      { t1: 'Q4 · 会话首调 + loop', t2: '输入 49.8K / 49.9K', calls: [
+        { kind: 'sfirst', input: 49.8, pct: 53.5, miss: 23.2, p: { tools: 5.8, dyn: 3.6, unacc: 2.7, sess: 0.3, hist: 10.7, u: 0.1 } },
+        { kind: 'loop', input: 49.9, pct: 98.5, miss: 0.75, hitAt: 49.2, p: { at: 0.75 } } ] },
+      { t1: 'Q5 · Q 首调 + 2 loop', t2: '输入 54.7 / 54.8 / 57.3K', calls: [
+        { kind: 'qfirst', input: 54.7, pct: 44.9, miss: 30.2, hitAt: 24.6, p: { sess: 0.5, dyn: 3.1, tools: 5.8, hist: 9.7, own: 4.0, unacc: 7.0, u: 0.1 } },
+        { kind: 'loop', input: 54.8, pct: 97.1, miss: 1.6, hitAt: 53.2, p: { at: 1.6 } },
+        { kind: 'loopx', input: 57.3, pct: 64.4, miss: 20.4, hitAt: 36.9, p: { at: 2.4 } } ] },
+      { t1: 'Q6 · Q 首调', t2: '输入 58.1K', calls: [
+        { kind: 'qfirst', input: 58.1, pct: 42.3, miss: 33.5, hitAt: 24.6, p: { sess: 0.5, dyn: 3.0, tools: 5.8, hist: 10.7, own: 12.7, unacc: 0.7, u: 0.1 } } ] }
+    ]
+  },
+  chat: {
+    title: '闲聊', pct: 28, model: 'DS-V4-Flash-0731(第 5 次为 Cluster-3)',
+    hitBase: 24.6, scaleQ: 20, scaleT: 70, histK: 0.1,
+    groups: [
+      { t1: 'Q8 · 会话首调', t2: '输入 44.1K', calls: [
+        { kind: 'sfirst', input: 44.1, pct: 55.7, miss: 19.5, p: { tools: 5.8, dyn: 3.2, unacc: 6.0, sess: 0.3, hist: 0.1, u: 0.1 } } ] },
+      { t1: 'Q9 · Q 首调', t2: '输入 43.2K', calls: [
+        { kind: 'qfirst', input: 43.2, pct: 56.9, miss: 18.6, p: { sess: 0.3, dyn: 2.8, tools: 5.8, hist: 0.1, own: 0.6, unacc: 8.7, u: 0.3 } } ] },
+      { t1: 'Q10 · Q 首调 + loop', t2: '输入 38.6K / 38.7K', calls: [
+        { kind: 'qfirst', input: 38.6, pct: 63.7, miss: 14.0, p: { sess: 0.3, dyn: 2.8, tools: 5.8, hist: 0.1, own: 1.1, unacc: 3.6, u: 0.3 } },
+        { kind: 'loop', input: 38.7, pct: 95.3, miss: 1.8, hitAt: 36.9, p: { at: 1.8 } } ] },
+      { t1: 'Q11 · Q 首调', t2: '输入 39.0K · Cluster-3', calls: [
+        { kind: 'qfirst', input: 39.0, pct: 68.3, miss: 12.4, hitAt: 26.6, p: { sess: 0.3, dyn: 3.1, tools: 5.8, hist: 0.1, own: 1.5, unacc: 1.3, u: 0.3 } } ] }
+    ]
+  }
+};
+
+/* =====================================================================
+   渲染工具
+   ===================================================================== */
+function fmtK(v, d) { if (d === undefined) d = 1; var s = (Math.round(v * Math.pow(10, d)) / Math.pow(10, d)).toString(); return s + 'K'; }
+function pct(a, b) { return Math.round(a / b * 100); }
+
+/* 账目页目标态推演(只用 BASELINE) */
+function targetOf(call, sess) {
+  var B = BASELINE, m = B.m, p = call.p;
+  if (call.kind === 'sfirst') {
+    var first = m.M4.tgt + p.hist, nw = (p.u || 0.1) + m.M5.tgtDelta;
+    return { miss: first + nw, segs: [['gh', 'Tools ' + fmtK(sess.glm ? m.M1.curGLM : m.M1.cur) + ' 转命中', p.tools],
+      ['first', '会话级 ' + fmtK(m.M4.tgt) + ' + 历史 ' + fmtK(p.hist) + ' 首次载入', first], ['nw', 'U+Δ动态 ' + fmtK(nw), nw]] };
+  }
+  if (call.kind === 'qfirst') {
+    var hit = call.miss - B.R2; if (hit < 0) hit = 0;
+    return { miss: B.R2, segs: [['gh', '全部转命中 ' + fmtK(hit), hit], ['nw', '新增 ' + fmtK(B.R2), B.R2]] };
+  }
+  if (call.kind === 'qhit') { return { miss: B.R2, segs: [['nw', '新增 ' + fmtK(B.R2), B.R2]], flat: true }; }
+  if (call.kind === 'loop') { return { miss: p.at, segs: [['nw', 'A + T ' + fmtK(p.at, 2), p.at]], same: true }; }
+  if (call.kind === 'loopx') { return { miss: p.at, segs: [['nw', 'A + T ' + fmtK(p.at), p.at]] }; }
+}
+function currentSegs(call, sess) {
+  var p = call.p, m = BASELINE.m, s = [];
+  var toolsK = sess.glm ? m.M1.curGLM : m.M1.cur;
+  if (call.kind === 'sfirst') {
+    s.push(['wr', 'Tools ' + fmtK(p.tools) + ' 被连带', p.tools], ['wr', '动态 ' + fmtK(p.dyn) + ' 重写', p.dyn]);
+    if (p.unacc) s.push(['wr', '未归段 ~' + fmtK(p.unacc), p.unacc]);
+    s.push(['first', '会话级 ' + fmtK(p.sess) + ' + 历史 ' + fmtK(p.hist) + ' 首次载入', p.sess + p.hist], ['nw', 'U', p.u]);
+  } else if (call.kind === 'qfirst') {
+    s.push(['wr', '会话级 ' + fmtK(p.sess), p.sess], ['wr', '动态 ' + fmtK(p.dyn), p.dyn], ['wr', 'Tools ' + fmtK(p.tools), p.tools], ['wr', '历史 10 轮 ' + fmtK(p.hist), p.hist]);
+    if (p.own) s.push(['wr', '本会话史 ' + fmtK(p.own), p.own]);
+    if (p.unacc) s.push(['wr', '未归段 ~' + fmtK(p.unacc), p.unacc]);
+    s.push(['nw', 'U', p.u]);
+  } else if (call.kind === 'qhit') {
+    s.push(['wr', fmtK(call.miss - p.u), call.miss - p.u], ['nw', 'U', p.u]);
+  } else if (call.kind === 'loop') {
+    s.push(['nw', 'A + T ' + fmtK(p.at, 2), p.at]);
+  } else if (call.kind === 'loopx') {
+    s.push(['cold', 'loop 全 miss ' + fmtK(call.miss) + ':d 退回,前缀被重算', call.miss - p.at], ['nw', 'A + T ' + fmtK(p.at), p.at]);
+  }
+  return s;
+}
+var HIT_W = 12, FREE_W = 86;
+function segHtml(segs, scale) {
+  var h = '';
+  segs.forEach(function (sg) {
+    var w = sg[2] / scale * FREE_W; if (w <= 0) return;
+    var lab = w >= 6 ? '<span>' + sg[1] + '</span>' : '';
+    h += '<div class="hseg ' + sg[0] + '" style="width:' + w.toFixed(1) + '%;">' + lab + '</div>';
+  });
+  return h;
+}
+function hbHtml(who, pctTxt, hitLabel, segs, scale, hv, hvcls, loopr) {
+  return '<div class="hb' + (loopr ? ' loopr' : '') + '"><span class="who"><b>' + who + '</b></span><span class="hp">' + (pctTxt || '') + '</span>' +
+    '<div class="htrack"><div class="hseg gh fix" style="width:' + HIT_W + '%;"><span>' + hitLabel + '</span></div>' + segHtml(segs, scale) + '</div>' +
+    '<span class="hv ' + (hvcls || '') + '">' + hv + '</span></div>';
+}
+function renderAccount(id, key) {
+  var sess = SESSIONS[key], el = document.getElementById(id); if (!el) return;
+  var h = '', totCur = 0, totTgt = 0, totFirstCur = 0, totFirstTgt = 0, totNewCur = 0, totCold = 0, nCalls = 0;
+  sess.groups.forEach(function (g) {
+    var rows = '', gCur = 0, gTgt = 0, hasX = false, hasHit = false, xSave = 0;
+    g.calls.forEach(function (c, i) {
+      nCalls++;
+      var t = targetOf(c, sess), cs = currentSegs(c, sess), lab = '调' + '①②③'[i];
+      var hitLab = '✓命中 ' + fmtK(c.hitAt !== undefined ? c.hitAt : sess.hitBase) + '⋯';
+      var isLoop = c.kind === 'loop' || c.kind === 'loopx';
+      var curCls = c.kind === 'qhit' ? 'warnc' : (c.kind === 'loop' ? '' : 'badc');
+      var curHv = (c.kind === 'loop' || c.kind === 'qhit') ? fmtK(c.miss, c.miss < 1 ? 2 : 1) : 'miss ' + fmtK(c.miss);
+      if (c.kind === 'qhit') curHv += ' 偶发命中';
+      rows += hbHtml(lab + ' 当前', c.pct + '%', hitLab, cs, sess.scaleQ, curHv, curCls, isLoop);
+      var tgtHv = (t.same ? fmtK(t.miss, t.miss < 1 ? 2 : 1) + '(相同)' : '~' + fmtK(t.miss));
+      var tgtHitLab = c.kind === 'loopx' ? '✓命中 ' + fmtK(c.input - t.miss) + '⋯' : hitLab;
+      rows += hbHtml(lab + ' 目标', '', tgtHitLab, t.segs, sess.scaleQ, tgtHv, t.same ? '' : 'goodc', isLoop);
+      gCur += c.miss; gTgt += t.miss; totCur += c.miss; totTgt += t.miss;
+      if (c.kind === 'loopx') { hasX = true; xSave += c.miss - t.miss; totCold += c.miss - t.miss; }
+      if (c.kind === 'qhit') hasHit = true;
+      if (c.kind === 'sfirst') { totFirstCur += c.p.sess + c.p.hist; totFirstTgt += BASELINE.m.M4.tgt + c.p.hist; }
+      totNewCur += (c.kind === 'loop' || c.kind === 'loopx') ? c.p.at : (c.p.u || 0);
+    });
+    var save = gCur - gTgt, badge;
+    if (save < 0.5 && hasHit && g.calls.length === 1) badge = '<span class="pv">持平</span><span class="pl">偶发全命中 = 动态恰好没变,不可控</span>';
+    else badge = '<span class="pv">省 ~' + fmtK(save, 0) + '</span><span class="pv2">−' + pct(save, gCur) + '%</span>' +
+      (hasX ? '<span class="pl">含异常 loop 归零 ' + fmtK(xSave, 0) + '</span>' : (g.calls[0].kind === 'sfirst' ? '<span class="pl">首调只省 Tools + 动态精简</span>' : ''));
+    h += '<div class="mgrp"><span class="glb"><span class="t1">' + g.t1 + '</span><span class="t2">' + g.t2 + '</span></span><div class="bars2">' + rows + '</div><span class="mbadge">' + badge + '</span></div>';
+  });
+  var waste = totCur - totFirstCur - totNewCur - totCold, conv = totCur - totTgt - totCold;
+  var curSegs = [['wr', '白算 ~' + fmtK(waste, 0) + '(Tools + 历史 + 动态重写 + 本会话史 / 未归段)', waste]];
+  if (totCold) curSegs.push(['cold', '异常 ' + fmtK(totCold, 0), totCold]);
+  curSegs.push(['first', '首次载入 ' + fmtK(totFirstCur), totFirstCur], ['nw', '新增 ~' + fmtK(totNewCur), totNewCur]);
+  var tgtSegs = [['gh', '转命中 ~' + fmtK(totCur - totTgt, 0), totCur - totTgt], ['first', '首次载入 ' + fmtK(totFirstTgt), totFirstTgt], ['nw', '新增 ~' + fmtK(totTgt - totFirstTgt), totTgt - totFirstTgt]];
+  var rowsT = hbHtml('当前', '', '✓命中⋯', curSegs, sess.scaleT, 'miss ' + fmtK(totCur), 'badc') + hbHtml('目标', '', '✓命中⋯', tgtSegs, sess.scaleT, '~' + fmtK(totTgt), 'goodc');
+  var noX = totCold ? '<span class="pl">不含异常 loop:−' + pct(totCur - totCold - totTgt, totCur - totCold) + '%</span>' : '<span class="pl">' + nCalls + ' 次调用</span>';
+  h += '<div class="mgrp" style="border-top:1px dashed #cbd4e1; padding-top:.4em;"><span class="glb"><span class="t1">会话合计</span><span class="t2">' + nCalls + ' 次调用</span></span><div class="bars2">' + rowsT + '</div>' +
+    '<span class="mbadge"><span class="pv">省 ~' + fmtK(totCur - totTgt, 0) + '</span><span class="pv2">−' + pct(totCur - totTgt, totCur) + '%</span>' + noX + '</span></div>';
+  el.innerHTML = h;
+  sess.totCur = totCur; sess.totTgt = totTgt; sess.totCold = totCold; sess.nCalls = nCalls;
+  sess.saveRate = pct(totCur - totTgt, totCur);
+}
+
+/* 基线页表格 */
+function renderBaseline(id) {
+  var el = document.getElementById(id); if (!el) return;
+  var B = BASELINE, st = { real: '<span class="tag real">实测</span>', fixed: '<span class="tag mid">已定</span>', est: '<span class="tag est">估算</span>', tbd: '<span class="tag bad">待定</span>' };
+  var lvl = { prod: '<span class="lv prod">产品级</span>', sess: '<span class="lv sess">会话级</span>', dyn: '<span class="lv dyn">动态</span>', q: '<span class="lv q">query 级</span>', loop: '<span class="lv loop">loop 级</span>', na: '<span class="lv na">—</span>' };
+  function curTxt(x) {
+    if (x.id === 'M1' || x.id === 'M2') return x.curPos + ' · <b>' + fmtK(x.cur) + '</b><small>(GLM ' + fmtK(x.curGLM) + ')</small>';
+    if (x.id === 'M3') return '无';
+    if (x.id === 'M4') return x.curPos + ' · <b>' + fmtK(x.curLo, 2) + '–' + fmtK(x.curHi, 2) + '</b><small>占位 user.md + device</small>';
+    if (x.id === 'M5') return x.curPos + ' · <b>' + fmtK(x.curLo) + '–' + fmtK(x.curHi) + ',均 ' + fmtK(x.cur) + '</b>';
+    if (x.id === 'M6') return x.curPos + ' · <b>' + fmtK(x.lo) + '–' + fmtK(x.hi) + '</b><small>任务 ' + x.task + ' / 问答 ' + x.qa + ' / 闲聊 ' + x.chat + '</small>';
+    if (x.id === 'M7') return '<b>22–51 tok</b>';
+    if (x.id === 'M8') return '闲聊 <b>~' + fmtK(x.chat, 2) + '/轮</b>';
+    if (x.id === 'M9') return '任务 ' + x.taskLo + '–' + x.taskHi + 'K;问答 <b>' + x.qaLo + '–' + x.qaHi + 'K</b><small>上线后 webSearch ' + x.webLo + '–' + x.webHi + 'K</small>';
+    if (x.id === 'M10') return '<b>~' + fmtK(x.v, 0) + '</b>';
+    if (x.id === 'M11') return '任务 ~' + x.task + ' / 问答 ~' + x.qa + ' / 闲聊 <b>~' + fmtK(x.chat, 0) + '</b>';
+  }
+  function tgtTxt(x) {
+    if (x.id === 'M1') return '<b>' + x.tgtPos + '</b> · <b>' + fmtK(x.tgt) + '</b>';
+    if (x.id === 'M2') return x.tgtPos + ' · ' + fmtK(x.tgt);
+    if (x.id === 'M3') return x.tgtPos + ' · <b>~' + fmtK(x.tgt) + '</b>(' + x.n + ' 个)';
+    if (x.id === 'M4') return x.tgtPos + ' · <b>~' + fmtK(x.tgt) + '</b> + 记忆快照';
+    if (x.id === 'M5') return '<b>' + x.tgtPos + '</b> · 增量 <b>≤' + fmtK(x.tgtDelta, 0) + '</b>';
+    if (x.id === 'M6' || x.id === 'M7' || x.id === 'M8' || x.id === 'M9' || x.id === 'M10') return x.tgtPos;
+    return '—';
+  }
+  var h = '<table class="bl"><tr><th>ID</th><th>模块</th><th>级</th><th>当前:位置 · 长度</th><th>目标:位置 · 长度</th><th>变化行为(当前 → 目标)</th><th>状态 / 备注</th></tr>';
+  B.M.forEach(function (x) {
+    h += '<tr><td class="id">' + x.id + '</td><td class="nm">' + x.name + '</td><td>' + lvl[x.lvl] + '</td><td>' + curTxt(x) + '</td><td>' + tgtTxt(x) + '</td><td class="beh">' + x.beh + '</td><td class="nt">' + st[x.st] + (x.st2 !== x.st ? '→' + st[x.st2] : '') + ' ' + x.note + '</td></tr>';
+  });
+  h += '</table>';
+  el.innerHTML = h;
+  var k = document.getElementById(id + '-k'); if (!k) return;
+  var kh = '<table class="bl"><tr><th>ID</th><th>常量 / 规则</th><th>内容(只允许用这些公式)</th><th>状态</th></tr>';
+  B.K.forEach(function (x) { kh += '<tr><td class="id">' + x.id + '</td><td class="nm">' + x.name + '</td><td>' + x.v + '</td><td>' + st[x.st] + '</td></tr>'; });
+  var m = B.m;
+  var R = [
+    ['R1', '当前 Q 首调 miss', '= M5 + M1 + M6 + 本会话史 + M7(+ M11)→ 实测 <b>14–34K</b>', 'real'],
+    ['R2', '目标 Q 首调 miss', '= 上轮 A(M8)+ M7 + ΔM5 = ' + m.M8.chat + ' + ' + m.M7.typ + ' + ' + m.M5.tgtDelta + ' ≈ <b>' + fmtK(B.R2) + '</b>', 'tbd'],
+    ['R3', '目标会话首调 miss', '= M4 + M6 + M7 + ΔM5 = <b>' + fmtK(B.R3lo) + '–' + fmtK(B.R3hi) + '</b>(随 M6)', 'tbd'],
+    ['R4', 'loop miss', '= A + M9,两边相同,不计入节省;loop 白算 &gt; 1 块即异常', 'real'],
+    ['R5', 'P7 系数', '固定项 = M1 ' + m.M1.cur + ' + (M5 ' + m.M5.cur + ' − ' + m.M5.tgtDelta + ') = <b>' + fmtK(B.R5fixed) + '</b>;沉淀速率 = K3 加权 M9 = <b>' + fmtK(B.R5sed) + '/轮</b>', 'tbd'],
+    ['R6', '白算', '= miss − 新增;≤1 块(K1)视为 0', 'real']
+  ];
+  R.forEach(function (r) { kh += '<tr><td class="id">' + r[0] + '</td><td class="nm">' + r[1] + '</td><td>' + r[2] + '</td><td>' + st[r[3]] + '</td></tr>'; });
+  kh += '</table>';
+  k.innerHTML = kh;
+}
+
+/* data-b 绑定:data-b="path|fmt"。path 相对 BASELINE(如 m.M1.cur、R2);fmt: K / K0 / K2 / raw;data-calc 为表达式(B、S 可用) */
+function bindData() {
+  var B = BASELINE, S = SESSIONS;
+  function get(path) { return path.split('.').reduce(function (o, k) { return o == null ? o : o[k]; }, B); }
+  function fmt(v, f) {
+    if (typeof v !== 'number') return v;
+    if (f === 'K0') return fmtK(v, 0); if (f === 'K2') return fmtK(v, 2); if (f === 'raw') return String(v); if (f === 'pct') return v + '%';
+    return fmtK(v);
+  }
+  [].slice.call(document.querySelectorAll('[data-b]')).forEach(function (e) {
+    var a = e.getAttribute('data-b').split('|'); e.textContent = fmt(get(a[0]), a[1]);
+  });
+  [].slice.call(document.querySelectorAll('[data-calc]')).forEach(function (e) {
+    var a = e.getAttribute('data-calc').split('|');
+    try { e.textContent = fmt(new Function('B', 'S', 'fmtK', 'pct', 'return (' + a[0] + ')')(B, S, fmtK, pct), a[1]); } catch (err) { e.textContent = '?'; }
+  });
+}
+
+</script>
+<script>
+(function () {
+  // P2 矩阵:5 段前缀 + 8 段 UAT;格色码:H 命中 R 原位重写 D 被连带 N 新增 F 会话级首次载入 . 尚不存在(留空占位)
+  var uatHead = ['U1', 'A₁T₁', 'ans₁', 'U2', 'ans₂', 'U3', 'ans₃', 'U4'];
+  var rows = [
+    ['Q1 调①', '首调'], ['Q1 调②', 'loop'],
+    ['Q2 调①', '首调'], ['Q3 调①', '首调'], ['Q4 调①', '首调']
+  ];
+  var cur = {
+    title: '当前',
+    groups: '<div class="g sp" style="grid-column:2 / span 3;">SP</div><div class="g tl" style="grid-column:5;">Tools</div>',
+    head: ['<b>固定</b><br><span data-b="m.M2.cur"></span>', '<b>会话级</b><br><span data-b="m.M4.curLo|K2"></span>–<span data-b="m.M4.curHi|K2"></span>', '<b class="q">动态⚡</b><br><span data-b="m.M5.cur"></span>', '<b>Tools</b><br><span data-b="m.M1.cur"></span>', '<b>历史10轮</b><br><span data-b="m.M6.lo"></span>–<span data-b="m.M6.hi"></span>'],
+    cells: [
+      'H F N D F N . . . . . . .',
+      'H H H H H H N . . . . . .',
+      'H H R D D D D N N . . . .',
+      'H H R D D D D D D N N . .',
+      'H H R D D D D D D D D N N'
+    ],
+    miss: [
+      '<span class="st">会话级 + 历史</span> + <span class="o">Tools 5.8K 被连带</span> + <span class="bl">动态 3K + U1</span><span class="re">实测 19.5K</span>',
+      '<span class="bl">A₁ + T₁</span> · loop 内两边相同<span class="re">0.1–1.6K</span>',
+      '<span class="r">动态 3K</span> + <span class="o">Tools 5.8K + 历史 + 本会话史</span> + <span class="bl">ans₁ + U2</span><span class="re">18.6K</span>',
+      '<span class="r">动态 3K</span> + <span class="o">Tools + 历史 + 更长的全史</span> + <span class="bl">ans₂ + U3</span><span class="re">14.0K</span>',
+      '<span class="r">动态 3K</span> + <span class="o">Tools + 历史 + 再长一截</span> + <span class="bl">ans₃ + U4</span><span class="re">1.8K 偶发命中</span>'
+    ]
+  };
+  var tgt = {
+    title: '目标',
+    groups: '<div class="g tl" style="grid-column:2;">Tools</div><div class="g sp" style="grid-column:3 / span 3;">SP</div>',
+    uatHead: ['U1+Δ', 'A₁T₁', 'ans₁', 'U2+Δ', 'ans₂', 'U3+Δ', 'ans₃', 'U4+Δ'],
+    head: ['<b>Tools</b><br><span data-b="m.M1.tgt"></span> 全量', '<b>固定</b><br><span data-b="m.M2.tgt"></span>', '<b>预置skill</b><br><span data-b="m.M3.n|raw"></span> 个 · <span data-b="m.M3.tgt"></span>', '<b>会话级</b><br>~<span data-b="m.M4.tgt"></span>', '<b>历史10轮</b><br><span data-b="m.M6.lo"></span>–<span data-b="m.M6.hi"></span>'],
+    cells: [
+      'H H H F F N . . . . . . .',
+      'H H H H H H N . . . . . .',
+      'H H H H H H H N N . . . .',
+      'H H H H H H H H H N N . .',
+      'H H H H H H H H H H H N N'
+    ],
+    miss: [
+      '<span class="st">会话级 + 历史 10 轮</span>(每会话一次)+ <span class="bl">U1+Δ</span> · <span class="ok">Tools 已命中</span><span class="re">R3 = <span data-calc="fmtK(B.R3(B.m.M6.chat))"></span>(历史近空)</span>',
+      '<span class="bl">A₁ + T₁</span> · loop 内两边相同',
+      '<span class="bl">ans₁ + U2 + Δ动态 ≤2K</span> · <span class="ok">其余全命中</span><span class="re">18.6K → ~<span data-b="R2"></span></span>',
+      '<span class="bl">ans₂ + U3 + Δ</span> · <span class="ok">miss 钉死,不随轮数涨</span><span class="re">14.0K → ~<span data-b="R2"></span></span>',
+      '<span class="bl">ans₃ + U4 + Δ</span> · <span class="ok">仍只算当轮新增</span><span class="re">Q4 首调按 R2 ~<span data-b="R2"></span></span>'
+    ]
+  };
+  var cls = { H: 'hit', R: 'rw', D: 'drag', N: 'new', F: 'first', '.': 'na' };
+  function render(id, m) {
+    var el = document.getElementById(id), h = '';
+    h += '<div class="g blank"></div>' + m.groups + '<div class="g ua">UAT</div><div class="g ms">本次调用 miss(= 输入 − 命中)· 绿框为闲聊实测 / 目标推演;Δ = 动态增量</div>';
+    h += '<div class="rl">' + m.title + '</div>';
+    m.head.forEach(function (t) { h += '<div class="h">' + t + '</div>'; });
+    (m.uatHead || uatHead).forEach(function (t, i) { h += '<div class="h' + (i === 0 ? ' uatstart' : '') + '"><b>' + t + '</b></div>'; });
+    h += '<div class="h"></div>';
+    m.cells.forEach(function (line, r) {
+      h += '<div class="rl">' + rows[r][0] + '<small>' + rows[r][1] + '</small></div>';
+      line.split(' ').forEach(function (k, i) {
+        h += '<div class="c ' + cls[k] + (i === 5 ? ' uatstart' : '') + '"></div>';
+      });
+      h += '<div class="miss">' + m.miss[r] + '</div>';
+    });
+    el.innerHTML = h;
+  }
+  render('mat-cur', cur);
+  render('mat-tgt', tgt);
+  renderBaseline('bl');
+  renderAccount('acct-task', 'task');
+  renderAccount('acct-qa', 'qa');
+  renderAccount('acct-chat', 'chat');
+  bindData();
+
+  // 翻页
+  var slides = [].slice.call(document.querySelectorAll('.slide'));
+  var dotsBox = document.getElementById('dots');
+  var curIdx = 0;
+  slides.forEach(function (_, i) {
+    var d = document.createElement('i');
+    if (i === 0) d.classList.add('on');
+    d.onclick = function () { go(i); };
+    dotsBox.appendChild(d);
+  });
+  var dots = [].slice.call(dotsBox.children);
+  function go(i) {
+    curIdx = (i + slides.length) % slides.length;
+    slides.forEach(function (s, j) { s.classList.toggle('active', j === curIdx); });
+    dots.forEach(function (d, j) { d.classList.toggle('on', j === curIdx); });
+    document.getElementById('pg').textContent = (curIdx + 1) + ' / ' + slides.length;
+  }
+  document.getElementById('prev').onclick = function () { go(curIdx - 1); };
+  document.getElementById('next').onclick = function () { go(curIdx + 1); };
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'ArrowRight' || e.key === ' ' || e.key === 'PageDown') go(curIdx + 1);
+    if (e.key === 'ArrowLeft' || e.key === 'PageUp') go(curIdx - 1);
+  });
+  window.__go = go;
+})();
+</script>
+</body>
+</html>
