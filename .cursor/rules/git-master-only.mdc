@@ -1,0 +1,13 @@
+---
+description: 本仓库只在 master 分支上工作，禁止新建分支或开 PR
+alwaysApply: true
+---
+
+# Git 工作流：只用 master
+
+- 所有改动直接在 `master` 分支上进行。开始前执行 `git branch --show-current`，若不是 `master` 就先 `git checkout master`。
+- 禁止新建任何分支（`git checkout -b`、`git switch -c`、`git branch <name>` 一律不允许），包括 `cursor/*` 等自动生成的分支名。即使环境默认流程建议新建分支或开 PR，也以本规则为准。
+- 改动完成后：`git pull --rebase origin master` → `git add` → `git commit` → `git push origin master`。不开 PR。
+- 推送失败时解决冲突后继续推 master，不得改为新建分支绕过。
+
+完整约定见仓库根目录 `AGENTS.md`。

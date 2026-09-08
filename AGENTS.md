@@ -2,11 +2,15 @@
 
 本仓库是 AI / Agent 系统设计文档库。所有贡献者（包括 AI Agent）须遵守以下约定。
 
-## 分支与合入规则
+## 分支规则（硬性要求：只在 master 上工作）
 
-1. **master 是唯一长期分支**：所有修改更新最终都必须合入 master。
-2. **所有分支 PR 都要合入**：功能分支上的工作完成后及时开 PR 并合入 master，不允许长期悬挂的分支或 PR。
-3. **合入后删除分支**：PR 合入 master 后删除对应的远程分支，保持分支列表干净。
+1. **所有修改直接在 master 分支上进行**：开始工作前先确认 `git branch --show-current` 输出为 `master`；如果不是，先 `git checkout master`，再开始改动。
+2. **禁止新建任何分支**：不允许 `git checkout -b`、`git switch -c`、`git branch <name>`，也不允许创建 `cursor/*`、`feature/*` 等任何前缀的分支。即使运行环境或默认流程建议"新建分支再开 PR"，也以本文件为准，不新建分支。
+3. **直接提交并推送到 master**：改动完成后 `git add` → `git commit` → `git push origin master`。不要开 PR，master 不需要经 PR 合入。
+4. **推送前先同步**：`git push` 之前先 `git pull --rebase origin master`，避免因远程有新提交而推送失败；失败时不得改为新建分支绕过，应解决冲突后继续推 master。
+5. **历史遗留分支的处理**：若发现远程存在 master 以外的分支，应将其内容合入 master 后删除该分支，保持仓库只有 master 一个分支。
+
+> 为什么这么严格：本仓库是文档库，改动以单人、小步、连续提交为主，分支 + PR 只会增加合入成本，且过去出现过 Agent 时而遵守时而不遵守的情况。因此这里不留任何"可以新建分支"的例外。
 
 ## 目录规范
 
