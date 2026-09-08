@@ -1,0 +1,736 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>openClaw 自动化任务 v0.1：定时 + 事件订阅 整体方案</title>
+<style>
+  :root {
+    --bg: #e9eef6;
+    --slide-bg: linear-gradient(135deg, #ffffff 0%, #f8fbfe 55%, #f2f7fd 100%);
+    --card: #ffffff;
+    --card-border: #dfe6f0;
+    --text: #1e2a3d;
+    --muted: #5a6b84;
+    --accent: #2f6fed;
+    --accent2: #0ea578;
+    --warn: #d97a06;
+    --danger: #d0453c;
+    --purple: #7c5cd6;
+    --code-bg: #f3f6fb;
+    --code-text: #24405f;
+    --mono: "SF Mono", "JetBrains Mono", Consolas, "Courier New", monospace;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { background: var(--bg); }
+  body {
+    font-family: "PingFang SC", "Microsoft YaHei", "Noto Sans SC", -apple-system, sans-serif;
+    color: var(--text);
+    display: flex; flex-direction: column; align-items: center;
+    padding: 28px 16px; gap: 28px; min-height: 100vh;
+  }
+  .slide {
+    width: min(1280px, 96vw);
+    aspect-ratio: 16 / 9;
+    background: var(--slide-bg);
+    border: 1px solid var(--card-border);
+    border-radius: 18px;
+    box-shadow: 0 18px 44px rgba(30,42,61,.14);
+    padding: 2% 2.6%;
+    display: flex; flex-direction: column;
+    overflow: hidden; position: relative;
+    font-size: clamp(9.5px, 1.02vw, 14px);
+  }
+  .slide::before {
+    content: ""; position: absolute; inset: 0 0 auto 0; height: 4px;
+    background: linear-gradient(90deg, var(--accent), var(--accent2));
+    border-radius: 18px 18px 0 0;
+  }
+  .pageno { position: absolute; right: 1.6em; bottom: 1em; font-family: var(--mono); font-size: .8em; color: var(--muted); }
+
+  .header { display: flex; align-items: baseline; justify-content: space-between; gap: 1.4em; margin-bottom: .6em; }
+  h1 { font-size: 1.6em; font-weight: 700; white-space: nowrap; }
+  h1 .hl { color: var(--accent); }
+  h1 .ver { font-family: var(--mono); font-size: .6em; color: var(--accent2); vertical-align: super; margin-left: .3em; }
+  .subtitle { color: var(--muted); font-size: .92em; line-height: 1.4; text-align: right; }
+  .subtitle strong { color: var(--text); }
+
+  code, .mono {
+    font-family: var(--mono); font-size: .92em;
+    background: var(--code-bg); color: var(--code-text);
+    border: 1px solid #e4eaf3; padding: 0 .3em; border-radius: 4px;
+  }
+  pre {
+    font-family: var(--mono); font-size: .78em; line-height: 1.42;
+    background: var(--code-bg); color: var(--code-text);
+    border: 1px solid #e4eaf3; border-radius: 8px; padding: .55em .75em;
+    overflow: hidden; white-space: pre;
+  }
+  pre .c { color: #7a8aa3; }
+  pre .k { color: var(--accent); font-weight: 600; }
+  pre .s { color: var(--accent2); }
+  pre .w { color: var(--warn); font-weight: 600; }
+
+  .cols { display: flex; gap: .9em; flex: 1; min-height: 0; }
+  .col { display: flex; flex-direction: column; gap: .7em; min-width: 0; min-height: 0; }
+
+  .panel {
+    background: var(--card); border: 1px solid var(--card-border); border-radius: 12px;
+    padding: .7em .9em; box-shadow: 0 2px 8px rgba(30,42,61,.04);
+    display: flex; flex-direction: column; min-height: 0;
+  }
+  .panel > h2 { font-size: 1em; font-weight: 700; margin-bottom: .45em; display: flex; align-items: baseline; gap: .5em; }
+  .panel > h2 .tag {
+    flex: none; font-size: .72em; font-weight: 700; color: var(--accent);
+    background: rgba(47,111,237,.08); border: 1px solid rgba(47,111,237,.3);
+    border-radius: 99px; padding: .1em .65em;
+  }
+  .panel > h2 .tag.green { color: var(--accent2); background: rgba(14,165,120,.08); border-color: rgba(14,165,120,.3); }
+  .panel > h2 .tag.warn { color: var(--warn); background: rgba(217,122,6,.08); border-color: rgba(217,122,6,.3); }
+  .panel > h2 .tag.purple { color: var(--purple); background: rgba(124,92,214,.08); border-color: rgba(124,92,214,.3); }
+  .panel > h2 .tag.red { color: var(--danger); background: rgba(208,69,60,.08); border-color: rgba(208,69,60,.3); }
+  .panel ul { list-style: none; }
+  .panel li { color: var(--muted); font-size: .86em; line-height: 1.45; padding-left: .95em; position: relative; margin-bottom: .3em; }
+  .panel li::before { content: "•"; color: var(--accent); position: absolute; left: 0; }
+  .panel li strong { color: var(--text); font-weight: 600; }
+  .panel p { color: var(--muted); font-size: .86em; line-height: 1.45; }
+  .panel p strong { color: var(--text); }
+  .panel ol { padding-left: 1.4em; }
+  .panel ol li { padding-left: .2em; }
+  .panel ol li::before { content: none; }
+
+  .reqs { display: grid; grid-template-columns: 1fr 1fr; gap: .55em; flex: 1; min-height: 0; }
+  .reqs.three { grid-template-columns: 1fr 1fr 1fr; }
+  .req { background: var(--card); border: 1px solid var(--card-border); border-radius: 10px; padding: .5em .7em; min-width: 0; }
+  .req h3 { font-size: .9em; font-weight: 700; margin-bottom: .2em; }
+  .req h3 .no { color: var(--accent); font-family: var(--mono); margin-right: .4em; }
+  .req p { color: var(--muted); font-size: .8em; line-height: 1.42; }
+  .req p strong { color: var(--text); }
+  .req.key { border-color: rgba(47,111,237,.5); background: linear-gradient(180deg, rgba(47,111,237,.05), #fff 45%); }
+  .req.warnk { border-color: rgba(217,122,6,.5); background: linear-gradient(180deg, rgba(217,122,6,.05), #fff 45%); }
+
+  .flow { display: flex; align-items: stretch; gap: .45em; }
+  .flow .node {
+    flex: 1; min-width: 0; background: #fff; border: 1px solid var(--card-border);
+    border-radius: 8px; padding: .42em .55em; font-size: .8em; line-height: 1.38; color: var(--muted);
+  }
+  .flow .node strong { display: block; color: var(--text); font-size: .95em; margin-bottom: .1em; }
+  .flow .node.hl { border-color: rgba(47,111,237,.55); background: linear-gradient(180deg, rgba(47,111,237,.06), #fff 50%); }
+  .flow .node.green { border-color: rgba(14,165,120,.55); background: linear-gradient(180deg, rgba(14,165,120,.06), #fff 50%); }
+  .flow .node.purpleb { border-color: rgba(124,92,214,.55); background: linear-gradient(180deg, rgba(124,92,214,.06), #fff 50%); }
+  .flow .node.warnb { border-color: rgba(217,122,6,.5); background: #fdf9f2; }
+  .flow .node.warnb strong { color: var(--warn); }
+  .flow .node.redb { border-color: rgba(208,69,60,.5); background: #fdf3f2; }
+  .flow .node.redb strong { color: var(--danger); }
+  .flow .arr { align-self: center; color: var(--accent); font-weight: 700; flex: none; }
+  .flow.vert { flex-direction: column; }
+  .flow.vert .arr { align-self: center; transform: rotate(90deg); line-height: 1; }
+
+  table { width: 100%; border-collapse: collapse; font-size: .82em; }
+  th, td { text-align: left; padding: .36em .55em; border-bottom: 1px solid #edf1f7; vertical-align: top; line-height: 1.4; }
+  th { color: var(--muted); font-size: .88em; font-weight: 700; background: #f6f9fd; white-space: nowrap; }
+  td strong { color: var(--text); }
+  td { color: var(--muted); }
+  tr:last-child td { border-bottom: none; }
+  td.ok { color: var(--accent2); font-weight: 700; }
+  td.no { color: var(--danger); font-weight: 700; }
+  tr.hl td { background: rgba(47,111,237,.05); }
+
+  .callout {
+    border-radius: 10px; padding: .5em .85em; font-size: .84em; line-height: 1.45;
+    background: rgba(14,165,120,.07); border: 1px solid rgba(14,165,120,.35); color: var(--text);
+  }
+  .callout.warn { background: #fdf7f0; border-color: rgba(217,122,6,.4); }
+  .callout.blue { background: rgba(47,111,237,.06); border-color: rgba(47,111,237,.35); }
+  .callout.red { background: #fdf3f2; border-color: rgba(208,69,60,.4); }
+  .callout b { color: var(--accent2); }
+  .callout.warn b { color: var(--warn); }
+  .callout.blue b { color: var(--accent); }
+  .callout.red b { color: var(--danger); }
+
+  /* 架构分层图 */
+  .arch { display: flex; flex-direction: column; gap: .35em; flex: 1; min-height: 0; }
+  .layer { display: flex; gap: .5em; align-items: stretch; }
+  .layer .lbl { flex: none; width: 11%; font-size: .78em; font-weight: 700; color: var(--muted); display: flex; align-items: center; justify-content: flex-end; text-align: right; padding-right: .4em; border-right: 2px solid var(--card-border); line-height: 1.3; }
+  .layer .boxes { flex: 1; display: flex; gap: .45em; min-width: 0; }
+  .box { flex: 1; min-width: 0; background: #fff; border: 1px solid var(--card-border); border-radius: 8px; padding: .38em .55em; font-size: .78em; line-height: 1.36; color: var(--muted); }
+  .box strong { display: block; color: var(--text); font-size: .96em; }
+  .box.a { border-color: rgba(47,111,237,.55); background: linear-gradient(180deg, rgba(47,111,237,.07), #fff 55%); }
+  .box.g { border-color: rgba(14,165,120,.55); background: linear-gradient(180deg, rgba(14,165,120,.07), #fff 55%); }
+  .box.p { border-color: rgba(124,92,214,.55); background: linear-gradient(180deg, rgba(124,92,214,.07), #fff 55%); }
+  .box.w { border-color: rgba(217,122,6,.5); background: #fdf9f2; }
+  .box.w strong { color: var(--warn); }
+  .box.r { border-color: rgba(208,69,60,.5); background: #fdf3f2; }
+  .box.r strong { color: var(--danger); }
+  .box.dim { opacity: .6; border-style: dashed; }
+  .arrow-row { text-align: center; color: var(--accent); font-weight: 700; font-size: .8em; line-height: 1; }
+  .arrow-row.split { display: flex; }
+  .arrow-row.split span:first-child { flex: none; width: 11%; }
+  .arrow-row.split span:not(:first-child) { flex: 1; text-align: center; }
+
+  /* 编译步骤 */
+  .steps { display: flex; flex-direction: column; gap: .35em; }
+  .step { display: flex; gap: .6em; align-items: flex-start; font-size: .82em; line-height: 1.42; color: var(--muted); }
+  .step .n { flex: none; width: 1.6em; height: 1.6em; border-radius: 50%; background: var(--accent); color: #fff; font-family: var(--mono); font-weight: 700; font-size: .85em; display: flex; align-items: center; justify-content: center; }
+  .step .n.g { background: var(--accent2); }
+  .step .n.w { background: var(--warn); }
+  .step strong { color: var(--text); }
+
+  .chat { display: flex; flex-direction: column; gap: .4em; overflow: hidden; }
+  .bubble { max-width: 94%; border-radius: 10px; padding: .38em .7em; font-size: .82em; line-height: 1.4; }
+  .bubble.user { align-self: flex-end; background: linear-gradient(135deg, #2f6fed, #4a84f2); color: #fff; border-bottom-right-radius: 3px; }
+  .bubble.agent { align-self: flex-start; background: var(--code-bg); color: var(--text); border: 1px solid var(--card-border); border-bottom-left-radius: 3px; }
+</style>
+</head>
+<body>
+
+<!-- ═══════════ P1 目标与场景 ═══════════ -->
+<section class="slide">
+  <div class="header">
+    <h1>openClaw 自动化任务<span class="ver">v0.1</span>：<span class="hl">目标与场景</span></h1>
+    <p class="subtitle">从"每天 9 点帮我干 xxx"出发，扩展到<strong>事件驱动</strong>的自动化<br>前提假设：存在<strong>统一事件管理服务（EMS）</strong>——订阅即推送，不区分手机平台</p>
+  </div>
+  <div class="cols">
+    <div class="col" style="flex: 0 0 46%;">
+      <div class="panel" style="flex:1;">
+        <h2><span class="tag">五个目标场景</span>用户原话 → 触发类型归类</h2>
+        <table>
+          <tr><th>#</th><th>用户原话</th><th>看起来是</th><th>实际是</th></tr>
+          <tr><td>S1</td><td><strong>每天早上 9 点</strong>帮我干 xxx</td><td>定时</td><td><code>cron</code></td></tr>
+          <tr><td>S2</td><td><strong>明天下雨</strong>的时候帮我干 xxx</td><td>事件</td><td><code>poll</code>：轮询 + 判定 → 派生事件</td></tr>
+          <tr><td>S3</td><td><strong>到家</strong>的时候帮我干 xxx</td><td>事件</td><td><code>event</code>：<code>geofence.enter</code></td></tr>
+          <tr><td>S4</td><td>收到 <strong>xxx 的电话</strong>时帮我 xxx</td><td>事件</td><td><code>event</code>：<code>phone.call_received</code></td></tr>
+          <tr><td>S5</td><td><strong>火车放票</strong>时帮我抢北京→上海的票</td><td>事件 / 监视</td><td><code>at</code> 精确触发 + <strong>预编译动作</strong>，放票瞬间不过模型</td></tr>
+        </table>
+        <div class="callout blue" style="margin-top:.6em;">
+          <b>归类结论：</b>五个场景只落在四种触发上——<code>cron/at</code>（时间）、<code>event</code>（EMS 推送）、<code>poll</code>（自己轮询产生派生事件）。<b>没有一个需要 openClaw 新增"订阅"原语</b>，缺的是一层薄的事件入口 + 一张统一的 Task 表。
+        </div>
+      </div>
+    </div>
+    <div class="col" style="flex:1;">
+      <div class="reqs">
+        <div class="req key"><h3><span class="no">G1</span>一种心智，一套工具</h3><p>"每天 9 点"和"到家时"对用户是同一件事：<strong>委托一个将来执行的任务</strong>。模型只面对 <code>create_task</code> 一个入口，底层是 cron 还是 EMS 由代码路由，不让模型选路。</p></div>
+        <div class="req key"><h3><span class="no">G2</span>触发不过模型，执行才过</h3><p>触发器（时间到 / 事件到 / 条件命中）全部是<strong>非 LLM、零 token、毫秒级</strong>；LLM 只在两个时刻介入：<strong>创建时编译</strong>、<strong>触发后执行</strong>。</p></div>
+        <div class="req"><h3><span class="no">G3</span>默认隔离 session</h3><p>自动化任务默认跑在 <code>isolated</code> 新 session，不污染主对话、不背 100K 历史；需要记忆用命名 session，纯提醒才进主 session。</p></div>
+        <div class="req"><h3><span class="no">G4</span>不丢、不重、不过期</h3><p>EMS at-least-once 投递 + 我们 <code>event_id</code> 去重 + 双侧 <code>stale_after</code> 过期校验。三句话就是对用户的全部承诺。</p></div>
+        <div class="req warnk"><h3><span class="no">G5</span>高危动作永不走默认路径</h3><p><strong>支付、对外发送、删除</strong>永远需要用户确认。抢票脚本最多锁单，然后唤醒主 session 找用户付款。</p></div>
+        <div class="req"><h3><span class="no">G6</span>一切可查、失败可见</h3><p>时间型 + 事件型 + 轮询型任务在<strong>同一张 Task 表</strong>里，用户随口能问"你在盯什么"；执行失败必须通知，不允许静默失败。</p></div>
+      </div>
+    </div>
+  </div>
+  <span class="pageno">1 / 11</span>
+</section>
+
+<!-- ═══════════ P2 openClaw 定时任务现状 ═══════════ -->
+<section class="slide">
+  <div class="header">
+    <h1>openClaw 定时任务<span class="hl">现状盘点</span></h1>
+    <p class="subtitle">来源：openClaw 官方文档 Scheduled tasks / Automation / Heartbeat（2026-09 核对）<br>结论：<strong>时间型触发已经够用</strong>，重试 / 超时 / 历史 / 模型覆盖都有，不必重造</p>
+  </div>
+  <div class="cols">
+    <div class="col" style="flex:1;">
+      <div class="panel">
+        <h2><span class="tag">执行位置与存储</span></h2>
+        <ul>
+          <li>cron 跑在 <strong>Gateway 进程内</strong>，不在模型内；任务定义 / 运行状态 / 历史持久化在共享 <strong>SQLite</strong>，重启不丢；</li>
+          <li>每次执行产生一条 <strong>background task 记录</strong>，<code>openclaw tasks list | audit</code> 可审计；</li>
+          <li>Gateway 启动时过期的 isolated 任务<strong>重排</strong>而非立刻回放，避免开机风暴。</li>
+        </ul>
+      </div>
+      <div class="panel">
+        <h2><span class="tag">三种调度</span></h2>
+        <table>
+          <tr><th>种类</th><th>参数</th><th>注意</th></tr>
+          <tr><td><code>at</code></td><td><code>--at "20m"</code> / ISO</td><td>一次性，成功后默认自删</td></tr>
+          <tr><td><code>every</code></td><td><code>--every 1h</code></td><td>固定间隔</td></tr>
+          <tr><td><code>cron</code></td><td><code>"0 9 * * *" --tz Asia/Shanghai</code></td><td><strong>不带 tz 按 UTC</strong>；整点默认错峰 ≤5min，要准时必须 <code>--exact</code></td></tr>
+        </table>
+      </div>
+      <div class="panel">
+        <h2><span class="tag green">可靠性</span></h2>
+        <ul>
+          <li>一次性任务：限流 / 过载 / 网络错误重试 3 次指数退避；周期任务 30s→60m 退避；</li>
+          <li><code>maxConcurrentRuns</code> 默认 8；isolated 任务有<strong>分阶段 watchdog</strong>（模型未起、context 未加载分别报超时原因）；</li>
+          <li>失败通知走独立的 <code>failureDestination</code>。</li>
+        </ul>
+      </div>
+    </div>
+    <div class="col" style="flex:1;">
+      <div class="panel">
+        <h2><span class="tag purple">三种 payload</span>决定"要不要叫醒模型"</h2>
+        <table>
+          <tr><th>payload</th><th>做什么</th><th>用途</th></tr>
+          <tr><td><code>systemEvent</code></td><td>往主 session 塞一条系统事件，可 <code>--wake now</code></td><td>提醒</td></tr>
+          <tr><td><code>agentTurn</code></td><td>起完整 agent 回合，可覆盖 <code>--model --thinking --tools --timeout-seconds</code></td><td>报告、后台活</td></tr>
+          <tr class="hl"><td><code>command</code></td><td><strong>直接跑脚本，不经模型</strong>，stdout 即交付；输出 <code>NO_REPLY</code> 静默</td><td><strong>checker、抢票、省 token 的关键</strong></td></tr>
+        </table>
+      </div>
+      <div class="panel">
+        <h2><span class="tag">交付</span></h2>
+        <ul>
+          <li><code>announce</code> 回聊天渠道（Telegram / Slack / Discord / 飞书等）；<code>webhook</code> POST 到 URL；<code>none</code> 静默；</li>
+          <li>agent 自己用 <code>message</code> 工具发过了，runner 就跳过兜底 announce。</li>
+        </ul>
+      </div>
+      <div class="panel">
+        <h2><span class="tag warn">Heartbeat</span>不是调度器</h2>
+        <ul>
+          <li>本质是系统托管的一条 cron（<code>Heartbeat (agent-id)</code>），默认 30min 跑主 session，带一份 scratch 清单；</li>
+          <li>官方明确：scratch 是 prompt 上下文，<strong>周期任务应建独立 automation</strong>。本方案不依赖 heartbeat。</li>
+        </ul>
+      </div>
+      <div class="callout" style="margin-top:auto;">
+        <b>S1 最朴素形态：</b><code>openclaw cron create "0 9 * * *" "xxx" --tz Asia/Shanghai --exact --session isolated --announce</code>
+      </div>
+    </div>
+  </div>
+  <span class="pageno">2 / 11</span>
+</section>
+
+<!-- ═══════════ P3 session 策略 ═══════════ -->
+<section class="slide">
+  <div class="header">
+    <h1>定时任务执行：<span class="hl">新建 session 还是复用？</span></h1>
+    <p class="subtitle">答案是<strong>四选一</strong>，由 <code>--session</code> 决定；本方案默认 <strong>isolated</strong>，按需升级</p>
+  </div>
+  <div class="cols">
+    <div class="col" style="flex: 0 0 58%;">
+      <div class="panel" style="flex:1;">
+        <h2><span class="tag">四种 session 目标</span></h2>
+        <table>
+          <tr><th><code>--session</code></th><th>跑在哪</th><th>上下文</th><th>适合</th><th>本方案</th></tr>
+          <tr><td><code>main</code></td><td>主 session 的专用 cron 通道</td><td>有主对话上下文；cron 回合<strong>不写入人类聊天轨</strong>、不刷新 session 新鲜度</td><td>提醒、系统事件</td><td>仅 <code>wake</code> 分支</td></tr>
+          <tr class="hl"><td><code>isolated</code></td><td>每次新 session id <code>cron:&lt;jobId&gt;</code></td><td><strong>零历史</strong>；只继承 thinking / model 等安全偏好，不继承渠道路由、权限提升</td><td>报告、后台活</td><td><strong>默认</strong></td></tr>
+          <tr><td><code>current</code></td><td>创建时绑定的对话</td><td>读一段创建时对话的有界尾部，结果提交回该对话</td><td>依赖对话上下文的周期工作</td><td>事件场景不适用（事件到达时"当前对话"无定义）</td></tr>
+          <tr><td><code>session:&lt;id&gt;</code></td><td>持久命名 session</td><td>跨次运行累积</td><td>"在上一次基础上继续"</td><td>需要记忆时 <code>session:&lt;task_id&gt;</code></td></tr>
+        </table>
+        <p style="margin-top:.5em;">默认规则：<code>systemEvent</code> → main；<code>agentTurn</code> 从聊天创建 → current，从 CLI/API 创建 → isolated；<code>command</code> → isolated。</p>
+      </div>
+    </div>
+    <div class="col" style="flex:1;">
+      <div class="panel">
+        <h2><span class="tag green">为什么默认 isolated</span></h2>
+        <ul>
+          <li><strong>token</strong>：主 session 动辄 100K，每天带着全部历史跑一遍是浪费；官方数字 isolated 可从 ~100K 降到 <strong>2–5K</strong>；</li>
+          <li><strong>context bleed</strong>：cron 产出污染主对话，用户下次聊天时模型"记得"一堆早报；</li>
+          <li><strong>权限隔离</strong>：不继承渠道路由与提升权限，<code>--tools</code> 白名单可进一步收窄。</li>
+        </ul>
+      </div>
+      <div class="panel">
+        <h2><span class="tag purple">升级路径</span></h2>
+        <ul>
+          <li>需要<strong>跨次记忆</strong>（"今天比昨天早还是晚"）→ <code>session:&lt;task_id&gt;</code>；</li>
+          <li>需要<strong>知道我最近聊什么</strong> → <code>current</code>，仅限时间型任务；</li>
+          <li><strong>纯提醒</strong>，不需要模型干活 → <code>main</code> + <code>systemEvent</code>。</li>
+        </ul>
+      </div>
+      <div class="callout blue" style="margin-top:auto;">
+        <b>与双脑设计一致：</b>后台任务不读前台全量上下文，靠几十 token 的<b>事件信封 + goal 原话</b>启动，结果以摘要回合。
+      </div>
+    </div>
+  </div>
+  <span class="pageno">3 / 11</span>
+</section>
+
+<!-- ═══════════ P4 事件驱动：能力与分工 ═══════════ -->
+<section class="slide">
+  <div class="header">
+    <h1>事件驱动：<span class="hl">openClaw 有什么、EMS 做什么、我们补什么</span></h1>
+    <p class="subtitle">关键事实：<strong>openClaw 没有"Agent 订阅事件"原语</strong>，订阅方向是反的——外部系统 push 到 Gateway</p>
+  </div>
+  <div class="cols">
+    <div class="col" style="flex:1;">
+      <div class="panel" style="flex:1;">
+        <h2><span class="tag">openClaw 现有入口</span></h2>
+        <table>
+          <tr><th>能力</th><th>说明</th><th>本方案用法</th></tr>
+          <tr><td><code>POST /hooks/wake</code></td><td>塞系统事件进主 session</td><td>提醒型事件</td></tr>
+          <tr><td><code>POST /hooks/agent</code></td><td>起 isolated agent 回合，可带 model / tools / timeout</td><td><strong>主路径</strong></td></tr>
+          <tr><td><code>hooks.mappings</code></td><td>模板 / 代码变换任意 payload → wake 或 agent</td><td>可做入口层的一部分</td></tr>
+          <tr><td>Gmail PubSub / IMAP</td><td>专用集成</td><td>不用</td></tr>
+          <tr><td>内部 lifecycle hooks</td><td><code>/new /reset</code> 压缩、启动</td><td>运维事件，不是业务事件</td></tr>
+          <tr><td class="no">缺</td><td>事件注册表、订阅 API、条件表达式评估、<strong>跑脚本的 hook 动作</strong></td><td>由 EMS + 入口层补</td></tr>
+        </table>
+      </div>
+    </div>
+    <div class="col" style="flex:1.15;">
+      <div class="panel">
+        <h2><span class="tag green">EMS 承担（已确认）</span></h2>
+        <ul>
+          <li><strong>事件生产</strong>：手机 / 家居 / 通知等原始事件的采集与标准化，不区分平台；</li>
+          <li><strong>条件匹配</strong>：订阅里的 <code>filter</code> 表达式在 EMS 侧评估；</li>
+          <li><strong>有状态门控</strong>：debounce / cooldown / 每天最多 N 次 / 活跃时段；</li>
+          <li><strong>事件目录可程序化发现</strong>：类型、payload schema、可用字段；</li>
+          <li><strong>投递</strong>：命中后按订阅指定的 target 推送，at-least-once。</li>
+        </ul>
+      </div>
+      <div class="panel">
+        <h2><span class="tag warn">EMS 不承担（已确认）→ 我们补</span></h2>
+        <ul>
+          <li><strong>派生事件</strong>（"明天下雨""某车次放票"）：EMS 不轮询外部世界，由我们的 <strong>checker</strong> 产生（P8）；</li>
+          <li><strong>Task 语义</strong>：goal / policy / 收件箱 / 暂停恢复，EMS 只认订阅；</li>
+          <li><strong>去重与过期</strong>：at-least-once 的必然代价，入口层做幂等；</li>
+          <li><strong>动作分发</strong>：wake / agent / command 三分支，尤其 command（openClaw hooks 不支持）。</li>
+        </ul>
+      </div>
+      <div class="callout" style="margin-top:auto;">
+        <b>分工一句话：</b>EMS 负责"<b>什么时候该叫我</b>"，openClaw 负责"<b>叫醒后怎么干</b>"，我们补的入口层 + Task 表负责"<b>叫谁、以什么身份、干什么</b>"。
+      </div>
+    </div>
+  </div>
+  <span class="pageno">4 / 11</span>
+</section>
+
+<!-- ═══════════ P5 整体架构 ═══════════ -->
+<section class="slide">
+  <div class="header">
+    <h1><span class="hl">整体架构</span>：一张 Task 表，两个触发引擎，一个入口，三条分支</h1>
+    <p class="subtitle">新增部分只有<strong>Task 表 + 事件入口</strong>（几百行、非 LLM、可独立于模型存活）；openClaw 与 EMS 均不改核心</p>
+  </div>
+  <div class="arch">
+    <div class="layer">
+      <div class="lbl">对话层<br>（LLM）</div>
+      <div class="boxes">
+        <div class="box a"><strong>主 loop（player-coach）</strong>意图路由 → 委托型请求走 <code>create_task</code>；编译 Trigger / Goal / Policy；一句话回读确认</div>
+        <div class="box a" style="flex:.6;"><strong>任务管理工具 ×9</strong><code>list_event_types</code> <code>create_task</code> <code>list_tasks</code> <code>steer</code> <code>pause/resume</code> <code>stop</code> <code>test_fire</code> …</div>
+      </div>
+    </div>
+    <div class="arrow-row">▼ 写入 / 查询</div>
+    <div class="layer">
+      <div class="lbl">任务层<br>（非 LLM）</div>
+      <div class="boxes">
+        <div class="box g"><strong>Task 表（新增）</strong><code>task_id · goal 原话 · trigger{kind…} · execution{mode,session,tools} · policy{attention,authorization,expires} · state · last_fired_at · runs[]</code>。按 <code>trigger.kind</code> 路由到下面两个引擎；是"任务收件箱"的唯一事实来源。</div>
+      </div>
+    </div>
+    <div class="arrow-row split"><span></span><span>▼ cron / at / poll-checker</span><span>▼ event 订阅</span></div>
+    <div class="layer">
+      <div class="lbl">触发层<br>（非 LLM）</div>
+      <div class="boxes">
+        <div class="box p"><strong>openClaw cron（复用）</strong>时间型：<code>cron / at / every</code>；轮询型：<code>command</code> checker 定时跑脚本 → 命中则 <strong>publish 派生事件到 EMS</strong>（路 B）或直接打入口（路 A）</div>
+        <div class="box p"><strong>EMS（外部，假设已存在）</strong>事件目录 · 订阅表 · filter 评估 · debounce/cooldown 门控 · at-least-once 投递 · <code>stale_after</code> 丢弃</div>
+      </div>
+    </div>
+    <div class="arrow-row">▼ 到点 / 命中后推送（标准事件信封）</div>
+    <div class="layer">
+      <div class="lbl">入口层<br>（新增，非 LLM）</div>
+      <div class="boxes">
+        <div class="box g"><strong><code>/hooks/events</code> 事件入口</strong>① <code>event_id</code> 去重（24h 窗口）② <code>now − occurred_at &gt; stale_after</code> 丢弃 ③ <strong>先回 200 再执行</strong> ④ 查 <code>task_id</code> → goal / policy ⑤ 按 <code>execution.mode</code> 分发</div>
+      </div>
+    </div>
+    <div class="arrow-row">▼ 三分支</div>
+    <div class="layer">
+      <div class="lbl">执行层<br>（openClaw）</div>
+      <div class="boxes">
+        <div class="box"><strong><code>wake</code></strong>systemEvent 进主 session，<code>--wake now</code>。<em>提醒型</em></div>
+        <div class="box a"><strong><code>agent</code>（默认）</strong>isolated agentTurn，prompt = 事件信封（user 角色）+ goal 原话；<code>--tools</code> 白名单、可 <code>--model</code>。<em>需要判断的任务</em></div>
+        <div class="box w"><strong><code>command</code></strong>直接跑预编译脚本，不经模型；openClaw hooks 不支持 → 入口层自己拉起。<em>抢票、秒级动作</em></div>
+        <div class="box dim" style="flex:.7;"><strong>交付</strong>announce 回渠道 / webhook / 静默；失败 → failureDestination；高危动作 → wake 主 session 要确认</div>
+      </div>
+    </div>
+  </div>
+  <span class="pageno">5 / 11</span>
+</section>
+
+<!-- ═══════════ P6 订阅契约 & 推送契约 ═══════════ -->
+<section class="slide">
+  <div class="header">
+    <h1>与 EMS 的两份契约：<span class="hl">订阅</span> 与 <span class="hl">推送</span></h1>
+    <p class="subtitle">投递语义已定：<strong>EMS at-least-once + 入口层 event_id 去重 + 双侧 stale_after 过期校验</strong></p>
+  </div>
+  <div class="cols">
+    <div class="col" style="flex:1.1;">
+      <div class="panel" style="flex:1;">
+        <h2><span class="tag">订阅（我们 → EMS）</span>以 S3 到家为例</h2>
+<pre>{
+  <span class="k">"subscription_id"</span>: <span class="s">"sub_7f3a"</span>,
+  <span class="k">"task_id"</span>: <span class="s">"task_home_lights"</span>,        <span class="c">// 回推时原样带回</span>
+  <span class="k">"event_type"</span>: <span class="s">"geofence.enter"</span>,        <span class="c">// 来自 EMS 目录</span>
+  <span class="k">"filter"</span>: <span class="s">"payload.zone=='home' &amp;&amp; weekday(ts) &amp;&amp; hour(ts)&gt;=18"</span>,
+  <span class="k">"guards"</span>: {                            <span class="c">// EMS 侧有状态门控</span>
+    <span class="k">"debounce"</span>: <span class="s">"5m"</span>,   <span class="k">"cooldown"</span>: <span class="s">"2h"</span>,
+    <span class="k">"max_fires_per_day"</span>: 1,
+    <span class="k">"active_window"</span>: <span class="s">"18:00-23:00 Asia/Shanghai"</span>
+  },
+  <span class="k">"lifetime"</span>: { <span class="k">"expires_at"</span>: null, <span class="k">"max_fires"</span>: null, <span class="k">"delete_on_fire"</span>: false },
+  <span class="k">"delivery"</span>: {
+    <span class="k">"target"</span>: <span class="s">"https://gateway/hooks/events"</span>,
+    <span class="k">"auth"</span>: <span class="s">"bearer &lt;dedicated-token&gt;"</span>,
+    <span class="w">"stale_after"</span>: <span class="s">"10m"</span>,                <span class="c">// 送不到就作废，不无限重试</span>
+    <span class="k">"semantics"</span>: <span class="s">"at-least-once"</span>
+  }
+}</pre>
+      </div>
+    </div>
+    <div class="col" style="flex:1;">
+      <div class="panel">
+        <h2><span class="tag green">推送（EMS → 我们）</span></h2>
+<pre>{
+  <span class="w">"event_id"</span>: <span class="s">"evt_9c21"</span>,               <span class="c">// 幂等键</span>
+  <span class="k">"subscription_id"</span>: <span class="s">"sub_7f3a"</span>,
+  <span class="k">"task_id"</span>: <span class="s">"task_home_lights"</span>,
+  <span class="k">"event_type"</span>: <span class="s">"geofence.enter"</span>,
+  <span class="w">"occurred_at"</span>: <span class="s">"2026-09-08T18:42:10+08:00"</span>,
+  <span class="k">"delivered_at"</span>: <span class="s">"…"</span>,
+  <span class="k">"payload"</span>: { <span class="k">"zone"</span>: <span class="s">"home"</span>, <span class="k">"source"</span>: <span class="s">"wifi+gps"</span>, <span class="k">"confidence"</span>: 0.93 }
+}</pre>
+      </div>
+      <div class="panel" style="flex:1;">
+        <h2><span class="tag warn">投递语义：三选一，选 at-least-once</span></h2>
+        <table>
+          <tr><th>语义</th><th>EMS 做法</th><th>后果</th></tr>
+          <tr><td>at-most-once</td><td>推一次不管结果</td><td>Gateway 重启那几秒的事件永久丢</td></tr>
+          <tr class="hl"><td><strong>at-least-once</strong></td><td>没拿到 2xx 就退避重试（5s/30s/2m/10m），超 <code>stale_after</code> 丢弃</td><td>不丢，可能重 → <strong>我们去重</strong></td></tr>
+          <tr><td>exactly-once</td><td>跨系统不存在严格实现</td><td>= at-least-once + 接收方幂等</td></tr>
+        </table>
+        <ul style="margin-top:.4em;">
+          <li>入口层 <code>event_id</code> 24h 内见过 → 直接 200 不执行；</li>
+          <li><strong>先回 200 再执行</strong>，否则 agent 跑 30s EMS 早已超时重推；</li>
+          <li>入口层也校验 <code>occurred_at</code>，任一侧配错都不会"20 分钟前到家现在才开灯"。</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+  <span class="pageno">6 / 11</span>
+</section>
+
+<!-- ═══════════ P7 编译流程 ═══════════ -->
+<section class="slide">
+  <div class="header">
+    <h1>从一句话到一条订阅：<span class="hl">Agent 侧编译流程</span></h1>
+    <p class="subtitle">LLM 只在这里介入一次；产物是结构化的 Trigger + Policy，Goal <strong>保留原话</strong>不翻译</p>
+  </div>
+  <div class="cols">
+    <div class="col" style="flex: 0 0 34%;">
+      <div class="panel" style="flex:1;">
+        <h2><span class="tag">对话回放</span></h2>
+        <div class="chat">
+          <div class="bubble user">到家的时候帮我把客厅灯开了，放点音乐</div>
+          <div class="bubble agent">好，你到家我就开客厅灯、放音乐。工作日晚上 6 点以后才触发，可以吗？</div>
+          <div class="bubble user">可以。你试一下</div>
+          <div class="bubble agent">已模拟一次"到家"：客厅灯已开、正在播放你常听的歌单。以后真到家就会这样。</div>
+          <div class="bubble user">明天下雨的话提醒我带伞</div>
+          <div class="bubble agent">好，每天晚上 8 点我看一次北京明天的预报，降雨概率超过 60% 就提醒你。</div>
+        </div>
+        <div class="callout blue" style="margin-top:.6em;">
+          <b>回读粒度：</b>默认一句话确认；只有<b>非常识默认值</b>（60% 阈值、20:00 窗口）和<b>高权限动作</b>才显式追问，不逐项审批。
+        </div>
+      </div>
+    </div>
+    <div class="col" style="flex:1;">
+      <div class="panel" style="flex:1;">
+        <h2><span class="tag green">七步编译</span></h2>
+        <div class="steps">
+          <div class="step"><span class="n">1</span><div><strong>意图路由</strong>：委托型请求且 Trigger 不是 <code>immediate</code> → 走 <code>create_task</code>，不就地执行。</div></div>
+          <div class="step"><span class="n">2</span><div><strong>查事件目录</strong>：<code>list_event_types</code> 找到 <code>geofence.enter</code>，读 payload schema（有 <code>zone</code>）。查不到 → 判断能否用 <code>poll</code> 拼出派生事件；都不行就如实告知做不到。</div></div>
+          <div class="step"><span class="n">3</span><div><strong>填槽</strong>：<code>zone=home</code> ← 用户画像；"哪个灯"缺槽 → 追问，或留给执行时判断。</div></div>
+          <div class="step"><span class="n">4</span><div><strong>补 guards</strong>：到家类默认 <code>debounce 5m + cooldown 2h</code>——这是写在编译规则里的<strong>常识默认值</strong>，按事件类型给。</div></div>
+          <div class="step"><span class="n">5</span><div><strong>补 policy</strong>：<code>attention=silent</code>（开灯不用汇报）；<code>authorization</code>：家居控制在免确认白名单，支付 / 对外发送 / 删除永远在必确认清单。</div></div>
+          <div class="step"><span class="n w">6</span><div><strong>回读确认</strong>：一句话。用户说"试一下" → <code>test_fire_task</code> 走真实入口路径模拟一次。</div></div>
+          <div class="step"><span class="n g">7</span><div><strong>落库 + 注册</strong>：写 Task 表 → 调 EMS subscribe → <code>subscription_id</code> 回填 Task。时间型则调 openClaw cron；轮询型两者都建。</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <span class="pageno">7 / 11</span>
+</section>
+
+<!-- ═══════════ P8 派生事件 ═══════════ -->
+<section class="slide">
+  <div class="header">
+    <h1>派生事件：<span class="hl">EMS 不提供，我们用 checker 补</span></h1>
+    <p class="subtitle">"明天下雨""某车次放票"没有事件源会主动推，只能有人去轮询；<strong>轮询是 command cron，不过模型</strong></p>
+  </div>
+  <div class="cols">
+    <div class="col" style="flex:1;">
+      <div class="panel">
+        <h2><span class="tag warn">路 A</span>checker 直接触发任务</h2>
+        <div class="flow">
+          <div class="node purpleb"><strong>command cron</strong>每天 20:00 跑天气脚本</div>
+          <div class="arr">→</div>
+          <div class="node"><strong>判定</strong>无雨输出 <code>NO_REPLY</code> 静默</div>
+          <div class="arr">→</div>
+          <div class="node hl"><strong>有雨</strong>脚本直接 POST <code>/hooks/events</code></div>
+        </div>
+        <ul style="margin-top:.5em;">
+          <li>简单；但"下雨"的订阅<strong>不在 EMS 里</strong>，收件箱要认两种触发器；</li>
+          <li>门控（每天最多一次、活跃时段）得脚本自己写，和 EMS 重复造轮子。</li>
+        </ul>
+      </div>
+      <div class="panel">
+        <h2><span class="tag green">路 B（建议）</span>checker 往 EMS 发布派生事件</h2>
+        <div class="flow">
+          <div class="node purpleb"><strong>command cron</strong>同一个脚本</div>
+          <div class="arr">→</div>
+          <div class="node green"><strong>EMS publish</strong><code>weather.rain_tomorrow</code> + 注册到目录</div>
+          <div class="arr">→</div>
+          <div class="node"><strong>EMS 订阅 / 门控 / 投递</strong>与到家事件完全同构</div>
+          <div class="arr">→</div>
+          <div class="node hl"><strong>/hooks/events</strong></div>
+        </div>
+        <ul style="margin-top:.5em;">
+          <li>Agent 视角里"下雨"和"到家"<strong>没有区别</strong>，下游全部复用；</li>
+          <li>checker 只有一个职责：轮询外部世界，命中就发事件，<strong>不碰任务逻辑</strong>；</li>
+          <li>checker 也登记进 Task 表（<code>trigger.kind=poll</code>），用户问"你在盯什么"能列出来；</li>
+          <li><strong>前提</strong>：EMS 有对外 publish 接口（受信生产者发事件 + 注册类型）—— <strong>待确认</strong>；没有则退回路 A，Task 表多一种 <code>poll</code> 由入口层补门控。</li>
+        </ul>
+      </div>
+    </div>
+    <div class="col" style="flex:1;">
+      <div class="panel" style="flex:1;">
+        <h2><span class="tag red">S5 抢票：唯一绕开 EMS 的特例</span></h2>
+        <p><strong>放票那一秒不能让模型思考。</strong>模型回合延迟是秒到十几秒级；事件 → EMS → 推送 → 入口 → 脚本这条链再加几百毫秒到几秒。所以：</p>
+        <div class="flow vert" style="margin:.5em 0;">
+          <div class="node hl"><strong>前置（LLM，提前一天）</strong>对话确认车次、乘车人、席别、备选车次、是否接受候补、预算 → 编译成结构化执行参数 → 回读确认</div>
+          <div class="arr">→</div>
+          <div class="node warnb"><strong>触发（非 LLM）</strong><code>--at</code> 精确到放票前 30s + <code>--exact</code> 关错峰，<code>command</code> payload 直接跑抢票脚本进入就位状态；放票事件（若有）只做兜底</div>
+          <div class="arr">→</div>
+          <div class="node redb"><strong>红线（Policy）</strong>脚本最多做到<strong>锁单</strong>，然后 <code>POST /hooks/wake</code> 以 <code>speak_now</code> 级别找用户付款 —— 这就是 <code>waiting_user</code> 状态的标准用法</div>
+          <div class="arr">→</div>
+          <div class="node green"><strong>事后（LLM）</strong>汇报结果；失败自动转候补 / 备选车次</div>
+        </div>
+        <div class="callout warn">
+          <b>风险坦白：</b>12306 有风控 + 滑块，脚本抢票有账号被限风险，合规灰色。倾向<b>候补优先</b>：放票时刻提交候补 + 备选车次，把"抢"改成"确保进候补队列最前面"。待拍板。
+        </div>
+      </div>
+    </div>
+  </div>
+  <span class="pageno">8 / 11</span>
+</section>
+
+<!-- ═══════════ P9 工具设计 ═══════════ -->
+<section class="slide">
+  <div class="header">
+    <h1>工具设计：<span class="hl">合一</span>，模型不接触 cron 和 EMS 两个后端</h1>
+    <p class="subtitle">给两条路就会走错路 —— 时间型 / 事件型 / 轮询型统一到 <code>create_task</code> 的 <code>trigger</code> 判别联合</p>
+  </div>
+  <div class="cols">
+    <div class="col" style="flex:1.05;">
+      <div class="panel" style="flex:1;">
+        <h2><span class="tag"><code>create_task</code> 核心参数</span></h2>
+<pre>{
+  <span class="k">"goal"</span>: <span class="s">"到家的时候帮我把客厅灯打开"</span>,      <span class="c">// 用户原话</span>
+  <span class="k">"trigger"</span>: {                             <span class="c">// 判别联合，四选一</span>
+    <span class="w">"kind"</span>: <span class="s">"event"</span>,                        <span class="c">// cron | at | event | poll</span>
+    <span class="k">"event_type"</span>: <span class="s">"geofence.enter"</span>,
+    <span class="k">"filter"</span>: <span class="s">"payload.zone=='home' &amp;&amp; …"</span>,
+    <span class="k">"guards"</span>: { <span class="k">"debounce"</span>: <span class="s">"5m"</span>, <span class="k">"cooldown"</span>: <span class="s">"2h"</span> }
+    <span class="c">// cron → {"cron":"0 9 * * *","tz":"Asia/Shanghai","exact":true}</span>
+    <span class="c">// at   → {"at":"2026-09-22T09:59:30+08:00"}</span>
+    <span class="c">// poll → {"every":"1d","at_time":"20:00","checker":"weather",</span>
+    <span class="c">//         "emit":"weather.rain_tomorrow","then":{…event 订阅…}}</span>
+  },
+  <span class="k">"execution"</span>: {
+    <span class="k">"mode"</span>: <span class="s">"agent"</span>,                        <span class="c">// agent | command | wake</span>
+    <span class="k">"session"</span>: <span class="s">"isolated"</span>,                  <span class="c">// isolated | session:&lt;id&gt; | main</span>
+    <span class="k">"tools"</span>: [<span class="s">"homekit"</span>], <span class="k">"model"</span>: null
+  },
+  <span class="k">"policy"</span>: {
+    <span class="k">"attention"</span>: <span class="s">"silent"</span>,
+    <span class="k">"authorization"</span>: { <span class="k">"auto"</span>: [<span class="s">"home_control"</span>],
+                       <span class="w">"confirm"</span>: [<span class="s">"payment"</span>,<span class="s">"send_external"</span>,<span class="s">"delete"</span>] },
+    <span class="k">"expires_at"</span>: null
+  }
+}</pre>
+      </div>
+    </div>
+    <div class="col" style="flex:1;">
+      <div class="panel" style="flex:1;">
+        <h2><span class="tag green">九个工具</span>全部仅主 loop 可调</h2>
+        <table>
+          <tr><th>工具</th><th>职责</th><th>底层</th></tr>
+          <tr><td><code>list_event_types</code></td><td>编译期查事件目录（类型 / schema / 可用字段）</td><td>EMS catalog</td></tr>
+          <tr class="hl"><td><code>create_task</code></td><td>建任务，trigger 判别联合</td><td>Task 表 → cron / EMS / checker</td></tr>
+          <tr><td><code>create_task_group</code></td><td>一组关联任务（抢票 = 前置 + at + 事后）</td><td>同上</td></tr>
+          <tr><td><code>list_tasks</code> / <code>get_task</code></td><td>收件箱与详情，含 <code>last_fired_at</code>、最近 run</td><td>Task 表 ∪ cron runs</td></tr>
+          <tr><td><code>steer_task</code></td><td>改 goal / 改 trigger 参数</td><td>改表并同步后端</td></tr>
+          <tr><td><code>pause_task</code> / <code>resume_task</code></td><td>暂停不删</td><td>cron disable / EMS pause</td></tr>
+          <tr><td><code>stop_task</code></td><td>删除</td><td>cron remove / EMS unsubscribe</td></tr>
+          <tr><td><code>test_fire_task</code></td><td>模拟一次触发，走真实入口路径</td><td>入口层</td></tr>
+          <tr><td><code>forward_user_reply</code> / <code>delegate_external</code></td><td>沿用原设计</td><td>—</td></tr>
+        </table>
+      </div>
+      <div class="callout warn">
+        <b>两条硬规则：</b>① openClaw 自带 cron 工具<b>对模型隐藏</b>（不进 <code>--tools</code> 白名单），否则偶发绕过 Task 表建 cron，收件箱漏项；② 原设计中独立的 <code>subscribe_event</code> 工具<b>并入</b> <code>create_task</code>，不再单独存在。
+      </div>
+    </div>
+  </div>
+  <span class="pageno">9 / 11</span>
+</section>
+
+<!-- ═══════════ P10 场景全表 ═══════════ -->
+<section class="slide">
+  <div class="header">
+    <h1>五个场景<span class="hl">在框架下的形态</span></h1>
+    <p class="subtitle">每一列都是 <code>create_task</code> 的一个字段；<strong>阈值 / 窗口</strong>是编译期要回读确认的东西，其余默认值基本能猜对</p>
+  </div>
+  <div class="panel" style="flex:1;">
+    <table>
+      <tr><th>#</th><th>场景</th><th>trigger.kind</th><th>事件 / 调度</th><th>filter</th><th>guards（EMS）</th><th>execution</th><th>高危动作</th></tr>
+      <tr><td>S1</td><td>每天早上 9 点 xxx</td><td><code>cron</code></td><td><code>0 9 * * *</code> tz=Asia/Shanghai exact</td><td>—</td><td>—</td><td>agent · isolated · announce</td><td>看 xxx</td></tr>
+      <tr><td>S2</td><td>明天下雨 → xxx</td><td><code>poll</code></td><td>checker 每天 20:00 查预报 → publish <code>weather.rain_tomorrow</code></td><td><code>city=='北京' &amp;&amp; rain_prob&gt;=0.6</code></td><td><code>max_fires_per_day 1</code>，<code>active_window 19:00-21:00</code></td><td>agent · isolated</td><td>无</td></tr>
+      <tr class="hl"><td>S3</td><td>到家 → xxx</td><td><code>event</code></td><td><code>geofence.enter</code></td><td><code>zone=='home' &amp;&amp; weekday &amp;&amp; hour&gt;=18</code></td><td><code>debounce 5m</code>，<code>cooldown 2h</code></td><td>agent · isolated（带 payload）；纯家居控制可 command</td><td>无</td></tr>
+      <tr><td>S4</td><td>收到 xxx 的电话 → xxx</td><td><code>event</code></td><td><code>phone.call_received</code></td><td><code>payload.contact_id=='xxx'</code></td><td>—</td><td>通话中动作 → <strong>command</strong>（秒级）；通话后动作 → agent</td><td>对外发送需确认；payload 内容视为<strong>不可信输入</strong></td></tr>
+      <tr><td>S5</td><td>放票 → 抢北京→上海</td><td><code>at</code>（+ 可选 event 兜底）</td><td>放票前 30s，exact；<code>train.tickets_released</code> 若 EMS 有则兜底</td><td><code>train_no in […]</code></td><td><code>delete_on_fire</code></td><td><strong>command</strong> 预编译脚本 → 锁单后 <code>wake</code> 主 session</td><td><strong>支付必确认</strong>；候补优先</td></tr>
+    </table>
+    <div class="cols" style="margin-top:.7em; flex:0;">
+      <div class="callout blue" style="flex:1;">
+        <b>S2 补充：</b>0.6 阈值和 19–21 点窗口是编译期确认项；城市从画像取还是跟随定位，创建时问一次。
+      </div>
+      <div class="callout warn" style="flex:1;">
+        <b>S4 补充：</b>payload 若含通话 / 通知全文，联系人可以在里面塞 prompt injection。入口层把 payload 明确标成"外部数据"，<b>goal 才是指令</b>；openClaw hook payload 默认有 safety boundary 包裹，再加一层。
+      </div>
+      <div class="callout" style="flex:1;">
+        <b>共同点：</b>五个场景下游完全同构：<b>入口去重过期 → 查 Task → 三分支之一 → 交付 / 失败通知</b>。差别只在 trigger 与 execution 两个字段。
+      </div>
+    </div>
+  </div>
+  <span class="pageno">10 / 11</span>
+</section>
+
+<!-- ═══════════ P11 可靠性 / 开放问题 / 下一步 ═══════════ -->
+<section class="slide">
+  <div class="header">
+    <h1><span class="hl">可靠性清单</span> · 开放问题 · 下一步</h1>
+    <p class="subtitle">v0.1 = 今天讨论已定部分；三个开放问题定了即可进入最小闭环实现</p>
+  </div>
+  <div class="cols">
+    <div class="col" style="flex:1;">
+      <div class="panel" style="flex:1;">
+        <h2><span class="tag green">可靠性清单（必做）</span></h2>
+        <table>
+          <tr><th>问题</th><th>对策</th></tr>
+          <tr><td><strong>重复</strong>：at-least-once + Gateway 重启</td><td>入口 <code>event_id</code> 幂等，24h 窗口；先回 200 再执行</td></tr>
+          <tr><td><strong>过期</strong>：Gateway 挂 20min 后 EMS 补推"到家"</td><td>EMS <code>stale_after</code> 丢弃 + 入口校验 <code>occurred_at</code>，双侧兜底</td></tr>
+          <tr><td><strong>并发</strong>：同一事件命中多订阅 / 短时重复命中</td><td>多订阅并行受 <code>maxConcurrentRuns</code> 约束；同订阅重复靠 cooldown 丢弃</td></tr>
+          <tr><td><strong>静默失败</strong>：事件型任务失败用户不知道</td><td>agent 失败走 <code>failureDestination</code> 必通知</td></tr>
+          <tr><td><strong>订阅腐烂</strong>：事件源下线 / 订阅过期</td><td>Task 表记 <code>last_fired_at</code>，收件箱显示"30 天未触发"</td></tr>
+          <tr><td><strong>不可信 payload</strong>：通知 / 通话内容含注入</td><td>payload 标为外部数据，goal 才是指令</td></tr>
+          <tr><td><strong>时区</strong>：cron 默认 UTC、整点错峰</td><td>编译时强制填 <code>tz</code>；抢票类强制 <code>exact</code></td></tr>
+        </table>
+      </div>
+    </div>
+    <div class="col" style="flex:1;">
+      <div class="panel">
+        <h2><span class="tag warn">开放问题（待拍板）</span></h2>
+        <table>
+          <tr><th>#</th><th>问题</th><th>倾向</th></tr>
+          <tr><td>1</td><td><strong>EMS 有没有 publish 接口</strong>（外部生产者发派生事件 + 注册类型）</td><td>有 → 路 B；无 → 路 A，Task 表多 <code>poll</code> 类型由入口补门控</td></tr>
+          <tr><td>2</td><td><strong>Task 表 + 入口层放哪</strong></td><td>独立小服务（不绑死 openClaw）vs openClaw plugin（少一个部署单元）；倾向前者</td></tr>
+          <tr><td>3</td><td><strong>抢票边界</strong></td><td>候补优先 + 支付永不自动，按此锁死</td></tr>
+          <tr><td>4</td><td><strong>主 session 渠道</strong>（微信 / Telegram / 飞书）</td><td>决定 announce 交付与"到家语音播报"能否做</td></tr>
+          <tr><td>5</td><td><strong>五个 xxx 的具体动作</strong></td><td>决定 S3 / S4 用 command 直出还是必须过模型</td></tr>
+        </table>
+      </div>
+      <div class="callout" style="margin-top:auto;">
+        <b>已定结论：</b>① 时间型复用 openClaw cron，事件型走 EMS，<b>一张 Task 表统一</b>；② 默认 isolated；③ at-least-once + 去重 + 双侧过期；④ 工具合一，<code>subscribe_event</code> 并入 <code>create_task</code>，openClaw cron 工具对模型隐藏；⑤ 触发不过模型，抢票放票瞬间全程 command。
+      </div>
+      <div class="callout blue" style="margin-top:.6em;">
+        <b>下一步：</b>① 确认开放问题 1–3；② 最小闭环：Task 表 + <code>/hooks/events</code> 入口（去重 / 过期 / 三分支）+ <code>create_task</code>/<code>list_tasks</code>/<code>test_fire_task</code> 三个工具；③ 用 S1 + S3 两个场景端到端跑通；④ 再接 S2 checker 与 S5 command 链路。
+      </div>
+    </div>
+  </div>
+  <span class="pageno">11 / 11</span>
+</section>
+
+</body>
+</html>
