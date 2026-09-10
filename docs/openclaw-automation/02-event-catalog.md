@@ -36,6 +36,16 @@ internal:                                     # 模型不可见
 - `must_filter` 列出的字段必须在 filter 中被约束（`==`、`in`、`startsWith` 任一）。
 - `rate: high | burst` 的条目若无 `must_filter`，编译规则要求回读时提醒用户"会很频繁"。
 
+**派生事件条目（路 B，v2.3 补）**
+
+派生事件是某条 job 的 payload 调 `event_publish(type, payload)` 发出的事件，与内建事件同构，登进同一张目录：
+
+- **谁登记**：生产者 job 首次 `cron add` 时，cron service 用 `payload` 里声明的 `publishes: {type, desc, fields}` 向事件中心 `catalog.register`；事件中心校验 `type` 不与内建冲突、`fields` 合法后写入。生产者 job `remove` 时条目保留（可能已有消费者），标 `orphaned` 供对账。
+- **group**：固定为生产者声明的业务组名（如 `weather`、`ticket`、`press`），不得复用 10 个内建组名；`type` 同样 `group.noun_verb`，如 `weather.rain_tomorrow`、`ticket.on_sale`、`press.conference_ended`。
+- **fields**：由生产者定，规则同内建（key 字段可标 `!`，枚举写全）。消费者 job 的 filter 只能引用这些字段，`cron add` 校验一致。
+- **internal**：`rate` 由生产者的 schedule 推出（`cron 0 20 * * *` → low），`debounce / stale_after` 取组默认（1m / 24h，天气类事件"过期"的含义与围栏不同，生产者可覆盖），`sensitivity` 继承生产者 payload 的最高级别。
+- **模型怎么看到**：不进静态 prompt（数量不定），主 loop 用 `event_catalog.get(type)` 或 `event_catalog.search(q)` 查派生事件；回读时把字段列给用户。
+
 ## 3. filter 语法（一页）
 
 ```
@@ -67,6 +77,8 @@ literal  := 'string' | number | true | false | null
 
 ## 4. 命名与字段规范
 
+- **两套大小写，各归各位**：事件目录 yaml 与事件 payload 字段一律 snake_case（`stale_after`、`must_filter`、`contact_id`、`occurred_at`）；openClaw job JSON（`cron add` 的所有字段）一律 camelCase（`staleAfter`、`nextCheckAt`、`maxRunsPerDay`、`activeWindow`、`eventType`）。cron service 订阅时把目录的 `stale_after` 带成 subscribe 参数 `staleAfter`，是同一个量的两种拼写，不是两个参数。
+- 事件类型：`group.noun_verb`，小写点号分组、下划线连词，如 `geofence.enter`、`phone.call_incoming`、`device.battery_low`。
 - 成对事件：`_on / _off`（开关类）、`_connected / _disconnected`（连接类）、`enter / exit`（围栏）、`locked / unlocked`、`plugged_in / plugged_out`。
 - 一次性变更：`_changed`，payload 带新值（必要时带 `previous`）。
 - 电话状态用 `call_incoming / call_outgoing / call_answered / call_ended / call_missed`（原稿 `call_received` 改为 `call_incoming`）。
