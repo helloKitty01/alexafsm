@@ -1,12 +1,12 @@
 # 02 · 事件目录（event catalog）规范与内建条目
 
-> 配套 `openClaw自动化任务方案.slides.v3.0.html` P7 / P10 与附录 A2 / A3 / A4。本文是目录的**完整文本版**：条目 schema、filter 语法、命名规则、10 组 63 条内建事件（含模型不可见的 internal 字段）。幻灯片只放分组总览，细节以本文为准。
+> 配套 `openClaw自动化任务方案.slides.v3.1.html` P7 / P11 与附录 A2 / A3 / A4。本文是目录的**完整文本版**：条目 schema、filter 语法、命名规则、10 组 63 条内建事件（含模型不可见的 internal 字段）。幻灯片只放分组总览，细节以本文为准。
 
 ## 1. 设计约束
 
 1. **模型只看目录的可见部分**：`type / group / desc / fields / must_filter / pair / state_query`。`rate / debounce / stale_after / sensitivity` 是 internal，cron service 在订阅时从目录取用，模型不写、不感知。
-2. **目录静态进 system prompt**：内建 63 条 + 已登记的派生条目，一行一条约 3–4K token，作为编译期 system prompt 的静态段（KV cache 前缀命中）。**没有 `event_catalog` 工具**（v3.0 删除）：派生条目数量有限，登记后同样静态注入；编译期 prompt 在会话开始时取目录快照。
-3. **filter 只做单事件布尔**：字段只能来自该条目的 `fields`；没有函数、时间、跨事件引用、state。时间窗归 `limits.activeWindow`；跨事件组合归 trigger + state（主稿 P10）。
+2. **目录静态进 system prompt**：内建 63 条 + 已登记的派生条目，一行一条约 3–4K token，作为编译期 system prompt 的静态段（KV cache 前缀命中）。**没有目录查询工具**：派生条目数量有限，登记后同样静态注入；编译期 prompt 在会话开始时取目录快照。
+3. **filter 只做单事件布尔**：字段只能来自该条目的 `fields`；没有函数、时间、跨事件引用、state。时间窗归 `limits.activeWindow`；跨事件组合归 trigger + state（主稿 P11）；绝对时间点作为 `sources[]` 里的时间源（`kind: at / every / cron`）与事件源混排，事件目录不参与。
 4. **事件中心不做 CEP**：目录 + 单事件 filter + at-least-once 推送，其余（trigger state、limits、nextCheckAt）都在 cron service。
 5. **`occurred_at` 不在 payload 里**：它是推送信封字段（`event_id / job_id / event_type / occurred_at / payload`），进 tick 时放在 `tick.event.occurred_at`。
 
@@ -87,7 +87,7 @@ literal  := 'string' | number | true | false | null
 
 ## 5. 唯一的只读查询工具 `phone.lookup`
 
-v3.0 把原来的四个解析工具（`contacts.search / apps.list / bluetooth.paired / places.list`）和 `phone_state.get` 合成一个工具，减少工具 schema 占用的 prompt，并让 trigger 脚本、判定 agent、动作 agentTurn 与主 loop 看到同一个名字。
+通讯录 / 应用 / 蓝牙设备 / 地点解析与手机即时状态查询合成一个只读工具，减少工具 schema 占用的 prompt，并让 trigger 脚本、判定 agent、动作 agentTurn 与主 loop 看到同一个名字。
 
 ```
 phone.lookup(kind, q?, fields?)
@@ -236,5 +236,5 @@ internal 额外字段：`latitude / longitude` 出现在推送 payload 中，但
 | payload 含 `occurred_at` | 移到推送信封 | 每条事件都有，不是 payload 语义 |
 | `notification.posted` 无约束 | `must_filter: package_name 或 category` | burst 级频率，裸订阅会淹没 job |
 | 无 internal | `rate / debounce / stale_after / sensitivity` | 订阅卫生参数从模型手里收回，由 cron service 按目录带上 |
-| `event_catalog` 工具 + 四个解析工具 + `phone_state.get`（v2.x） | 目录静态注入 + 一个 `phone.lookup(kind, …)`（v3.0） | 7 个工具的 schema 占 prompt；目录已静态可见，不需要查询工具 |
-| `state_query` 写 `phone_state.get(...)`（v2.x） | `phone.lookup(state, ...)`（v3.0） | 同上 |
+| 目录查询工具 + 四个解析工具 + `phone_state.get` | 目录静态注入 + 一个 `phone.lookup(kind, …)` | 7 个工具的 schema 占 prompt；目录已静态可见，不需要查询工具 |
+| `state_query` 写 `phone_state.get(...)` | `phone.lookup(state, ...)` | 同上 |

@@ -1,0 +1,1183 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>openClaw 自动化任务 v3.1：一个工具 · 一条路 · 五项新增</title>
+<style>
+  :root {
+    --bg: #e9eef6;
+    --slide-bg: linear-gradient(135deg, #ffffff 0%, #f8fbfe 55%, #f2f7fd 100%);
+    --card: #ffffff;
+    --line: #dfe6f0;
+    --text: #1e2a3d;
+    --muted: #5a6b84;
+    --accent: #2f6fed;
+    --green: #0ea578;
+    --warn: #d97a06;
+    --danger: #d0453c;
+    --purple: #7c5cd6;
+    --code-bg: #f3f6fb;
+    --code-text: #24405f;
+    --mono: "SF Mono", "JetBrains Mono", Consolas, "Courier New", monospace;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { background: var(--bg); }
+  body {
+    font-family: "PingFang SC", "Microsoft YaHei", "Noto Sans SC", -apple-system, sans-serif;
+    color: var(--text);
+    display: flex; flex-direction: column; align-items: center;
+    padding: 28px 16px; gap: 28px; min-height: 100vh;
+  }
+  .slide {
+    width: min(1280px, 96vw); aspect-ratio: 16 / 9;
+    background: var(--slide-bg); border: 1px solid var(--line); border-radius: 16px;
+    box-shadow: 0 18px 44px rgba(30,42,61,.14);
+    padding: 1.9% 2.6% 2.2%;
+    display: flex; flex-direction: column; overflow: hidden; position: relative;
+    font-size: clamp(11px, 1.12vw, 15px); line-height: 1.45;
+  }
+  .slide::before { content: ""; position: absolute; inset: 0 0 auto 0; height: 4px; background: linear-gradient(90deg, var(--accent), var(--green)); }
+  .pageno { position: absolute; right: 1.6em; bottom: .9em; font-family: var(--mono); font-size: .78em; color: var(--muted); }
+  .crumb { font-size: .74em; font-weight: 700; color: var(--accent); letter-spacing: .06em; margin-bottom: .15em; }
+  .crumb .ch { display: inline-block; background: rgba(47,111,237,.1); border-radius: 99px; padding: 0 .7em; margin-right: .6em; }
+  .crumb.c2 { color: var(--purple); } .crumb.c2 .ch { background: rgba(124,92,214,.1); }
+  .crumb.c3 { color: var(--green); } .crumb.c3 .ch { background: rgba(14,165,120,.1); }
+  .crumb.c4 { color: var(--warn); } .crumb.c4 .ch { background: rgba(217,122,6,.1); }
+  .crumb.c5 { color: var(--danger); } .crumb.c5 .ch { background: rgba(208,69,60,.1); }
+  .header { display: flex; align-items: baseline; justify-content: space-between; gap: 1.6em; margin-bottom: .75em; }
+  h1 { font-size: 1.5em; font-weight: 700; white-space: nowrap; letter-spacing: .01em; }
+  h1 .hl { color: var(--accent); }
+  .subtitle { color: var(--muted); font-size: .88em; line-height: 1.4; text-align: right; max-width: 58%; }
+  .subtitle strong { color: var(--text); }
+
+  code, .mono { font-family: var(--mono); font-size: .9em; background: var(--code-bg); color: var(--code-text); border: 1px solid #e4eaf3; padding: 0 .3em; border-radius: 4px; }
+  pre { font-family: var(--mono); font-size: .8em; line-height: 1.42; background: var(--code-bg); color: var(--code-text); border: 1px solid #e4eaf3; border-radius: 8px; padding: .6em .8em; white-space: pre-wrap; word-break: normal; overflow-wrap: break-word; }
+  pre .c { color: #7a8aa3; } pre .k { color: var(--accent); font-weight: 600; } pre .s { color: var(--green); }
+  pre .w { color: var(--warn); font-weight: 600; } pre .r { color: var(--danger); font-weight: 600; } pre .h { color: var(--purple); font-weight: 700; }
+
+  .cols { display: flex; gap: 1em; flex: 1; min-height: 0; }
+  .col { display: flex; flex-direction: column; gap: .8em; min-width: 0; min-height: 0; flex: 1; }
+
+  .panel { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: .75em .95em; box-shadow: 0 2px 8px rgba(30,42,61,.04); display: flex; flex-direction: column; min-height: 0; flex: 1 1 auto; }
+  .panel.fit { flex: 0 0 auto; }
+  .panel > h2 { font-size: 1em; font-weight: 700; margin-bottom: .5em; display: flex; align-items: baseline; gap: .55em; }
+  .panel > h2 .tag { flex: none; font-size: .72em; font-weight: 700; color: var(--accent); background: rgba(47,111,237,.08); border: 1px solid rgba(47,111,237,.3); border-radius: 99px; padding: .08em .65em; }
+  .tag.green { color: var(--green) !important; background: rgba(14,165,120,.08) !important; border-color: rgba(14,165,120,.3) !important; }
+  .tag.warn { color: var(--warn) !important; background: rgba(217,122,6,.08) !important; border-color: rgba(217,122,6,.3) !important; }
+  .tag.purple { color: var(--purple) !important; background: rgba(124,92,214,.08) !important; border-color: rgba(124,92,214,.3) !important; }
+  .tag.red { color: var(--danger) !important; background: rgba(208,69,60,.07) !important; border-color: rgba(208,69,60,.35) !important; }
+  .frame.dyn { border-left: 3px solid var(--warn); background: linear-gradient(90deg, rgba(217,122,6,.06), #fff 60%); }
+  .frame.ext { border-left: 3px solid var(--danger); }
+  .frame .who { float: right; font-family: var(--mono); font-size: .86em; color: var(--muted); }
+  pre .d { color: var(--warn); }
+  .legend { display: flex; gap: 1.2em; font-size: .8em; color: var(--muted); margin-top: .5em; }
+  .legend i { display: inline-block; width: .9em; height: .9em; border-radius: 3px; vertical-align: -.1em; margin-right: .35em; }
+  .legend i.fixed { background: rgba(47,111,237,.5); } .legend i.sugg { background: rgba(208,69,60,.5); }
+  td.sugg, .sugg-mark { color: var(--danger); font-weight: 700; white-space: nowrap; }
+  .panel ul { list-style: none; }
+  .panel li { color: var(--muted); font-size: .9em; line-height: 1.48; padding-left: 1em; position: relative; margin-bottom: .35em; }
+  .panel li::before { content: "•"; color: var(--accent); position: absolute; left: 0; }
+  .panel li strong, .panel p strong { color: var(--text); font-weight: 600; }
+  .panel p { color: var(--muted); font-size: .9em; line-height: 1.48; }
+  .panel > table { flex: 1 1 auto; }
+  .panel > table tr:first-child { height: 1px; }
+  .grow { flex: 1 1 auto; }
+
+  table { width: 100%; border-collapse: collapse; font-size: .88em; }
+  th, td { text-align: left; padding: .38em .6em; border-bottom: 1px solid #edf1f7; vertical-align: middle; line-height: 1.42; }
+  .pre-lg pre { font-size: .9em; }
+  th { color: var(--muted); font-size: .9em; font-weight: 700; background: #f6f9fd; white-space: nowrap; }
+  td { color: var(--muted); } td strong { color: var(--text); }
+  tr:last-child td { border-bottom: none; }
+  td.ok { color: var(--green); font-weight: 700; white-space: nowrap; }
+  td.no { color: var(--danger); font-weight: 700; }
+  td.new { color: var(--warn); font-weight: 700; white-space: nowrap; }
+  tr.hl td { background: rgba(47,111,237,.05); }
+  td.nw { white-space: nowrap; }
+
+  .callout { border-radius: 10px; padding: .55em .9em; font-size: .88em; line-height: 1.48; background: rgba(14,165,120,.07); border: 1px solid rgba(14,165,120,.35); color: var(--text); }
+  .callout.warn { background: #fdf7f0; border-color: rgba(217,122,6,.4); }
+  .callout.blue { background: rgba(47,111,237,.06); border-color: rgba(47,111,237,.35); }
+  .callout.red { background: #fdf3f2; border-color: rgba(208,69,60,.4); }
+  .callout b { color: var(--green); } .callout.warn b { color: var(--warn); } .callout.blue b { color: var(--accent); } .callout.red b { color: var(--danger); }
+
+  .reqs { display: grid; grid-template-columns: 1fr 1fr; grid-auto-rows: 1fr; gap: .7em; flex: 1; min-height: 0; }
+  .req { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: .6em .8em; min-width: 0; }
+  .req h3 { font-size: .95em; font-weight: 700; margin-bottom: .25em; }
+  .req h3 .no { color: var(--accent); font-family: var(--mono); margin-right: .45em; }
+  .req p { color: var(--muted); font-size: .84em; line-height: 1.45; }
+  .req p strong { color: var(--text); }
+  .req.key { border-color: rgba(47,111,237,.5); background: linear-gradient(180deg, rgba(47,111,237,.05), #fff 45%); }
+  .req.warnk { border-color: rgba(217,122,6,.5); background: linear-gradient(180deg, rgba(217,122,6,.05), #fff 45%); }
+
+  .flow { display: flex; align-items: stretch; gap: .5em; }
+  .flow .node { flex: 1; min-width: 0; background: #fff; border: 1px solid var(--line); border-radius: 8px; padding: .5em .65em; font-size: .86em; line-height: 1.42; color: var(--muted); align-content: center; }
+  .flow .node strong { color: var(--text); } .flow .node > strong:first-child { display: block; font-size: .98em; margin-bottom: .12em; }
+  .flow .node.hl { border-color: rgba(47,111,237,.55); background: linear-gradient(180deg, rgba(47,111,237,.06), #fff 50%); }
+  .flow .node.green { border-color: rgba(14,165,120,.55); background: linear-gradient(180deg, rgba(14,165,120,.06), #fff 50%); }
+  .flow .node.purpleb { border-color: rgba(124,92,214,.55); background: linear-gradient(180deg, rgba(124,92,214,.06), #fff 50%); }
+  .flow .node.warnb { border-color: rgba(217,122,6,.5); background: #fdf9f2; } .flow .node.warnb strong { color: var(--warn); }
+  .flow .arr { align-self: center; color: var(--accent); font-weight: 700; flex: none; }
+  .flow.vert { flex-direction: column; } .flow.vert .arr { align-self: center; transform: rotate(90deg); line-height: 1; }
+  .flow.vert.fill { flex: 1; min-height: 0; } .flow.vert.fill .node { flex: 1; }
+  .fill-even { flex: 1; justify-content: space-between; }
+  .stack.fill-even .frame { font-size: .9em; flex: 1; align-content: center; }
+  .steps.roomy { gap: .75em; } .steps.roomy .step { font-size: .92em; }
+
+  /* 架构分层图 */
+  .arch { display: flex; flex-direction: column; gap: .4em; flex: 1; min-height: 0; } .arch .box { font-size: .92em; }
+  .layer { display: flex; gap: .6em; align-items: stretch; flex: 1; }
+  .layer .lbl { flex: none; width: 10%; font-size: .82em; font-weight: 700; color: var(--muted); display: flex; align-items: center; justify-content: flex-end; text-align: right; padding-right: .5em; border-right: 2px solid var(--line); line-height: 1.3; }
+  .layer .boxes { flex: 1; display: flex; gap: .5em; min-width: 0; }
+  .box { flex: 1; min-width: 0; background: #fff; border: 1px solid var(--line); border-radius: 8px; padding: .45em .65em; font-size: .84em; line-height: 1.4; color: var(--muted); align-content: center; }
+  .box strong { color: var(--text); } .box > strong:first-child { display: block; font-size: .98em; margin-bottom: .1em; }
+  .box.a { border-color: rgba(47,111,237,.55); background: linear-gradient(180deg, rgba(47,111,237,.07), #fff 55%); }
+  .box.g { border-color: rgba(14,165,120,.55); background: linear-gradient(180deg, rgba(14,165,120,.07), #fff 55%); }
+  .box.p { border-color: rgba(124,92,214,.55); background: linear-gradient(180deg, rgba(124,92,214,.07), #fff 55%); }
+  .box.w { border-color: rgba(217,122,6,.5); background: #fdf9f2; } .box.w strong { color: var(--warn); }
+  .box.dim { opacity: .7; border-style: dashed; }
+  .badge { display: inline-block; font-size: .74em; font-weight: 700; border-radius: 99px; padding: 0 .55em; margin-left: .35em; vertical-align: middle; }
+  .badge.native { color: var(--purple); background: rgba(124,92,214,.1); }
+  .badge.new { color: var(--warn); background: rgba(217,122,6,.12); }
+  .badge.ext { color: var(--green); background: rgba(14,165,120,.1); }
+  .arrow-row { display: flex; color: var(--accent); font-weight: 700; font-size: .82em; line-height: 1; }
+  .arrow-row span:first-child { flex: none; width: 10%; }
+  .arrow-row span:not(:first-child) { flex: 1; text-align: center; }
+
+  .steps { display: flex; flex-direction: column; gap: .45em; }
+  .step { display: flex; gap: .65em; align-items: flex-start; font-size: .88em; line-height: 1.45; color: var(--muted); }
+  .step .n { flex: none; width: 1.7em; height: 1.7em; border-radius: 50%; background: var(--accent); color: #fff; font-family: var(--mono); font-weight: 700; font-size: .85em; display: flex; align-items: center; justify-content: center; margin-top: .1em; }
+  .step .n.g { background: var(--green); } .step .n.w { background: var(--warn); }
+  .step strong { color: var(--text); }
+
+  .chat { display: flex; flex-direction: column; gap: .45em; }
+  .bubble { max-width: 92%; border-radius: 10px; padding: .45em .8em; font-size: .86em; line-height: 1.42; }
+  .bubble.user { align-self: flex-end; background: linear-gradient(135deg, #2f6fed, #4a84f2); color: #fff; border-bottom-right-radius: 3px; }
+  .bubble.agent { align-self: flex-start; background: var(--code-bg); color: var(--text); border: 1px solid var(--line); border-bottom-left-radius: 3px; }
+
+  .stack { display: flex; flex-direction: column; gap: .4em; }
+  .frame { border: 1px solid var(--line); border-radius: 8px; padding: .45em .7em; font-size: .84em; line-height: 1.42; color: var(--muted); background: #fff; }
+  .frame strong { color: var(--text); }
+  .frame.sys { border-left: 3px solid var(--purple); } .frame.tools { border-left: 3px solid var(--muted); }
+  .frame.none { border-left: 3px solid var(--danger); border-style: dashed; opacity: .85; }
+  .frame.user { border-left: 3px solid var(--accent); background: linear-gradient(90deg, rgba(47,111,237,.05), #fff 60%); }
+  .frame .sz { float: right; font-family: var(--mono); font-size: .9em; color: var(--green); }
+
+  /* 目录页 */
+  .cover { justify-content: center; }
+  .cover .title { font-size: 2.3em; font-weight: 800; letter-spacing: .01em; line-height: 1.2; }
+  .cover .title .hl { color: var(--accent); }
+  .cover .lead { color: var(--muted); font-size: 1.05em; margin: .5em 0 1.3em; line-height: 1.5; }
+  .toc { display: grid; grid-template-columns: repeat(5, 1fr); gap: .8em; }
+  .toc .ch { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: .8em .9em; border-top: 4px solid var(--accent); }
+  .toc .ch.c2 { border-top-color: var(--purple); } .toc .ch.c3 { border-top-color: var(--green); } .toc .ch.c4 { border-top-color: var(--warn); } .toc .ch.c5 { border-top-color: var(--danger); }
+  .toc .ch h3 { font-size: 1.05em; font-weight: 700; margin-bottom: .1em; }
+  .toc .ch .pg { font-family: var(--mono); font-size: .78em; color: var(--muted); margin-bottom: .55em; }
+  .toc .ch ul { list-style: none; }
+  .toc .ch li { font-size: .86em; color: var(--muted); line-height: 1.45; padding-left: 2.7em; position: relative; margin-bottom: .2em; list-style: none; }
+  .toc .ch li b { position: absolute; left: 0; font-family: var(--mono); color: var(--text); font-weight: 600; }
+  .route { display: flex; gap: .9em; margin-top: 1.1em; }
+  .route .r { flex: 1; font-size: .86em; color: var(--muted); background: rgba(47,111,237,.05); border: 1px solid rgba(47,111,237,.25); border-radius: 10px; padding: .55em .9em; }
+  .route .r b { color: var(--accent); }
+</style>
+</head>
+<body>
+<!-- ═══════════ P1 目录 ═══════════ -->
+<section class="slide cover">
+  <div class="title">openClaw 自动化任务 <span class="hl">v3.1</span><br>一个工具 · 一条路 · 五项新增</div>
+  <p class="lead">把 openClaw 的定时任务扩展为统一的自动化任务：<strong>时间</strong>到点、<strong>事件</strong>到达、<strong>脚本</strong>判定、<strong>模型</strong>判定，全部汇入 cron service 同一条执行路径。前提：存在统一事件中心（EventHub，订阅即推送、单事件 filter、publish 接口）；openClaw 可改源码。<br>方案只做<strong>五项新增</strong>、<strong>三个新工具</strong>，字段集一页写完；一条路 <code>tick → trigger → fire → limits → run</code>，三道门各答一个问题；判定者 <code>script</code> 与 <code>agent</code> 是同一契约下的两个正式选项——有结构化数据源默认脚本（零 token），看图 / 读页面 / 语义判断选模型，十二个场景里只有 S7 必须选模型；<strong>六件事拍板</strong>（fire 语义、脚本边界、预授权分期、ask_user 路径、事件入口、窗外 tick）。主稿 17 页讲清逻辑与每个场景，规格细节在<strong>附录</strong>（另一份）。</p>
+  <div class="toc">
+    <div class="ch"><h3>① 总体</h3><div class="pg">P2 – P4</div>
+      <ul><li><b>P2</b>十二个场景：谁叫醒、谁判定</li><li><b>P3</b>一页看懂：整体架构</li><li><b>P4</b>原生复用 vs 五项新增</li></ul></div>
+    <div class="ch c2"><h3>② 核心模型</h3><div class="pg">P5 – P12</div>
+      <ul><li><b>P5</b>一条路 · 三道门 · 名词</li><li><b>P6</b>最小字段集</li><li><b>P7</b>事件源：规格 · 入口 · 订阅</li><li><b>P8</b>trigger：脚本与模型同一契约</li><li><b>P9</b>agent 判定的完整形态</li><li><b>P10</b>limits 与 nextCheckAt</li><li><b>P11</b>组合条件：一种写法</li><li><b>P12</b>派生事件：只差 payload</li></ul></div>
+    <div class="ch c3"><h3>③ 编译与执行</h3><div class="pg">P13 – P14</div>
+      <ul><li><b>P13</b>编译：从一句话到 cron add</li><li><b>P14</b>执行：session · 工具面 · 信封</li></ul></div>
+    <div class="ch c4"><h3>④ 验证与拍板</h3><div class="pg">P15 – P17</div>
+      <ul><li><b>P15</b>十二场景全表</li><li><b>P16</b>时序：S3 到家开灯</li><li><b>P17</b>六项拍板 · 可靠性 · 分期 · 待核实</li></ul></div>
+    <div class="ch c5"><h3>附录（另一份）</h3><div class="pg">A1 – A10</div>
+      <ul><li><b>A2</b>事件目录 10 组 63 条</li><li><b>A3</b>filter 语法与校验</li><li><b>A4</b>编译模板三套</li><li><b>A5</b>时序 ②：派生事件接力</li><li><b>A6–A8</b>模型视角：地图 · 判定 · 动作</li><li><b>A9</b>事件入口传输四选一</li><li><b>A10</b>S7 完整 job：agent 判定示例</li></ul></div>
+  </div>
+  <div class="route">
+    <div class="r"><b>只看结论：</b>P3 架构 → P17 拍板与分期</div>
+    <div class="r"><b>要评审方案：</b>P2 → P5 一条路 → P6 字段 → P15 全表</div>
+    <div class="r"><b>要做实现：</b>P4 新增清单 → P6–P10 规格 → P17 待核实 → 附录 A2 / A3</div>
+    <div class="r"><b>要核对场景：</b>P2 归类 → P10 / P11 脚本 → P15 全表 → P16 时序</div>
+  </div>
+  <span class="pageno">1 / 17</span>
+</section>
+
+<!-- ═══════════ P2 十二个场景 ═══════════ -->
+<section class="slide">
+  <div class="crumb"><span class="ch">① 总体</span>场景</div>
+  <div class="header">
+    <h1>十二个场景：<span class="hl">谁叫醒、谁判定</span>——只有 S7 必须选模型</h1>
+    <p class="subtitle">"什么时候"决定叫醒源，"条件是什么"决定判定者。数值 / 字段规则默认脚本；<strong>看图、读页面、语义判断</strong>选模型，两者可行时按用户偏好</p>
+  </div>
+  <div class="cols">
+    <div class="col" style="flex: 0 0 58%;">
+      <div class="panel">
+        <h2><span class="tag">场景归类</span>用户原话 → 叫醒源 → 判定者</h2>
+        <table style="font-size:.78em;">
+          <tr><th>#</th><th>用户原话</th><th>叫醒源</th><th>判定者</th><th>过模型</th></tr>
+          <tr><td>S1</td><td><strong>每天早上 9 点</strong>帮我干 xxx</td><td><code>cron</code></td><td>—</td><td class="ok">否</td></tr>
+          <tr><td>S2</td><td><strong>明天下雨</strong>的时候帮我干 xxx</td><td><code>cron 20:00</code></td><td>script 查预报</td><td class="ok">否</td></tr>
+          <tr><td>S3</td><td><strong>到家</strong>的时候帮我干 xxx</td><td><code>event geofence.enter</code></td><td>—</td><td class="ok">否</td></tr>
+          <tr><td>S4</td><td>收到 <strong>xxx 的电话</strong>时帮我 xxx</td><td><code>event phone.call_incoming</code></td><td>—</td><td class="ok">否</td></tr>
+          <tr><td>S5</td><td><strong>火车放票</strong>时帮我抢票</td><td><code>at</code> 放票前 30s</td><td>—（编译期问清车次）</td><td class="ok">否</td></tr>
+          <tr><td>S6</td><td>股票<strong>跌 10% 卖一半，跌 30% 清仓</strong></td><td><code>every 1m</code></td><td>script 查行情，跃迁 fire（可选 agent）</td><td class="ok">否</td></tr>
+          <tr class="hl"><td>S7</td><td>狗<strong>上沙发就驱赶，5 分钟仍在</strong>则通知</td><td><code>every 30s</code></td><td><strong>agent 看快照</strong>（script 门：有运动）</td><td class="no">是</td></tr>
+          <tr><td>S8</td><td><strong>开售后买卧铺，没买到继续盯</strong></td><td><code>every 30s</code></td><td>script 查余票 <strong>或</strong> agent 读页</td><td>可选</td></tr>
+          <tr><td>S9</td><td><strong>曼联持续领先 30 分钟</strong>通知张三</td><td><code>every 1m</code> + self</td><td>script 查比分 + nextCheckAt <strong>或</strong> agent</td><td>可选</td></tr>
+          <tr><td>S10</td><td><strong>到家且电量 &lt; 20%</strong> 提醒充电</td><td><code>event geofence.enter</code></td><td>script 查 <code>phone.lookup(state)</code></td><td class="ok">否</td></tr>
+          <tr><td>S11</td><td><strong>到家后 10 分钟内来电</strong>，提醒可能是快递</td><td><code>event</code> ×2</td><td>script，state 记 a_at</td><td class="ok">否</td></tr>
+          <tr><td>S12</td><td><strong>离开公司 1 小时没到家</strong>，通知家人</td><td><code>event</code> ×2 + self</td><td>script，state 记 deadline + nextCheckAt</td><td class="ok">否</td></tr>
+        </table>
+      </div>
+    </div>
+    <div class="col">
+      <div class="reqs">
+        <div class="req key"><h3><span class="no">G1</span>一个任务工具，一张表</h3><p>模型只面对原生 <code>cron</code> 工具；job 表就是任务表。事件是 <strong>schedule 的一种 kind</strong>，模型判定是 <strong>trigger 的一种 kind</strong>；另加 3 个小工具（P4）。</p></div>
+        <div class="req key"><h3><span class="no">G2</span>判定默认是脚本，模型是可选项</h3><p>时间到 / 事件到 / 脚本命中零 token。有结构化数据源默认 <code>trigger.script</code>；<strong>看图、读页面、语义判断</strong>选 <code>trigger.agent</code>——同一契约，只读、有前置脚本门、有预算（P9）。</p></div>
+        <div class="req key"><h3><span class="no">G3</span>运行上下文 = 冻结的任务定义</h3><p>执行 Agent 拿到<strong>系统身份 + 触发事实 + 创建时冻结的任务</strong>，不读主对话历史（P14）。</p></div>
+        <div class="req"><h3><span class="no">G4</span>filter 归事件中心，判定与限额归 cron service</h3><p>事件中心只做目录 + 单事件 <code>filter</code> + 推送，不做 CEP；trigger state、<code>limits</code>、<code>nextCheckAt</code> 全在 cron service（P5）。</p></div>
+        <div class="req"><h3><span class="no">G5</span>派生事件是资产</h3><p>判定结果要给别人用时，payload 改成 <code>event_publish</code>，事件登进目录，谁要谁订（P12）。</p></div>
+        <div class="req warnk"><h3><span class="no">G6</span>高危动作分期放开</h3><p>支付永远 <code>ask_user</code>。卖出 / 对外发送：<strong>一期 ask_user</strong>，二期做 toolsAllow 参数级约束后按创建期确认范围免确认（P17 D3）。</p></div>
+      </div>
+    </div>
+  </div>
+  <span class="pageno">2 / 17</span>
+</section>
+
+<!-- ═══════════ P3 整体架构 ═══════════ -->
+<section class="slide">
+  <div class="crumb"><span class="ch">① 总体</span>一页看懂</div>
+  <div class="header">
+    <h1><span class="hl">整体架构</span>：cron service 是唯一中枢，所有叫醒源汇入同一条路</h1>
+    <p class="subtitle"><span class="badge native">原生</span> 复用不改　<span class="badge new">新增</span> 本方案五项　<span class="badge ext">外部</span> 事件中心</p>
+  </div>
+  <div class="arch">
+    <div class="layer" style="flex:1.1;">
+      <div class="lbl">对话层<br>（LLM）</div>
+      <div class="boxes">
+        <div class="box a"><strong>主 loop<span class="badge native">原生</span></strong>委托型请求 → 事件目录（内建 + 派生）静态在 system prompt → <code>phone.lookup</code> 填槽 → 编译 schedule / trigger / limits / <strong>payload.message 三段</strong> → 一句话回读 → <code>cron add</code>，到此为止</div>
+        <div class="box a" style="flex:.75;"><strong><code>cron</code> 工具<span class="badge native">原生</span></strong>唯一任务入口：add / update / remove / list / runs / run；<code>schedule.event</code>、<code>trigger.agent</code>、<code>limits</code> 是新增字段</div>
+        <div class="box w" style="flex:.85;"><strong>phone.lookup<span class="badge new">新增</span></strong>唯一新查询工具：contacts / apps / bluetooth / places / state</div>
+      </div>
+    </div>
+    <div class="arrow-row"><span></span><span>▼ RPC cron.add / update / remove</span></div>
+    <div class="layer" style="flex:.8;">
+      <div class="lbl">中枢<br>（非 LLM）</div>
+      <div class="boxes">
+        <div class="box p"><strong>cron service · job 表<span class="badge native">原生</span></strong>SQLite：job 定义 · trigger state · runs · delivery · failureAlert。<strong>job 表 = 任务表</strong>。新增：<code>subscription_ids[]</code> 列、<strong>limits 限额器</strong>、<code>nextCheckAt</code> 定时器、统一入口 <code>onTick(jobId, tick)</code></div>
+      </div>
+    </div>
+    <div class="arrow-row"><span></span><span>▼ 时间到点</span><span>▼ 事件到达</span><span>▼ nextCheckAt 到期（self）</span></div>
+    <div class="layer" style="flex:1.5;">
+      <div class="lbl">叫醒 →<br>判定</div>
+      <div class="boxes">
+        <div class="box p" style="flex:.7;"><strong>时间调度<span class="badge native">原生</span></strong>at / every / cron 到点 → tick；也可作为 sources[] 的一项与事件源混排</div>
+        <div class="box w" style="flex:1.2;"><strong>事件中心适配器<span class="badge new">新增 ①</span></strong>add → 按 sources[] 订阅（filter + 目录默认 debounce / staleAfter）；remove → 退订；收推送 → 去重 → 过期 → 回 200 → tick</div>
+        <div class="box p"><strong>脚本 checker<span class="badge native">原生</span></strong><code>trigger.script</code> 收 tick，返回 <code>{fire, message, state, nextCheckAt?}</code>；组合、时序、阈值跃迁都在这里用 state 写</div>
+        <div class="box w"><strong>模型 checker<span class="badge new">新增 ④</span></strong><code>trigger.agent</code>：只读 isolated agentTurn，<code>trigger_result</code> 唯一出口，同一契约；前置 script 门为真才起，可选 postScript 收口</div>
+        <div class="box g" style="flex:.8;"><strong>事件中心<span class="badge ext">外部</span></strong>目录 · 订阅表 · 单事件 filter · at-least-once 投递 · publish。<strong>不做 CEP</strong></div>
+      </div>
+    </div>
+    <div class="arrow-row"><span></span><span>▼ fire → <strong>limits</strong>（activeWindow / cooldown / maxRunsPerDay / maxRunsTotal）→ 同一段 runJob：拼五块信封 → isolated agentTurn → delivery → run 状态</span></div>
+    <div class="layer" style="flex:1;">
+      <div class="lbl">执行层</div>
+      <div class="boxes">
+        <div class="box a"><strong>agentTurn · isolated<span class="badge native">原生</span></strong>system prompt（可 lightContext）+ 工具（toolsAllow）+ <strong>user message = 五块信封</strong>；高危动作 <code>ask_user</code> → run waiting</div>
+        <div class="box dim" style="flex:.8;"><strong>交付<span class="badge native">原生</span></strong>announce → 渠道 + 主 session 摘要；none；失败 → failureAlert</div>
+        <div class="box dim" style="flex:.6;"><strong>记录<span class="badge native">原生</span></strong>runs 历史 · <code>last_run_summary</code> 一行</div>
+      </div>
+    </div>
+  </div>
+  <span class="pageno">3 / 17</span>
+</section>
+
+<!-- ═══════════ P4 原生复用 vs 五项新增 ═══════════ -->
+<section class="slide">
+  <div class="crumb"><span class="ch">① 总体</span>复用与新增</div>
+  <div class="header">
+    <h1>原生 <span class="hl"><code>cron</code></span> 全部复用，新增只有<span class="hl">五项</span>、三个工具</h1>
+    <p class="subtitle">来源：<code>cron-tool.ts</code> 工具描述 + Scheduled tasks 文档。原生已有 <strong>schedule / trigger.script / payload / session / delivery / runs</strong>，本方案在两处各加一个 kind、加一组 limits、一个适配器</p>
+  </div>
+  <div class="cols">
+    <div class="col" style="flex:1.15;">
+      <div class="panel fit">
+        <h2><span class="tag">层级</span>"cron" 既是工具名又是一种 schedule kind</h2>
+<pre style="font-size:.76em;">工具 <span class="h">cron</span>（显示名 Automations）                        <span class="c">← 模型看到的唯一任务工具</span>
+ └ action: status | list | get | <span class="k">add</span> | update | remove | run | runs
+    └ add 的参数 job:
+       ├ <span class="k">schedule</span> = 单源简写 {kind: at|every|<span class="h">cron</span>|stream}
+       │            | <span class="w">通用 {sources:[{kind: at|every|cron|event(新增)}…]}</span> <span class="c">← 谁叫醒</span>
+       ├ <span class="k">trigger.kind</span>  ∈ { script | <span class="w">agent(新增)</span> }                <span class="c">← 谁判定；可选</span>
+       ├ <span class="w">limits(新增)</span>  { activeWindow · cooldown · maxRuns… }      <span class="c">← 此刻该不该跑</span>
+       ├ <span class="k">payload.kind</span>  ∈ { agentTurn | script | systemEvent }       <span class="c">← 跑什么</span>
+       ├ sessionTarget ∈ { isolated | main | session:&lt;id&gt; | current } <span class="c">← 在哪跑</span>
+       └ delivery · contextMessages · enabled</pre>
+      </div>
+      <div class="panel">
+        <h2><span class="tag purple">原生复用清单</span>一行不改</h2>
+        <table style="font-size:.8em;">
+          <tr><th style="width:28%;">能力</th><th>本方案怎么用</th></tr>
+          <tr><td><strong>at / every / cron</strong></td><td>时间叫醒源；<code>at</code> 跑完自删（S5）；<code>cron run --force</code> 做"试一下"</td></tr>
+          <tr><td><strong>trigger.script</strong> 契约</td><td><code>{fire, message, state}</code> 原样沿用，只多一个可选 <code>nextCheckAt</code>；state 持久化在 job 表</td></tr>
+          <tr><td><strong>payload 三种</strong></td><td>agentTurn 是统一动作形态；script 用于 publish 派生事件；systemEvent 只给 main 提醒</td></tr>
+          <tr><td><strong>runs / 状态机</strong></td><td>queued → running → waiting（ask_user）→ ok / error / skipped；重试、退避、maxConcurrentRuns、watchdog</td></tr>
+          <tr><td><strong>delivery / failureAlert</strong></td><td>announce = 渠道 + 主 session 摘要；none；失败必告警</td></tr>
+          <tr><td><strong>运行中权限</strong></td><td>自动化 run 只能对自己 status / get / runs / <strong>remove</strong>——S6 / S8 "完成后自删"靠它</td></tr>
+        </table>
+      </div>
+    </div>
+    <div class="col">
+      <div class="panel">
+        <h2><span class="tag warn">五项新增</span>全部在 cron service 与主 loop prompt 里</h2>
+        <table style="font-size:.7em;">
+          <tr><th>#</th><th>新增</th><th>内容</th><th style="width:12%;">页</th></tr>
+          <tr><td>①</td><td class="nw"><strong>sources[] + 事件适配器</strong></td><td><code>schedule.sources[]</code> 1..n，每项 kind ∈ at / every / cron / <code>event</code>；event 项 add / remove 时订阅 / 退订；入口去重、过期、回 200、转 tick</td><td>P7</td></tr>
+          <tr><td>②</td><td class="nw"><strong>tick + nextCheckAt</strong></td><td>三种叫醒统一成 tick 进 <code>onTick</code>；trigger 可返回 <code>nextCheckAt</code>，到点造 self tick</td><td>P10</td></tr>
+          <tr><td>③</td><td class="nw"><strong>limits 限额器</strong></td><td>fire 与 run 之间：activeWindow / cooldown / maxRunsPerDay / maxRunsTotal / maxChecksPerDay</td><td>P10</td></tr>
+          <tr><td>④</td><td class="nw"><strong>trigger.agent</strong></td><td>只读 isolated agentTurn 当判定者，<code>trigger_result</code> 收口，失败不算 fire；前置 script 门 + 可选 postScript</td><td>P8 / P9</td></tr>
+          <tr><td>⑤</td><td class="nw"><strong>编译期支撑</strong></td><td>目录（内建 + 派生）静态进 prompt；<code>phone.lookup</code>；<code>event_publish</code> + publishes 登记；三套模板</td><td>P13</td></tr>
+        </table>
+      </div>
+      <div class="panel fit">
+        <h2><span class="tag warn">三个新工具</span>各只对一种上下文可见</h2>
+        <table style="font-size:.68em;">
+          <tr><th>工具</th><th>谁可见</th><th>做什么</th></tr>
+          <tr><td class="nw"><code>phone.lookup(kind, q)</code></td><td>主 loop · trigger script · 判定 agent · 动作</td><td>只读：显示名 → key（contacts / apps / bluetooth / places）；<code>state</code> 读现况</td></tr>
+          <tr><td class="nw"><code>event_publish(type, payload)</code></td><td>payload script；动作 agentTurn 按 toolsAllow，默认关</td><td>发派生事件；配 <code>publishes</code> 登记目录</td></tr>
+          <tr><td class="nw"><code>trigger_result({…})</code></td><td>仅判定 agent</td><td>唯一合法结束方式</td></tr>
+        </table>
+      </div>
+      <div class="callout warn" style="font-size:.78em;"><b>取舍原则：</b>每个机制都要能指出"没有它哪个场景跑不通"，指不出就不进字段集；不做 CEP、不加第二个任务工具、不让模型写订阅卫生参数；模板只有例子没有编号；判定动作一体的写法只用于离线验 prompt，不作方案项。</div>
+    </div>
+  </div>
+  <span class="pageno">4 / 17</span>
+</section>
+
+<!-- ═══════════ P5 一条路 · 三道门 · 名词 ═══════════ -->
+<section class="slide">
+  <div class="crumb c2"><span class="ch">② 核心模型</span>一条路 · 名词</div>
+  <div class="header">
+    <h1>一条路：<span class="hl">tick → trigger → fire → limits → run</span>，三道门各答一个问题</h1>
+    <p class="subtitle">后面每一页只用这九个词。<strong>fire 不是"条件为真"</strong>，是"trigger 认为现在需要执行一次 payload"</p>
+  </div>
+  <div class="panel fit">
+    <h2><span class="tag purple">一条路</span>叫醒源不同，后面完全相同；<code>filter</code> 站在路口之前、事件中心那一侧</h2>
+    <div class="flow" style="gap:.4em;">
+      <div class="node green" style="flex:1.05;"><strong>filter <span style="font-weight:400;color:var(--muted);">· 事件中心</span></strong>这件事值不值得叫醒我？<br><code>zone == 'home'</code>，不过就不推</div><div class="arr">⇢</div>
+      <div class="node purpleb"><strong>tick <span style="font-weight:400;color:var(--muted);">· cron service</span></strong>叫醒：到点 / 事件到达 / 自设闹钟到期</div><div class="arr">→</div>
+      <div class="node purpleb"><strong>trigger</strong>现在需要动作吗？可选；无 trigger 则 tick 即 fire</div><div class="arr">→</div>
+      <div class="node hl"><strong>fire</strong>"需要执行一次 payload"；message 写跃迁名</div><div class="arr">→</div>
+      <div class="node warnb"><strong>limits</strong>此刻该不该跑？时段 / 冷却 / 每日 / 总次数</div><div class="arr">→</div>
+      <div class="node hl"><strong>run</strong>跑什么：payload（agentTurn / script / systemEvent）</div>
+    </div>
+  </div>
+  <div class="panel" style="margin-top:.45em; padding-top:.5em; padding-bottom:.5em;">
+    <h2><span class="tag">名词表</span>定义 · 回答的问题 · 谁负责 · 在 <code>cron add</code> 的哪个字段</h2>
+    <table style="font-size:.7em;">
+      <tr><th style="width:9%;">名词</th><th>一句话定义</th><th style="width:14%;">回答的问题</th><th style="width:11%;">归属</th><th style="width:22%;">出现在</th></tr>
+      <tr><td class="nw"><strong>tick</strong></td><td>job 被叫醒、给 trigger 一次判定机会的最小单位。三种来源：时间到点（at / every / cron）、订阅事件到达（event）、自设闹钟到期（self）</td><td>谁、何时叫醒我</td><td class="nw">cron service</td><td><code>tick = {source, event?, now}</code>，trigger 的输入</td></tr>
+      <tr><td class="nw"><strong>trigger</strong></td><td>拿到 tick 后判定"现在是否需要动作"的一层，可选。script 由 checker 跑，agent 由判定模型跑；同一契约。<strong>负责检测跃迁</strong>（进入阈值、上 / 下沙发、到点仍领先）</td><td>需要动作吗</td><td class="nw">checker / 判定模型</td><td><code>trigger.kind</code>，返回 <code>{fire, message, state, nextCheckAt?}</code></td></tr>
+      <tr class="hl"><td class="nw"><strong>fire</strong></td><td>trigger 返回 <code>fire:true</code>（无 trigger 时 = tick 到达）。含义是"需要跑一次 payload"，<code>message</code> 写<strong>跃迁名</strong>（不是动作名）；还要过 limits 才 run</td><td>要动了</td><td class="nw">cron service</td><td>内部状态；runs 里记为 fired / skipped</td></tr>
+      <tr><td class="nw"><strong>limits</strong></td><td>fire 之后、run 之前的 job 级闸门。四种叫醒源共用，用户明说才写</td><td>此刻该不该跑</td><td class="nw">cron service</td><td><code>limits {…}</code>（P10）</td></tr>
+      <tr><td class="nw"><strong>run</strong></td><td>通过 limits 后真正执行 payload 一次；有 run 记录、delivery、failureAlert</td><td>跑什么、在哪跑</td><td class="nw">cron service → 会话</td><td><code>payload</code> · <code>sessionTarget</code> · <code>toolsAllow</code></td></tr>
+      <tr><td class="nw"><strong>filter</strong></td><td>单事件布尔表达式，只引用目录 <code>fields</code>，在事件中心侧评估；不过就不推</td><td>值不值得叫醒我</td><td class="nw">事件中心</td><td><code>sources[].filter</code>（附录 A3）</td></tr>
+      <tr><td class="nw"><strong>nextCheckAt</strong></td><td>trigger 自设的一次 self tick 时刻。<strong>只加一个 tick，不减任何 tick</strong>；新值覆盖旧值，清空即作废</td><td>下次何时再看</td><td class="nw">cron service</td><td>trigger 返回值（P10）</td></tr>
+      <tr><td class="nw"><strong>state</strong></td><td>trigger 的跨 tick 记忆（阶段、时间戳、基线），≤16KB；<code>stateSchema</code> 可选，声明结构供 checker 校验</td><td>上次看到什么</td><td class="nw">cron service 存</td><td><code>trigger.state</code> 初值 · 返回值 <code>state</code></td></tr>
+      <tr><td class="nw"><strong>派生事件</strong></td><td>某条 job 的 payload 调 <code>event_publish</code> 发布、登进目录的事件；与内建事件同构</td><td>结果给谁用</td><td class="nw">事件中心</td><td><code>payload.kind="script"</code> + <code>publishes</code>（P12）</td></tr>
+    </table>
+  </div>
+  <div class="cols" style="flex:0 0 auto; margin-top:.4em; font-size:.84em;">
+    <div class="callout blue" style="flex:1.25;"><b>fire 的定义（拍板 D1）：</b>S6 "跌 10% 卖一半、跌 30% 清仓"是两次不同动作，S7 "下沙发停声"里条件是变假。若 fire = 条件为真，两个场景都要两条 job；若 fire = 需要动作，trigger 检测跃迁、message 写跃迁名（<code>stage_1 / stage_2</code>、<code>entered_sofa / still_on_sofa_5m / left_sofa</code>），跃迁 → 动作的映射写在 payload.message 策略段，一条 job 就够。</div>
+    <div class="callout" style="flex:1;"><b>三道门不重叠：</b>filter 管事件"是不是我要的"（事件级），trigger 管"需不需要动"（条件级，有 state），limits 管"此刻该不该跑"（job 级）。凡 filter 写不了的不扩 filter，分别归 trigger 与 limits。</div>
+  </div>
+  <span class="pageno">5 / 17</span>
+</section>
+
+<!-- ═══════════ P6 最小字段集 ═══════════ -->
+<section class="slide">
+  <div class="crumb c2"><span class="ch">② 核心模型</span>字段集</div>
+  <div class="header">
+    <h1><span class="hl">最小字段集</span>：一页写完，全部场景只用这些</h1>
+    <p class="subtitle">加粗 = 新增。除 <code>schedule</code> / <code>payload</code> / <code>sessionTarget</code> / <code>delivery</code> 外全部可选；<strong>limits 只在用户明说时写</strong>；debounce / staleAfter 模型不写</p>
+  </div>
+  <div class="cols">
+    <div class="col" style="flex:1.25;">
+      <div class="panel">
+        <h2><span class="tag">cron add 的 job</span>注释里是取值与归属</h2>
+<pre style="font-size:.74em;">{
+  <span class="k">"schedule"</span>: { "kind": "at | every | cron", … }        <span class="c">// 单一时间源的简写（原生）</span>
+            | { <span class="w">"sources"</span>: [                        <span class="c">// 通用形式；1..n，时间与事件可混排</span>
+                { "kind": "<span class="w">event</span>", "eventType": "geofence.enter", "filter": "zone == 'home'" },
+                { "kind": "<span class="w">event</span>", "eventType": "phone.call_incoming" },
+                { "kind": "cron", "expr": "0 20 * * *" } ] },
+  <span class="k">"trigger"</span>:  { "kind": "script | <span class="w">agent</span>",
+                "script": "…",            <span class="c">// script 必填；agent 时可选 = 零 token 前置门</span>
+                <span class="w">"prompt"</span>: "…",            <span class="c">// agent 必填，三段模板（附录 A4）</span>
+                <span class="w">"postScript"</span>: "…",        <span class="c">// agent 可选：收 trigger_result 算计时 / 计数（P9）</span>
+                "state": {}, <span class="w">"stateSchema"</span>: {},   <span class="c">// 初值 · 可选结构校验</span>
+                "toolsAllow": ["sports_api"] },   <span class="c">// 判定只读工具面</span>
+  <span class="w">"limits"</span>:   { "activeWindow": "18:00-23:00 Asia/Shanghai",
+                "cooldown": "2h", "maxRunsPerDay": 1, "maxRunsTotal": 1,
+                "maxChecksPerDay": 200 },      <span class="c">// 全部可选；最后一项只对 agent 有意义</span>
+  <span class="k">"payload"</span>:  { "kind": "agentTurn | script | systemEvent",
+                "message": "## 任务\n用户原话：…\n编译补充：…\n策略：…",
+                "toolsAllow": ["homekit", "music"],
+                <span class="w">"publishes"</span>: { "type": "…", "fields": [] } },  <span class="c">// 仅 script 发派生事件时</span>
+  "sessionTarget": "isolated",                <span class="c">// 默认；main 只给 systemEvent</span>
+  "delivery": { "mode": "announce | none" },  <span class="c">// 可能 ask_user 的 job 强制 announce（D4）</span>
+  "contextMessages": 3 }
+
+<span class="c">// trigger 契约（script 与 agent 相同）</span>
+trigger(<span class="k">tick</span>, state) → { <span class="k">fire</span>, message, state, <span class="w">nextCheckAt?</span> }
+tick = { source: { kind: "time" | "event" | "self", index?, eventType? }, event?: {…}, now }</pre>
+      </div>
+    </div>
+    <div class="col">
+      <div class="panel">
+        <h2><span class="tag purple">逐字段</span>谁写 · 何时写</h2>
+        <table style="font-size:.75em;">
+          <tr><th>字段</th><th>谁写</th><th>何时写</th></tr>
+          <tr><td><code>schedule.kind</code></td><td>模型</td><td>只有一个时间源时的简写：at / every / cron</td></tr>
+          <tr class="hl"><td><code>sources[]</code></td><td>模型</td><td>通用形式，每项 kind ∈ at / every / cron / event；有事件源、或"或 / 之后 / 没有 / 到点还没"涉及第二个源时用</td></tr>
+          <tr><td><code>sources[].filter</code></td><td>模型</td><td>只比较目录 fields；must_filter 字段必须约束</td></tr>
+          <tr><td><code>trigger</code></td><td>模型</td><td>条件不是"到点 / 事件到了就干"时才有；先 script，写不出才 agent</td></tr>
+          <tr class="hl"><td><code>limits</code></td><td>模型</td><td>用户说了"只在…时段 / 别一直 / 每天一次 / 只一次"或确认了 Agent 提议</td></tr>
+          <tr><td><code>payload.message</code></td><td>模型</td><td>必填三段，编译核心产物（P13）</td></tr>
+          <tr><td><code>toolsAllow</code></td><td>模型</td><td>按动作反推收窄；判定面只读</td></tr>
+          <tr><td><code>subscription_ids[]</code></td><td>cron service</td><td>订阅副作用写回，模型不可见</td></tr>
+          <tr><td><code>debounce / staleAfter</code></td><td>cron service</td><td>订阅时取目录 internal，模型不写</td></tr>
+        </table>
+      </div>
+      <div class="callout blue" style="font-size:.84em;"><b>命名约定：</b>job JSON 一律 camelCase（<code>nextCheckAt</code> <code>maxRunsTotal</code>）；事件目录 yaml 一律 snake_case（<code>stale_after</code> <code>must_filter</code>）；事件类型 <code>group.verb_noun</code>（<code>geofence.enter</code>）；点火入口叫 <code>onTick</code>。</div>
+      <div class="callout" style="font-size:.84em;"><b>三种"时间"的分工：</b>绝对时间点 → sources 里的时间源（<code>cron 0 20 * * *</code>）；相对某次事件的时间点 → <code>nextCheckAt</code>（离开后 1 小时、领先后 30 分钟）；只在某时段允许跑 → <code>limits.activeWindow</code>。</div>
+    </div>
+  </div>
+  <span class="pageno">6 / 17</span>
+</section>
+
+<!-- ═══════════ P7 事件源 ═══════════ -->
+<section class="slide">
+  <div class="crumb c2"><span class="ch">② 核心模型</span>事件源</div>
+  <div class="header">
+    <h1>事件源：<span class="hl">模型只写 eventType + filter</span>，订阅与投递全在 cron service</h1>
+    <p class="subtitle">新增 ①。投递语义：事件中心 at-least-once + openClaw <code>event_id</code> 去重 24h + 双侧 staleAfter；<strong>先回 200 再执行</strong></p>
+  </div>
+  <div class="cols">
+    <div class="col" style="flex:1.1;">
+      <div class="panel fit">
+        <h2><span class="tag">S3 的 schedule</span>模型写的 vs cron service 实际发的</h2>
+<pre style="font-size:.76em;"><span class="c">// 模型写的（cron add 里）</span>
+"schedule": { "sources": [
+   { "kind": "event", "eventType": "geofence.enter",   <span class="c">// 必须在目录里</span>
+     "filter": "zone == 'home'" } ] },                 <span class="c">// 只比较 fields；zone 是 must_filter</span>
+"limits": { "activeWindow": "18:00-23:00 Asia/Shanghai", "cooldown": "2h" }
+
+<span class="c">// cron service 处理 add 时对每个 source 发的（模型不可见）</span>
+EventHub.subscribe({ eventType, filter, tag: job_id,
+                     debounce: "5m", staleAfter: "10m" })   <span class="c">// 目录 internal 默认</span></pre>
+      </div>
+      <div class="panel fit">
+        <h2><span class="tag green">事件中心 → openClaw</span><code>POST /hooks/eventhub</code></h2>
+<pre style="font-size:.76em;">{ "event_id": "evt_9c21",                 <span class="c">// 幂等键</span>
+  "job_id": "job_7f3a",                   <span class="c">// 订阅时的 tag，原样带回</span>
+  "event_type": "geofence.enter",
+  "occurred_at": "2026-09-08T18:42:10+08:00",
+  "payload": { "zone": "home", "confidence": 0.93 } }</pre>
+      </div>
+      <div class="callout" style="font-size:.86em;"><b>对用户的三句承诺：</b>事件不丢（at-least-once）· 动作不重复（event_id 幂等）· 过期不执行（双侧 TTL，不会"20 分钟前到家现在才开灯"）。</div>
+    </div>
+    <div class="col">
+      <div class="panel fit">
+        <h2><span class="tag warn">入口四步</span>几十行，在 <code>onTick</code> 之前</h2>
+        <div class="steps">
+          <div class="step"><span class="n">1</span><div><strong>鉴权 → 按 job_id 找 job</strong>；找不到 / disabled → 2xx + 顺手退订，不执行。</div></div>
+          <div class="step"><span class="n">2</span><div><strong>去重</strong>：event_id 24h 内见过 → 200，不执行（记 skipped）。</div></div>
+          <div class="step"><span class="n">3</span><div><strong>过期</strong>：now − occurred_at &gt; staleAfter → 200，记 skipped。</div></div>
+          <div class="step"><span class="n">4</span><div><strong>先回 200，再 <code>onTick(jobId, {source:{kind:'event',…}, event, now})</code></strong>——之后与时间到点完全同一段代码。5xx 只留给"落 run 失败"，事件中心据此重试。</div></div>
+        </div>
+      </div>
+      <div class="panel">
+        <h2><span class="tag purple">订阅生命周期</span>全部是 job 操作的副作用，模型不调任何订阅工具</h2>
+        <table style="font-size:.76em;">
+          <tr><th style="width:30%;">job 操作</th><th>cron service 对事件中心做什么</th></tr>
+          <tr><td><strong>add</strong>（含 event 源）</td><td>校验 eventType 在目录、filter 字段 ∈ fields、must_filter 已约束 → 落 job → 每个 source 一条 subscribe → <code>subscription_ids[]</code> 写回</td></tr>
+          <tr><td><strong>update</strong> 改 sources</td><td>按差集 unsubscribe / subscribe；改 limits / payload 不动订阅</td></tr>
+          <tr><td><strong>enabled</strong> false / true</td><td>pause / resume</td></tr>
+          <tr><td><strong>remove</strong>（含 maxRunsTotal 到达）</td><td>unsubscribe</td></tr>
+          <tr><td><strong>Gateway 启动</strong></td><td><code>EventHub.list(tag=gateway)</code> 与 job 表对账：多的退订、少的补订</td></tr>
+          <tr><td>sources 里的<strong>时间项</strong></td><td>由原生调度器按 index 产生 <code>source.kind="time"</code> 的 tick，不经事件中心；同一 trigger 处理</td></tr>
+        </table>
+      </div>
+      <div class="callout blue" style="font-size:.84em;"><b>入口选定（拍板 D5）：</b>默认 webhook；同机部署切本机直调，入口函数不变。传输四选一与原生 <code>stream</code> 零改动验证路径见附录 A9。</div>
+    </div>
+  </div>
+  <span class="pageno">7 / 17</span>
+</section>
+
+<!-- ═══════════ P8 trigger ═══════════ -->
+<section class="slide">
+  <div class="crumb c2"><span class="ch">② 核心模型</span>trigger</div>
+  <div class="header">
+    <h1>trigger：<span class="hl">脚本与模型同一契约</span>，脚本是默认，模型是可选项</h1>
+    <p class="subtitle">新增 ④ 只是把"谁算 fire"换成受限 agentTurn；tick 输入、返回结构、state 持久、fire:false 静默全部沿用原生 <code>trigger.script</code></p>
+  </div>
+  <div class="cols">
+    <div class="col" style="flex:1.05;">
+      <div class="panel fit">
+        <h2><span class="tag">契约</span>输入 tick + state，输出四个字段</h2>
+<pre style="font-size:.72em;">tick = { source: { kind: "time", index? },                <span class="c">// at / every / cron 到点；sources 里的带 index</span>
+       | { kind: "event", eventType, index },          <span class="c">// sources[index] 到达</span>
+       | { kind: "self" },                             <span class="c">// 自己设的 nextCheckAt 到点</span>
+         event?: { event_id, occurred_at, payload }, now }
+→ { fire: bool,            <span class="c">// 需要跑一次 payload？</span>
+    message: "证据摘要",    <span class="c">// 进动作信封块 ②；写清是哪个跃迁</span>
+    state: {…},            <span class="c">// 写回 job，下 tick 原样传入</span>
+    nextCheckAt?: ts }     <span class="c">// 到点再给我一个 self tick</span>
+<span class="c">// agent：前置 script 的 message 进判定信封 tick 块；
+//        有 postScript 时 trigger_result → trigger.result，postScript 的返回才是结果（P9）</span></pre>
+      </div>
+      <div class="panel">
+        <h2><span class="tag warn">脚本运行时边界</span>拍板 D2——全部数值规则场景成立的前提</h2>
+        <table style="font-size:.76em;">
+          <tr><th style="width:22%;">项</th><th>规定</th></tr>
+          <tr><td>在哪跑</td><td>cron service 进程内的脚本沙箱（原生 checker），不起 session、零 token</td></tr>
+          <tr><td>能读</td><td><code>tick</code>、<code>trigger.state</code>、job 的 <code>limits</code> 只读快照</td></tr>
+          <tr><td>能调</td><td><code>await tools.call(name, args)</code>，仅 <code>trigger.toolsAllow</code> 内的<strong>只读</strong>工具：业务查询 API、<code>phone.lookup</code>、web_fetch</td></tr>
+          <tr><td>不能</td><td>cron、event_publish、任何写工具；不能起 agentTurn</td></tr>
+          <tr><td>预算</td><td>超时 30s、≤5 次 tools.call、state ≤16KB</td></tr>
+          <tr><td>失败</td><td>抛错 / 超时 = <strong>fire:false + 记 check error</strong>，state 保留旧值；连续 N 次 failureAlert（与原生"失败算 fire"不同，见 D2）</td></tr>
+        </table>
+      </div>
+    </div>
+    <div class="col">
+      <div class="panel fit">
+        <h2><span class="tag purple">两种判定者</span>只差三行</h2>
+        <table style="font-size:.72em;">
+          <tr><th></th><th>trigger.script（原生）</th><th>trigger.agent（新增）</th></tr>
+          <tr><td>判定者</td><td>JS 脚本</td><td>只读 isolated agentTurn，小模型 + lightContext</td></tr>
+          <tr><td>返回</td><td>脚本 return</td><td>调 <code>trigger_result({…})</code>，调用即结束；不调 / 超时 / 不合 stateSchema = 判定失败</td></tr>
+          <tr><td>工具面</td><td>toolsAllow 内只读</td><td>同左 + <code>trigger_result</code>；看不到 cron / event_publish / 写工具</td></tr>
+          <tr><td>预算</td><td>30s / 5 调用</td><td>60s / 5 调用 / <code>limits.maxChecksPerDay</code></td></tr>
+          <tr><td>成本</td><td class="ok">零 token</td><td>每次 2–4K；prompt 静态前缀命中 KV cache</td></tr>
+          <tr><td>用于</td><td>阈值、字段变化、时序、组合；有 API 的余票、比分</td><td><strong>看图</strong>（S7）、<strong>读页面 / 语义判断</strong>（S8 / S9 可选）</td></tr>
+        </table>
+      </div>
+      <div class="panel fit">
+        <h2><span class="tag warn">agent 前面挂一段 script</span>同一契约的 trigger.script；其 message 进判定信封</h2>
+<pre style="font-size:.68em;">"trigger": { "kind": "agent",
+  "script": "                          <span class="c">// 前置门，同一契约</span>
+    const c = await tools.call('camera.motion', { cam: 'living' });
+    return json({ fire: c.moved || tick.source.kind === 'self',
+                  state: trigger.state });",
+  "prompt": "## 判定\n条件：狗是否在沙发上 …",
+  "state": { "on_sofa_since": null, "alerted": false } }</pre>
+        <p style="margin-top:.3em; font-size:.78em;">script fire:false → 模型不起、state 照存；fire:true → 起判定模型，其 <code>trigger_result</code> 才是最终结果。S7 有运动或到 5 分钟闹钟才花 token。</p>
+      </div>
+      <div class="callout" style="font-size:.76em;"><b>编译规则：</b>有结构化数据源 → 默认 script；只有图像 / 页面 → agent；两者都行 → 默认 script，用户要更强的语义判断时选 agent。选 agent 必配前置 script 门与 <code>maxChecksPerDay</code>（P9）。</div>
+    </div>
+  </div>
+  <span class="pageno">8 / 17</span>
+</section>
+
+<!-- ═══════════ P9 agent 判定 ═══════════ -->
+<section class="slide">
+  <div class="crumb c2"><span class="ch">② 核心模型</span>agent 判定</div>
+  <div class="header">
+    <h1>agent 判定的<span class="hl">完整形态</span>：前置 script → 判定模型 → postScript</h1>
+    <p class="subtitle"><code>trigger.agent</code> 是 trigger.kind 的正式取值，任何有判定的 job 都可以选；代价是 token 与不确定性，所以配<strong>三道护栏</strong>，并把计时 / 计数从模型手里拿回来</p>
+  </div>
+  <div class="cols">
+    <div class="col" style="flex:1.15;">
+      <div class="panel fit">
+        <h2><span class="tag">一个 tick 内的三段</span>中间一段才花 token</h2>
+        <div class="flow" style="gap:.4em;">
+          <div class="node purpleb"><strong>① 前置 script <span style="font-weight:400;color:var(--muted);">可选 · 零 token</span></strong>门：不放行就结束；顺手预取数据，<code>message</code> 进判定信封 tick 块</div><div class="arr">→</div>
+          <div class="node warnb"><strong>② 判定模型 <span style="font-weight:400;color:var(--muted);">只读</span></strong>prompt 三段 + state + tick 块；唯一出口 <code>trigger_result</code>；失败 = 不 fire</div><div class="arr">→</div>
+          <div class="node purpleb"><strong>③ postScript <span style="font-weight:400;color:var(--muted);">可选 · 零 token</span></strong>收 <code>trigger.result</code>，算计时 / 计数 / 去重，返回最终 <code>{fire, message, state, nextCheckAt}</code></div>
+        </div>
+      </div>
+      <div class="panel">
+        <h2><span class="tag purple">S7 的 trigger</span>模型只回答"狗在不在沙发上"，其余全是脚本</h2>
+<pre style="font-size:.68em;">"trigger": { "kind": "agent", "toolsAllow": ["camera"],
+  "script": "                                     <span class="c">// ① 门 + 预取</span>
+    const c = await tools.call('camera.motion', { cam: 'living' });
+    return json({ fire: c.moved || tick.source.kind === 'self',
+                  message: `motion=${c.moved}`, state: trigger.state });",
+  "prompt": "## 判定\n条件：客厅沙发上是否有狗          <span class="c">// ② 只分类</span>
+    \n步骤：camera.snapshot(living) 看图 → on_sofa: true/false
+    \n输出：只调 trigger_result({ on_sofa, confidence })；不维护 state",
+  "postScript": "                                 <span class="c">// ③ 计时 · 跃迁</span>
+    const r = trigger.result, s = trigger.state ?? {}, now = tick.now;
+    if (r.on_sofa &amp;&amp; !s.on_sofa_since)
+      return json({ fire: true, message: 'entered_sofa',
+                    state: { on_sofa_since: now, alerted: false }, nextCheckAt: now + 300 });
+    if (r.on_sofa &amp;&amp; s.on_sofa_since &amp;&amp; !s.alerted &amp;&amp; now - s.on_sofa_since &gt;= 300)
+      return json({ fire: true, message: 'still_on_sofa_5m', state: { ...s, alerted: true } });
+    if (!r.on_sofa &amp;&amp; s.on_sofa_since)
+      return json({ fire: true, message: 'left_sofa', state: {}, nextCheckAt: null });
+    return json({ fire: false, state: s });",
+  "state": {}, "stateSchema": { "on_sofa_since": "datetime|null", "alerted": "boolean" } },
+"limits": { "maxChecksPerDay": 400 }</pre>
+      </div>
+    </div>
+    <div class="col">
+      <div class="panel fit">
+        <h2><span class="tag warn">为什么判定和动作分在两个 agentTurn</span></h2>
+        <table style="font-size:.73em;">
+          <tr><th></th><th>判定动作一体（every + agentTurn）</th><th>trigger.agent + payload</th></tr>
+          <tr><td class="nw">fire:false 代价</td><td>一个完整 run，5–10K，可能 announce</td><td class="ok">一次 check，2–4K，无 run</td></tr>
+          <tr><td class="nw">判定期权限</td><td>看得到动作工具，判断时就能误动作</td><td class="ok">只读；出口只有 trigger_result</td></tr>
+          <tr><td class="nw">跨 tick 记忆</td><td>只有 last_run_summary 一行</td><td class="ok">结构化 state + stateSchema</td></tr>
+          <tr><td class="nw">limits</td><td>只能数 run，fire 与 run 分不开</td><td class="ok">cooldown / maxRunsTotal 只数真正的动作</td></tr>
+        </table>
+        <p style="margin-top:.3em; font-size:.8em;">一体写法只用于离线验证判定 prompt 的措辞与 state 演进；它看得到动作工具，行为与正式形态不同，不能当端到端验证。</p>
+      </div>
+      <div class="panel fit">
+        <h2><span class="tag">何时选 agent</span></h2>
+        <table style="font-size:.72em;">
+          <tr><th>情况</th><th>选择</th><th>例</th></tr>
+          <tr><td>只有图像 / 非结构化页面</td><td class="new">必须 agent</td><td>S7；S8 / S9 没有 API 时</td></tr>
+          <tr><td>有 API，但条件含语义判断</td><td class="nw">可选，默认 script</td><td>S8 "卧铺"席别命名混乱；S9 加时是否算"领先"</td></tr>
+          <tr><td>纯数值 / 字段规则</td><td class="ok">script</td><td>S6 / S10 / S11 / S12</td></tr>
+        </table>
+      </div>
+      <div class="callout warn" style="font-size:.8em;"><b>三道护栏：</b>前置 script 门（不放行不花钱）· <code>maxChecksPerDay</code>（超出暂停并告警，回读时告知"每天最多看 N 次"）· stateSchema + postScript（计时、计数、去重不交给模型，模型写坏 state 的路被堵上）。</div>
+      <div class="callout blue" style="font-size:.8em;"><b>trigger 报告跃迁，不报告动作：</b>message 是 <code>entered_sofa / still_on_sofa_5m / left_sofa</code>；"播声 / 通知 / 停声"写在 payload.message 策略段的跃迁 → 动作表里。判定 prompt 里不出现任何动作工具名。</div>
+    </div>
+  </div>
+  <span class="pageno">9 / 17</span>
+</section>
+
+<!-- ═══════════ P10 limits 与 nextCheckAt ═══════════ -->
+<section class="slide">
+  <div class="crumb c2"><span class="ch">② 核心模型</span>limits · nextCheckAt</div>
+  <div class="header">
+    <h1><span class="hl">limits</span> 管"此刻该不该跑"，<span class="hl">nextCheckAt</span> 管"到点叫我一次"</h1>
+    <p class="subtitle">新增 ② ③。两者都在 cron service，模型运行期零感知。S9 用 <code>trigger.script</code> 走一遍：<strong>六个 tick，零 token</strong></p>
+  </div>
+  <div class="cols">
+    <div class="col">
+      <div class="panel fit">
+        <h2><span class="tag warn">limits 规格</span>job 级，fire 之后 run 之前；全部可选</h2>
+        <table style="font-size:.76em;">
+          <tr><th style="width:26%;">字段</th><th>语义</th><th style="width:22%;">用户话里的信号</th></tr>
+          <tr><td><code>activeWindow</code></td><td>窗外不产生时间 tick、fire 不进 run；<strong>事件 / self tick 仍进 trigger 维护 state</strong>（D6）</td><td>"只在晚上 / 交易时段 / 赛程内"</td></tr>
+          <tr><td><code>cooldown</code></td><td>上次 run 起 N 内的 fire 丢弃，记 skipped</td><td>"别一直提醒"；S8 防连续下单</td></tr>
+          <tr><td><code>maxRunsPerDay</code></td><td>按 tz 自然日计 run；check 不计</td><td>"每天最多一次"</td></tr>
+          <tr><td><code>maxRunsTotal</code></td><td>累计 run 到达 → disable + 退订</td><td>"通知我一次就行"（S9 = 1）</td></tr>
+          <tr><td><code>maxChecksPerDay</code></td><td>agent 判定次数上限，超出暂停并告警</td><td>编译规则默认 200，用户不说</td></tr>
+        </table>
+      </div>
+      <div class="panel fit">
+        <h2><span class="tag">nextCheckAt 三条语义</span></h2>
+        <ul style="font-size:.92em;">
+          <li><strong>只加不减</strong>：到点造一个 <code>source.kind="self"</code> 的 tick；周期 tick、事件 tick 照常。要省成本用 activeWindow 与前置 script，不靠它跳过。</li>
+          <li><strong>覆盖与作废</strong>：新返回值覆盖旧闹钟；返回时不带字段 = 保留；显式 <code>null</code> = 作废。</li>
+          <li><strong>用途</strong>：时序条件的"到点"（S9 30 分钟、S7 5 分钟、S12 1 小时）由 trigger 自己声明，event-only 的 job 因此不需要时间源。</li>
+        </ul>
+      </div>
+    </div>
+    <div class="col" style="flex:1.2;">
+      <div class="panel fit">
+        <h2><span class="tag purple">S9 的 trigger.script</span>默认写法；选 agent 时同一逻辑进 prompt（附录 A7）</h2>
+<pre style="font-size:.68em;">const m = await tools.call('sports_api.get_match', { id: 'm_8821' });
+const s = trigger.state ?? { lead_since: null };
+if (m.status === 'finished') return json({ fire: false, state: { done: true } });
+const lead = m.score.manutd &gt; m.score.barca;
+if (!lead) return json({ fire: false, state: { lead_since: null }, nextCheckAt: null });  <span class="c">// 闹钟作废</span>
+if (!s.lead_since) return json({ fire: false, state: { lead_since: tick.now },
+                                 nextCheckAt: tick.now + 30*60 });               <span class="c">// 30 分钟后叫我</span>
+if (tick.now - s.lead_since &gt;= 30*60)
+  return json({ fire: true, state: s, message: `曼联 ${m.score.manutd}:${m.score.barca}，自 ${s.lead_since} 领先满 30 分钟` });
+return json({ fire: false, state: s });</pre>
+      </div>
+      <div class="panel fit">
+        <h2><span class="tag green">关键 tick</span>every 1m · limits {activeWindow: 赛程, maxRunsTotal: 1}；其余 150 个 time tick 走脚本、state 不变</h2>
+        <table style="font-size:.74em;">
+          <tr><th>tick</th><th>看到</th><th>state / nextCheckAt</th><th>fire</th></tr>
+          <tr><td>20:55 time</td><td>未开赛</td><td>不变</td><td>否</td></tr>
+          <tr><td>21:23 time</td><td>曼联 1:0</td><td>lead_since 21:23 · 闹钟 21:53</td><td>否</td></tr>
+          <tr><td>21:40 time</td><td>巴萨扳平 1:1</td><td>lead_since null · 闹钟作废</td><td>否</td></tr>
+          <tr><td>22:10 time</td><td>曼联 2:1</td><td>lead_since 22:10 · 闹钟 22:40</td><td>否</td></tr>
+          <tr class="hl"><td><strong>22:40 self</strong></td><td>仍 2:1，满 30 分钟</td><td>不变</td><td><strong>是</strong> → maxRunsTotal → run → 自动 disable</td></tr>
+        </table>
+      </div>
+      <div class="callout" style="font-size:.8em;"><b>成本：</b>155 个 tick 全是脚本，零 token；只有 22:40 起一次动作 agentTurn。若选 agent 判定，同一逻辑写进 prompt，前置 script 只在比分变化或 self tick 时放行，一场球 5–6 次判定（附录 A7）。</div>
+    </div>
+  </div>
+  <span class="pageno">10 / 17</span>
+</section>
+
+<!-- ═══════════ P11 组合条件 ═══════════ -->
+<section class="slide">
+  <div class="crumb c2"><span class="ch">② 核心模型</span>组合条件</div>
+  <div class="header">
+    <h1>组合条件<span class="hl">一种写法</span>：state 记时间戳，nextCheckAt 兜底到点</h1>
+    <p class="subtitle">与 / 或 / 之后 / 没有 / 到点还没 全是 <code>sources[]</code>（事件与时间可混排）+ 一段 <code>trigger.script</code>；事件中心不做 CEP。<strong>"或"甚至不需要 trigger</strong></p>
+  </div>
+  <div class="panel fit">
+    <div class="flow" style="gap:.4em;">
+      <div class="node purpleb"><strong>或</strong>"到家或连上家里 WiFi"= sources 写两个，无 trigger，任一到达即 fire；<strong>时间源也能混排</strong>："8 点前一直没收到快递通知"= event + cron 两源，脚本在 time tick 查 state</div><div class="arr">→</div>
+      <div class="node purpleb"><strong>事件 且 状态</strong>S10：事件到了，脚本查一下现况（<code>phone.lookup(state)</code> / 业务 API）</div><div class="arr">→</div>
+      <div class="node hl"><strong>A 之后 W 内 B</strong>S11：A 来了记 <code>a_at</code>；B 来了比较两个 occurred_at</div><div class="arr">→</div>
+      <div class="node hl"><strong>A 之后 W 内没有 B</strong>S12：A 来了记 <code>deadline</code> 并设 nextCheckAt；B 来了清空；self tick 到点仍在 → fire</div>
+    </div>
+  </div>
+  <div class="cols" style="margin-top:.5em;">
+    <div class="col" style="flex:.85;">
+      <div class="panel">
+        <h2><span class="tag">S10</span>到家 且 电量 &lt; 20%</h2>
+<pre style="font-size:.68em;">"schedule": { "sources": [
+  { "kind": "event",
+    "eventType": "geofence.enter",
+    "filter": "zone == 'home'" } ] },
+"trigger": { "kind": "script",
+  "toolsAllow": ["phone.lookup"],
+  "script": "
+const st = await tools.call('phone.lookup',
+  { kind: 'state', fields: ['battery'] });
+return json({ fire: st.battery.level &lt; 20,
+  message: `电量 ${st.battery.level}%`,
+  state: {} });" }</pre>
+      </div>
+    </div>
+    <div class="col" style="flex:1.1;">
+      <div class="panel">
+        <h2><span class="tag">S11</span>到家 之后 10 分钟内 来电 · limits.cooldown 30m</h2>
+<pre style="font-size:.68em;">"schedule": { "sources": [
+  { "kind": "event",                    <span class="c">// 0</span>
+    "eventType": "geofence.enter",
+    "filter": "zone == 'home'" },
+  { "kind": "event",                    <span class="c">// 1</span>
+    "eventType": "phone.call_incoming" } ] },
+"trigger": { "kind": "script",
+  "stateSchema": { "a_at": "datetime|null" },
+  "script": "
+const s = trigger.state ?? {};
+const i = tick.source.index;
+const t = tick.event.occurred_at; <span class="c">// 非 now</span>
+if (i === 0)
+  return json({ fire: false, state: { a_at: t } });
+if (i === 1 &amp;&amp; s.a_at &amp;&amp; t - s.a_at &lt;= 600)
+  return json({ fire: true, state: {},
+    message: 'call_within_10m' });
+return json({ fire: false, state: s });" }</pre>
+      </div>
+    </div>
+    <div class="col" style="flex:1.25;">
+      <div class="panel">
+        <h2><span class="tag">S12</span>离开公司 之后 1 小时 没有 到家 · maxRunsPerDay 1</h2>
+<pre style="font-size:.68em;">"schedule": { "sources": [
+  { "kind": "event", "eventType": "geofence.exit",    <span class="c">// 0</span>
+    "filter": "zone == 'office'" },
+  { "kind": "event", "eventType": "geofence.enter",   <span class="c">// 1</span>
+    "filter": "zone == 'home'" } ] },
+"trigger": { "kind": "script",
+  "stateSchema": { "deadline": "datetime|null" },
+  "script": "
+const s = trigger.state ?? {};
+const i = tick.source.index;
+if (i === 0) {                          <span class="c">// 离开：以事件时刻起算</span>
+  const d = tick.event.occurred_at + 3600;
+  return json({ fire: false, state: { deadline: d },
+                nextCheckAt: d }); }
+if (i === 1)                            <span class="c">// 到家：取消闹钟</span>
+  return json({ fire: false, state: {}, nextCheckAt: null });
+if (tick.source.kind === 'self' &amp;&amp; s.deadline
+    &amp;&amp; tick.now &gt;= s.deadline)      <span class="c">// 到点：用自己的钟</span>
+  return json({ fire: true, state: {}, message: 'not_home_1h' });
+return json({ fire: false, state: s });" }</pre>
+      </div>
+    </div>
+  </div>
+  <div class="cols" style="flex:0 0 auto; margin-top:.5em; font-size:.84em;">
+    <div class="callout" style="flex:1;"><b>为什么不做 CEP：</b>组合 state 要能被 <code>stateSchema</code> 校验、被 runs 对账、被 <code>cron get</code> 看到，只有放在 job 里才做得到；事件中心永远不需要理解"之后 / 没有"。</div>
+    <div class="callout warn" style="flex:1;"><b>时间戳规则：</b>事件与事件之间的间隔用 <code>tick.event.occurred_at</code>（投递可能延迟、重试）；deadline / nextCheckAt 的到点用 <code>tick.now</code>（cron service 自己的钟）。不假设投递顺序，同 job 的 tick 串行处理。</div>
+    <div class="callout blue" style="flex:1;"><b>编译期填槽：</b>三段脚本是附录 A4 的模板，模型只填 sources 下标、W 秒数、跃迁名；更复杂的组合直接写脚本，或改 agent 判定（P9）。</div>
+  </div>
+  <span class="pageno">11 / 17</span>
+</section>
+
+<!-- ═══════════ P12 派生事件 ═══════════ -->
+<section class="slide">
+  <div class="crumb c2"><span class="ch">② 核心模型</span>派生事件</div>
+  <div class="header">
+    <h1>派生事件：判定结果<span class="hl">给自己用还是给别人用</span>，只差 payload 一个字段</h1>
+    <p class="subtitle">默认是普通 job（没有派生事件）。结果要复用时，payload 换成 <code>script → event_publish</code>，事件登进目录，谁要谁订。判定者是 script 还是 agent 与此无关</p>
+  </div>
+  <div class="cols">
+    <div class="col" style="flex:1.2;">
+      <div class="panel">
+        <h2><span class="tag">S2 明天下雨</span>同一条生产 job，两种 payload</h2>
+<pre style="font-size:.74em;"><span class="c">// 共同部分：叫醒、判定、限额一字不改</span>
+"schedule": { "kind": "cron", "expr": "0 20 * * *", "tz": "Asia/Shanghai" },
+"trigger":  { "kind": "script", "toolsAllow": ["weather"], "script": "
+  const p = (await tools.call('weather.forecast', {city:'beijing', day:'tomorrow'})).rain_prob;
+  return json({ fire: p &gt;= 0.6, message: `明天北京降雨概率 ${Math.round(p*100)}%`, state: { p } });" },
+"limits":   { "maxRunsPerDay": 1 },
+
+<span class="c">// 只有我用 → 普通 job：payload 直接动作</span>
+"payload":  { "kind": "agentTurn", "message": "## 任务\n用户原话：明天下雨提醒我带伞\n…" },
+"delivery": { "mode": "announce" }
+
+<span class="c">// 要复用 → payload 改 publish，多一段 publishes 声明，目录因此多一条</span>
+"payload":  { "kind": "script",
+  "script": "await tools.call('event_publish', { type: 'weather.rain_tomorrow',
+             payload: { city: 'beijing', rain_prob: trigger.state.p } })",
+  "publishes": { "type": "weather.rain_tomorrow", "desc": "明日降雨概率",
+                 "fields": [ { "name": "city", "type": "string", "key": true },
+                             { "name": "rain_prob", "type": "number" } ] } },
+"delivery": { "mode": "none" }
+
+<span class="c">// 消费者：普通 event job，可以有 N 条（带伞 / 收衣服 / 改路线）</span>
+"schedule": { "sources": [ { "kind": "event", "eventType": "weather.rain_tomorrow",
+                             "filter": "city == 'beijing' &amp;&amp; rain_prob &gt;= 0.6" } ] }</pre>
+      </div>
+    </div>
+    <div class="col">
+      <div class="panel fit">
+        <h2><span class="tag purple">对比</span></h2>
+        <table style="font-size:.8em;">
+          <tr><th></th><th>给自己用</th><th>给别人用（派生事件）</th></tr>
+          <tr><td>job 数</td><td>1</td><td>生产者 1 + 消费者 N</td></tr>
+          <tr><td>目录</td><td>不动</td><td>+1 条，<code>publishes</code> 在 add 时登记，fields 由生产者定</td></tr>
+          <tr><td>limits</td><td>一层：本 job 跑几次</td><td>两层：生产侧管事件发几次；消费侧各管自己</td></tr>
+          <tr><td>加一个用途</td><td>改 payload 或再建判定 job</td><td>再建一条消费者，不动生产者</td></tr>
+          <tr><td>可被发现</td><td>否</td><td>目录可见，其他 Agent 也能订</td></tr>
+        </table>
+      </div>
+      <div class="callout" style="font-size:.86em;"><b>编译规则：</b>判定结果只有一个用途、只关我一人（包裹、S6–S12）→ 普通 job。天然是公共事实（天气、放票、发布会、赛果）或用户说了两个以上用途 → 派生事件。拿不准 → 普通 job，日后要复用再拆。</div>
+      <div class="callout blue" style="font-size:.86em;"><b>模型判定也一样：</b>"发布会结束了吗"由 <code>trigger.agent</code> 判定，payload 仍是 <code>script → event_publish(press.conference_ended)</code>；判定 agent 自己看不到 event_publish。</div>
+      <div class="callout warn" style="font-size:.86em;"><b><code>event_publish</code> 可见范围：</b>payload script ✓；动作 agentTurn 按 toolsAllow 默认关；判定 agent ✗；主 loop ✗。派生条目进目录后与内建条目同样静态注入编译期 prompt。</div>
+    </div>
+  </div>
+  <span class="pageno">12 / 17</span>
+</section>
+
+<!-- ═══════════ P13 编译 ═══════════ -->
+<section class="slide">
+  <div class="crumb c3"><span class="ch">③ 编译与执行</span>编译</div>
+  <div class="header">
+    <h1>编译：从一句话到 <span class="hl"><code>cron add</code></span>，主 loop 一次完成</h1>
+    <p class="subtitle">编译期是<strong>唯一读主对话的位置</strong>；核心产物不是 JSON 字段，是给另一个执行者看的 <code>payload.message</code>、脚本或判定 prompt</p>
+  </div>
+  <div class="cols">
+    <div class="col" style="flex:.95;">
+      <div class="panel fit">
+        <h2><span class="tag">对话回放</span>S3</h2>
+        <div class="chat">
+          <div class="bubble user">到家的时候帮我把客厅灯开了，放点音乐</div>
+          <div class="bubble agent">好，你到家我就开客厅灯、放音乐。工作日晚上 6 点以后才触发，可以吗？</div>
+          <div class="bubble user">可以。你试一下</div>
+          <div class="bubble agent">已模拟一次"到家"：客厅灯已开、正在播放常听歌单。以后真到家就会这样。</div>
+        </div>
+        <p style="margin-top:.5em;"><strong>回读粒度：</strong>默认一句话；只有非常识默认值（60%、20:00）和高权限动作才显式追问。"试一下" = <code>cron run jobId --force</code>，走真实路径。<strong>S5 的车次 / 席别 / 是否代付也在这一步问清</strong>，不留到运行期；选了 agent 判定要告知"每天最多看 N 次"。</p>
+      </div>
+      <div class="panel">
+        <h2><span class="tag green">编译期看到什么</span></h2>
+        <ul>
+          <li><strong>事件目录</strong>：内建 63 条 + 已登记派生条目，一行一条静态在 system prompt（≈3–4K token，KV cache 前缀）</li>
+          <li><strong><code>phone.lookup</code></strong>：显示名 → key（张三 → c_12，家 → home）</li>
+          <li><strong>编译规则与三套模板</strong>（附录 A4）：message 三段 / 判定 prompt 三段 / 组合脚本三例</li>
+        </ul>
+      </div>
+    </div>
+    <div class="col">
+      <div class="panel fit">
+        <h2><span class="tag warn">六步</span>每步一个决定</h2>
+        <div class="steps">
+          <div class="step"><span class="n">1</span><div><strong>路由</strong>：委托型且非立即执行 → 走 cron add，不就地干。</div></div>
+          <div class="step"><span class="n">2</span><div><strong>选叫醒源与判定者</strong>（成本阶梯）：时间词 → at / cron；目录里有 → event 源；"或 / 之后 / 没有 / 到点还没"→ sources 两个（事件、时间可混排）；有结构化数据源 → <code>trigger.script</code>；看图 / 读页面 / 语义判断 → <code>trigger.agent</code> + 前置 script。</div></div>
+          <div class="step"><span class="n">3</span><div><strong>填槽</strong>：人 / App / 设备 / 地点 → <code>phone.lookup</code> → key 进 filter；灯 / 歌单 / match_id → 具体对象进 message；缺槽追问或写"执行时判断"。</div></div>
+          <div class="step"><span class="n">4</span><div><strong>写判定与限额</strong>：filter 只比较 fields；脚本按模板填槽；agent 配 prompt + state 初值 + 只读 toolsAllow；<strong>limits 只在用户明说时写</strong>。</div></div>
+          <div class="step"><span class="n">5</span><div><strong>写 message 三段</strong> + 显式 sessionTarget / toolsAllow / delivery；可能 ask_user 的 job 用 announce。</div></div>
+          <div class="step"><span class="n">6</span><div><strong>回读一句 → cron add</strong>；event 源由 cron service 自动订阅，模型一次调用结束。</div></div>
+        </div>
+      </div>
+      <div class="panel fit">
+        <h2><span class="tag purple">payload.message 三段</span>必填；回答运行时模型三个问题</h2>
+<pre style="font-size:.76em;">## 任务
+用户原话：&lt;原句，逐字不改写&gt;                          <span class="c">← 干什么</span>
+编译补充：&lt;指代 → 具体对象；已确认参数；缺槽标"执行时判断"&gt;   <span class="c">← 指的是什么</span>
+策略：免确认 = &lt;白名单动作&gt;；必确认 = 支付 / 对外发送 / 删除；
+      交付 = &lt;silent | 当前聊天&gt;；失败必须通知                 <span class="c">← 能不能直接干</span></pre>
+      </div>
+    </div>
+  </div>
+  <span class="pageno">13 / 17</span>
+</section>
+
+<!-- ═══════════ P14 执行 ═══════════ -->
+<section class="slide">
+  <div class="crumb c3"><span class="ch">③ 编译与执行</span>执行</div>
+  <div class="header">
+    <h1>执行：<span class="hl">isolated 默认</span> · 四种上下文的工具面 · 五块信封</h1>
+    <p class="subtitle">"判断世界是什么样"与"改变世界"隔在两个 agentTurn 里；运行时模型不读主对话，只读冻结的任务定义</p>
+  </div>
+  <div class="cols">
+    <div class="col">
+      <div class="panel fit">
+        <h2><span class="tag">sessionTarget</span>只用前两种</h2>
+        <table style="font-size:.8em;">
+          <tr><th>取值</th><th>跑在哪</th><th>用法</th></tr>
+          <tr class="hl"><td><strong>isolated</strong></td><td>每次新 session <code>cron:&lt;jobId&gt;</code>，零历史</td><td><strong>默认</strong>：所有动作 agentTurn 与判定 agent。2–5K token，不污染主对话，权限不继承</td></tr>
+          <tr><td><strong>main</strong></td><td>主 session heartbeat lane</td><td>仅 <code>systemEvent</code> 纯提醒（S5 "明天放票"）</td></tr>
+          <tr><td>session:&lt;id&gt;</td><td>持久命名 session</td><td>一行 <code>last_run_summary</code> 不够时才用；本期无场景</td></tr>
+          <tr><td>current</td><td>创建时的对话</td><td><strong>不用</strong>：S5 的确认移到编译期，避免"运行中 cron add"</td></tr>
+        </table>
+      </div>
+      <div class="panel">
+        <h2><span class="tag purple">工具可见范围</span>四种上下文</h2>
+        <table style="font-size:.78em;">
+          <tr><th>工具</th><th>主 loop</th><th>trigger script</th><th>判定 agent</th><th>动作 agentTurn</th></tr>
+          <tr><td><code>cron</code></td><td class="ok">全部</td><td class="no">✗</td><td class="no">✗</td><td>仅对自己 status / runs / remove</td></tr>
+          <tr><td><code>phone.lookup</code></td><td class="ok">✓</td><td class="ok">✓ 只读</td><td class="ok">✓ 只读</td><td class="ok">✓</td></tr>
+          <tr><td><code>event_publish</code></td><td class="no">✗</td><td class="no">✗</td><td class="no">✗</td><td>payload script ✓；agentTurn 按 toolsAllow</td></tr>
+          <tr><td><code>trigger_result</code></td><td class="no">✗</td><td>直接 return</td><td class="ok">唯一出口</td><td class="no">✗</td></tr>
+          <tr><td>业务工具</td><td class="ok">✓</td><td>只读查询</td><td>只读查询</td><td>按 toolsAllow</td></tr>
+          <tr><td>EventHub subscribe</td><td colspan="4" style="text-align:center;">全部不可见，cron service 内部</td></tr>
+        </table>
+      </div>
+    </div>
+    <div class="col" style="flex:1.1;">
+      <div class="panel">
+        <h2><span class="tag green">五块信封</span>①② 运行时拼，③④⑤ 创建时冻结；整轮 5–10K token</h2>
+<pre style="font-size:.74em;"><span class="c">① 触发头：机器可读，与 runs 对账</span>
+[event:geofence.enter job:job_7f3a run:run_9c21]
+<span class="c">② 触发事实：显式标外部数据；有 trigger 时换成 &lt;trigger_result&gt; message + state</span>
+&lt;event_payload source="eventhub" trust="external-data"&gt;
+occurred_at: 2026-09-08T18:42:10+08:00 | zone: home | confidence: 0.93
+&lt;/event_payload&gt;
+<span class="c">③ 冻结的 payload.message 三段（编译产物）</span>
+## 任务
+用户原话：到家的时候帮我把客厅灯打开，放点音乐
+编译补充："灯" = 客厅主灯（homekit:living_main）；"音乐" = 常听歌单
+策略：免确认 = 家居控制；必确认 = 支付 / 对外发送 / 删除；完成不汇报，失败必须通知
+<span class="c">④ contextMessages 0–10，创建时冻结</span>
+## 创建时对话片段
+U: 到家的时候帮我把客厅灯开了 / A: 工作日晚 6 点后触发，可以吗？ / U: 可以
+<span class="c">⑤ last_run_summary 一行</span>
+## 上次运行
+2026-09-07 18:50 成功：开灯 + 播放"晚间放松"歌单</pre>
+        <p style="margin-top:.45em;"><strong>栈：</strong>system prompt（lightContext 可跳过 SOUL / USER / MEMORY，3–8K）+ 按 toolsAllow 过滤的工具 schema（1–2K）+ 上面这条 user message（&lt;1K）。<strong>没有对话历史</strong>；长期记忆靠 memory_search 按需取。</p>
+      </div>
+      <div class="callout warn" style="font-size:.84em;"><b>ask_user 的路径（拍板 D4）：</b>动作模型遇到必确认动作 → run 进 <code>waiting</code> → 问题经 <code>delivery</code> 渠道送到用户 → 答复回到该 run 继续。因此<b>可能 ask_user 的 job 强制 announce</b>，否则问题无处可去；超时未答 → run error + failureAlert。S5 支付、S8 支付走这条路。</div>
+    </div>
+  </div>
+  <span class="pageno">14 / 17</span>
+</section>
+
+<!-- ═══════════ P15 十二场景全表 ═══════════ -->
+<section class="slide">
+  <div class="crumb c4"><span class="ch">④ 验证与拍板</span>场景全表</div>
+  <div class="header">
+    <h1>十二个场景<span class="hl">在框架下的形态</span>：每一列都是 <code>cron add</code> 里的一个字段</h1>
+    <p class="subtitle">下游同构：<strong>onTick → trigger → fire → limits → 拼信封 → isolated agentTurn → delivery</strong>。S6–S12 的分档 / 嵌套 / 时序 / 组合全部落在 trigger 的 state；"模型"列 = 判定是否过模型</p>
+  </div>
+  <div class="panel">
+    <table style="font-size:.65em;">
+      <tr><th>#</th><th style="width:12%;">场景</th><th>schedule</th><th>trigger</th><th>limits</th><th>state</th><th>payload 动作</th><th>toolsAllow</th><th>模型</th><th>高危</th></tr>
+      <tr><td>S1</td><td>每天 9 点晨报</td><td><code>cron 0 9 * * *</code></td><td>—</td><td>—</td><td>—</td><td>agentTurn，announce</td><td>按 xxx</td><td class="ok">否</td><td>—</td></tr>
+      <tr><td>S2</td><td>明天下雨提醒带伞</td><td><code>cron 0 20 * * *</code></td><td>script 查预报 ≥ 0.6</td><td>maxRunsPerDay 1</td><td>{p}</td><td>单用途 agentTurn；多用途 script → event_publish + 消费者 job</td><td>weather</td><td class="ok">否</td><td>—</td></tr>
+      <tr><td>S3</td><td>到家开灯放音乐</td><td><code>event</code> geofence.enter zone=='home'</td><td>—</td><td>activeWindow 18–23 · cooldown 2h</td><td>—</td><td>agentTurn，none</td><td>homekit, music</td><td class="ok">否</td><td>—</td></tr>
+      <tr><td>S4</td><td>张三来电</td><td><code>event</code> phone.call_incoming contact_id=='c_12'</td><td>—</td><td>—</td><td>—</td><td>agentTurn；来电字段标外部数据</td><td>按 xxx</td><td class="ok">否</td><td>对外发送 → 一期 ask_user</td></tr>
+      <tr><td>S5</td><td>放票抢票</td><td><code>at</code> 放票前 30s exact（编译期问清车次）</td><td>—</td><td>—</td><td>—</td><td>browser 下单 → 支付 ask_user</td><td>browser</td><td class="ok">否</td><td>支付 ask_user</td></tr>
+      <tr><td>S6</td><td>跌 10% 卖一半 / 30% 清仓</td><td><code>every 1m</code></td><td>script 查行情；stage 跃迁 fire，message stage_1 / stage_2（可选 agent）</td><td>activeWindow 交易时段</td><td>{baseline, stage}</td><td>broker 卖出；stage=2 后 cron remove 自己</td><td>broker, cron</td><td>可选</td><td>卖出 → 一期 ask_user</td></tr>
+      <tr class="hl"><td>S7</td><td>狗上沙发</td><td><code>every 30s</code></td><td><strong>agent 看快照</strong>；前置 script 有运动 || self；postScript 算跃迁（P9）</td><td>maxChecksPerDay 400</td><td>{on_sofa_since, alerted}</td><td>策略段映射跃迁 → 播放 / 发消息 / 停音</td><td>speaker, messaging</td><td class="no">是</td><td>对外发送 → 一期 ask_user</td></tr>
+      <tr><td>S8</td><td>开售后买卧铺，没买到继续盯</td><td><code>every 30s</code></td><td>script 查余票 或 agent 读页；有卧铺 → fire</td><td>activeWindow 开售后 · cooldown 2m</td><td>{attempts}</td><td>下单 → 支付 ask_user → 成功后 cron remove 自己</td><td>browser, cron</td><td>可选</td><td>支付 ask_user</td></tr>
+      <tr><td>S9</td><td>曼联持续领先 30 分钟</td><td><code>every 1m</code></td><td>script 或 agent 查比分；lead_since + nextCheckAt +30m；self 仍领先 → fire（P10）</td><td>activeWindow 赛程 · maxRunsTotal 1</td><td>{lead_since}</td><td>messaging 发张三</td><td>messaging</td><td>可选</td><td>对外发送 → 一期 ask_user</td></tr>
+      <tr><td>S10</td><td>到家且电量 &lt; 20%</td><td><code>event</code> geofence.enter zone=='home'</td><td>script 查 phone.lookup(state) battery &lt; 20</td><td>—</td><td>—</td><td>agentTurn 提醒，announce</td><td>—</td><td class="ok">否</td><td>—</td></tr>
+      <tr><td>S11</td><td>到家后 10 分钟内来电</td><td><code>event</code> ×2：geofence.enter, phone.call_incoming</td><td>script：0 → 记 a_at；1 且 occurred_at−a_at ≤ 600 → fire</td><td>cooldown 30m</td><td>{a_at}</td><td>agentTurn 提醒</td><td>—</td><td class="ok">否</td><td>—</td></tr>
+      <tr><td>S12</td><td>离开公司 1h 没到家</td><td><code>event</code> ×2：geofence.exit office, geofence.enter home</td><td>script：0 → deadline + nextCheckAt；1 → 清空；self 到点 → fire</td><td>maxRunsPerDay 1</td><td>{deadline}</td><td>messaging 发家人</td><td>messaging</td><td class="ok">否</td><td>对外发送 → 一期 ask_user</td></tr>
+    </table>
+  </div>
+  <div class="cols" style="flex:0 0 auto; margin-top:.4em; font-size:.8em;">
+    <div class="callout" style="flex:1;"><b>只有 S7 必须选 agent 判定</b>；S6 / S8 / S9 两种判定者都成立，有 API 默认 script，用户要更强的语义判断时选 agent。其余是 script 或无 trigger。</div>
+    <div class="callout blue" style="flex:1;"><b>收尾都靠原生：</b>S6 / S8 用自动化 run 里的"对自己 cron remove"；S9 用 maxRunsTotal；S8 "刚试过别再试"用 cooldown；S5 编译期问清后是一条 at。</div>
+    <div class="callout warn" style="flex:1;"><b>"一期 ask_user"</b>= 拍板 D3：二期有参数级 toolsAllow 约束后，创建期确认过的收件人 / 数量才免确认；支付永远 ask_user。</div>
+  </div>
+  <span class="pageno">15 / 17</span>
+</section>
+
+<!-- ═══════════ P16 时序 S3 ═══════════ -->
+<section class="slide">
+  <div class="crumb c4"><span class="ch">④ 验证与拍板</span>时序</div>
+  <div class="header">
+    <h1><span class="hl">端到端时序</span>：S3 到家开灯，从一句话到灯亮</h1>
+    <p class="subtitle">蓝 = 模型参与　紫 = openClaw 非 LLM　绿 = 事件中心。12 步里<strong>只有 1 / 2 / 3 / 6 / 11 五步有模型参与</strong>，其余零 token</p>
+  </div>
+  <div class="cols">
+    <div class="col" style="min-height:0;">
+      <div class="panel" style="padding:.5em .6em;"><svg viewBox="0 0 1000 764" preserveAspectRatio="xMidYMin meet" xmlns="http://www.w3.org/2000/svg" style="display:block;width:100%;height:100%;font-family:inherit;">
+<defs>
+<marker id="ar-blue" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#2f6fed"/></marker>
+<marker id="ar-green" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#0ea578"/></marker>
+<marker id="ar-purple" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#7c5cd6"/></marker>
+</defs>
+<line x1="71.4" y1="46" x2="71.4" y2="760" stroke="#dfe6f0" stroke-width="1.4" stroke-dasharray="3,5"/>
+<rect x="7.0" y="3" width="128.9" height="40" rx="7" fill="#2f6fed" fill-opacity=".1" stroke="#2f6fed" stroke-width="1.3"/>
+<text x="71.4" y="27.5" text-anchor="middle" font-size="14" font-weight="700" fill="#1e2a3d">用户</text>
+<line x1="214.3" y1="46" x2="214.3" y2="760" stroke="#dfe6f0" stroke-width="1.4" stroke-dasharray="3,5"/>
+<rect x="149.9" y="3" width="128.9" height="40" rx="7" fill="#2f6fed" fill-opacity=".1" stroke="#2f6fed" stroke-width="1.3"/>
+<text x="214.3" y="21.0" text-anchor="middle" font-size="14" font-weight="700" fill="#1e2a3d">主 loop</text>
+<text x="214.3" y="36.0" text-anchor="middle" font-size="12.5" font-weight="600" fill="#5a6b84">LLM</text>
+<line x1="357.1" y1="46" x2="357.1" y2="760" stroke="#dfe6f0" stroke-width="1.4" stroke-dasharray="3,5"/>
+<rect x="292.7" y="3" width="128.9" height="40" rx="7" fill="#2f6fed" fill-opacity=".1" stroke="#2f6fed" stroke-width="1.3"/>
+<text x="357.1" y="21.0" text-anchor="middle" font-size="14" font-weight="700" fill="#1e2a3d">工具层</text>
+<text x="357.1" y="36.0" text-anchor="middle" font-size="12.5" font-weight="600" fill="#5a6b84">cron · phone.lookup</text>
+<line x1="500.0" y1="46" x2="500.0" y2="760" stroke="#dfe6f0" stroke-width="1.4" stroke-dasharray="3,5"/>
+<rect x="435.6" y="3" width="128.9" height="40" rx="7" fill="#7c5cd6" fill-opacity=".1" stroke="#7c5cd6" stroke-width="1.3"/>
+<text x="500.0" y="21.0" text-anchor="middle" font-size="14" font-weight="700" fill="#1e2a3d">cron service</text>
+<text x="500.0" y="36.0" text-anchor="middle" font-size="12.5" font-weight="600" fill="#5a6b84">含事件中心适配器</text>
+<line x1="642.9" y1="46" x2="642.9" y2="760" stroke="#dfe6f0" stroke-width="1.4" stroke-dasharray="3,5"/>
+<rect x="578.4" y="3" width="128.9" height="40" rx="7" fill="#0ea578" fill-opacity=".1" stroke="#0ea578" stroke-width="1.3"/>
+<text x="642.9" y="21.0" text-anchor="middle" font-size="14" font-weight="700" fill="#1e2a3d">事件中心</text>
+<text x="642.9" y="36.0" text-anchor="middle" font-size="12.5" font-weight="600" fill="#5a6b84">EventHub</text>
+<line x1="785.7" y1="46" x2="785.7" y2="760" stroke="#dfe6f0" stroke-width="1.4" stroke-dasharray="3,5"/>
+<rect x="721.3" y="3" width="128.9" height="40" rx="7" fill="#2f6fed" fill-opacity=".1" stroke="#2f6fed" stroke-width="1.3"/>
+<text x="785.7" y="21.0" text-anchor="middle" font-size="14" font-weight="700" fill="#1e2a3d">isolated</text>
+<text x="785.7" y="36.0" text-anchor="middle" font-size="12.5" font-weight="600" fill="#5a6b84">agentTurn</text>
+<line x1="928.6" y1="46" x2="928.6" y2="760" stroke="#dfe6f0" stroke-width="1.4" stroke-dasharray="3,5"/>
+<rect x="864.1" y="3" width="128.9" height="40" rx="7" fill="#5a6b84" fill-opacity=".1" stroke="#5a6b84" stroke-width="1.3"/>
+<text x="928.6" y="27.5" text-anchor="middle" font-size="14" font-weight="700" fill="#1e2a3d">渠道 / 主 session</text>
+<rect x="8" y="62" width="984" height="20" rx="4" fill="#2f6fed" fill-opacity=".09"/><text x="18" y="76.5" font-size="14.5" font-weight="700" fill="#2f6fed">T0 创建期：对话中一次完成，第 1–6 步；只有 1 / 2 / 3 / 6 有模型参与</text>
+<line x1="71.4" y1="112" x2="214.3" y2="112" stroke="#2f6fed" stroke-width="1.7" marker-end="url(#ar-blue)"/>
+<rect x="47.0" y="87" width="191.7" height="18" rx="4" fill="#fff" fill-opacity=".96"/><text x="142.9" y="100" text-anchor="middle" font-size="14.5" fill="#1e2a3d">“到家的时候帮我把灯开了”</text>
+<circle cx="35.0" cy="96.0" r="8.5" fill="#2f6fed"/><text x="35.0" y="99.8" text-anchor="middle" font-size="10.5" font-weight="700" fill="#fff">1</text>
+<line x1="214.3" y1="146" x2="357.1" y2="146" stroke="#2f6fed" stroke-width="1.7" marker-end="url(#ar-blue)"/>
+<rect x="62.0" y="121" width="447.5" height="18" rx="4" fill="#fff" fill-opacity=".96"/><text x="285.7" y="134" text-anchor="middle" font-size="14.5" fill="#1e2a3d">目录（prompt 静态）命中 geofence.enter；phone.lookup(places) 解析"家"→ home</text>
+<circle cx="50.0" cy="130.0" r="8.5" fill="#2f6fed"/><text x="50.0" y="133.8" text-anchor="middle" font-size="10.5" font-weight="700" fill="#fff">2</text>
+<line x1="214.3" y1="180" x2="357.1" y2="180" stroke="#2f6fed" stroke-width="1.7" marker-end="url(#ar-blue)"/>
+<rect x="84.6" y="155" width="402.3" height="18" rx="4" fill="#fff" fill-opacity=".96"/><text x="285.7" y="168" text-anchor="middle" font-size="14.5" fill="#1e2a3d">cron add(schedule.event, message 三段, isolated)</text>
+<circle cx="72.6" cy="164.0" r="8.5" fill="#2f6fed"/><text x="72.6" y="167.8" text-anchor="middle" font-size="10.5" font-weight="700" fill="#fff">3</text>
+<line x1="357.1" y1="214" x2="500.0" y2="214" stroke="#7c5cd6" stroke-width="1.7" marker-end="url(#ar-purple)"/>
+<rect x="262.5" y="189" width="332.1" height="18" rx="4" fill="#fff" fill-opacity=".96"/><text x="428.6" y="202" text-anchor="middle" font-size="14.5" fill="#1e2a3d">RPC cron.add → 校验 eventType，落 job 表</text>
+<circle cx="250.5" cy="198.0" r="8.5" fill="#7c5cd6"/><text x="250.5" y="201.8" text-anchor="middle" font-size="10.5" font-weight="700" fill="#fff">4</text>
+<line x1="500.0" y1="248" x2="642.9" y2="248" stroke="#7c5cd6" stroke-width="1.7" marker-end="url(#ar-purple)"/>
+<rect x="331.4" y="223" width="480" height="18" rx="4" fill="#fff" fill-opacity=".96"/><text x="571.4" y="236" text-anchor="middle" font-size="14.5" fill="#1e2a3d">subscribe(filter + 目录默认 debounce / staleAfter, job_id)</text>
+<circle cx="352.5" cy="232.0" r="8.5" fill="#7c5cd6"/><text x="352.5" y="235.8" text-anchor="middle" font-size="10.5" font-weight="700" fill="#fff">5</text>
+<line x1="642.9" y1="282" x2="500.0" y2="282" stroke="#0ea578" stroke-width="1.7" stroke-dasharray="6,4" marker-end="url(#ar-green)"/>
+<rect x="467.7" y="257" width="207.4" height="18" rx="4" fill="#fff" fill-opacity=".96"/><text x="571.4" y="270" text-anchor="middle" font-size="14.5" fill="#1e2a3d">subscription_id 写回 job</text>
+<line x1="214.3" y1="316" x2="71.4" y2="316" stroke="#2f6fed" stroke-width="1.7" marker-end="url(#ar-blue)"/>
+<rect x="26.0" y="291" width="264.2" height="18" rx="4" fill="#fff" fill-opacity=".96"/><text x="158.1" y="304" text-anchor="middle" font-size="14.5" fill="#1e2a3d">回读确认：“好，你到家我就开客厅灯”</text>
+<circle cx="14.0" cy="300.0" r="8.5" fill="#2f6fed"/><text x="14.0" y="303.8" text-anchor="middle" font-size="10.5" font-weight="700" fill="#fff">6</text>
+<text x="234.3" y="342" font-size="14.5" font-weight="700" fill="#d97a06" text-anchor="start">模型到此为止——直到第 11 步之前全部非 LLM、零 token</text>
+<rect x="8" y="354" width="984" height="20" rx="4" fill="#7c5cd6" fill-opacity=".09"/><text x="18" y="368.5" font-size="14.5" font-weight="700" fill="#7c5cd6">T1 触发期：某天 18:42，第 7–12 步；只有 11 有模型参与</text>
+<rect x="433.5" y="386" width="418.7" height="52" rx="5" fill="#fff" stroke="#0ea578" stroke-width="1.3"/>
+<text x="642.9" y="401.0" text-anchor="middle" font-size="14.5" fill="#1e2a3d">原始事件到达 → 评估 filter（zone == 'home'）</text>
+<text x="642.9" y="419.0" text-anchor="middle" font-size="14.5" fill="#1e2a3d">+ 目录默认 debounce 5m → 推送</text>
+<circle cx="421.5" cy="412.0" r="8.5" fill="#0ea578"/><text x="421.5" y="415.8" text-anchor="middle" font-size="10.5" font-weight="700" fill="#fff">7</text>
+<line x1="642.9" y1="468" x2="500.0" y2="468" stroke="#0ea578" stroke-width="1.7" marker-end="url(#ar-green)"/>
+<rect x="315.8" y="443" width="511.3" height="18" rx="4" fill="#fff" fill-opacity=".96"/><text x="571.4" y="456" text-anchor="middle" font-size="14.5" fill="#1e2a3d">POST /hooks/eventhub {event_id, job_id, occurred_at, payload}</text>
+<circle cx="303.8" cy="452.0" r="8.5" fill="#0ea578"/><text x="303.8" y="455.8" text-anchor="middle" font-size="10.5" font-weight="700" fill="#fff">8</text>
+<rect x="323.7" y="484" width="352.6" height="52" rx="5" fill="#fff" stroke="#7c5cd6" stroke-width="1.3"/>
+<text x="500.0" y="499.0" text-anchor="middle" font-size="14.5" fill="#1e2a3d">ingress：鉴权 → 解析 → 按 job_id 找 job</text>
+<text x="500.0" y="517.0" text-anchor="middle" font-size="14.5" fill="#1e2a3d">onTick：去重 → 过期 → 回 200 → fire → limits → run queued</text>
+<circle cx="311.7" cy="510.0" r="8.5" fill="#7c5cd6"/><text x="311.7" y="513.8" text-anchor="middle" font-size="10.5" font-weight="700" fill="#fff">9</text>
+<line x1="500.0" y1="566" x2="785.7" y2="566" stroke="#7c5cd6" stroke-width="1.7" marker-end="url(#ar-purple)"/>
+<rect x="397.9" y="541" width="489.9" height="18" rx="4" fill="#fff" fill-opacity=".96"/><text x="642.9" y="554" text-anchor="middle" font-size="14.5" fill="#1e2a3d">runJob（与定时到点同一段代码）：拼信封 → 起 isolated agentTurn</text>
+<circle cx="385.9" cy="550.0" r="8.5" fill="#7c5cd6"/><text x="385.9" y="553.8" text-anchor="middle" font-size="10.5" font-weight="700" fill="#fff">10</text>
+<rect x="622.5" y="582" width="326.5" height="52" rx="5" fill="#fff" stroke="#2f6fed" stroke-width="1.3"/>
+<text x="785.7" y="597.0" text-anchor="middle" font-size="14.5" fill="#1e2a3d">读信封 → homekit.set(living_main, on)</text>
+<text x="785.7" y="615.0" text-anchor="middle" font-size="14.5" fill="#1e2a3d">→ music.play(常听歌单)（toolsAllow 内）</text>
+<circle cx="610.5" cy="608.0" r="8.5" fill="#2f6fed"/><text x="610.5" y="611.8" text-anchor="middle" font-size="10.5" font-weight="700" fill="#fff">11</text>
+<line x1="785.7" y1="664" x2="500.0" y2="664" stroke="#2f6fed" stroke-width="1.7" stroke-dasharray="6,4" marker-end="url(#ar-blue)"/>
+<rect x="532.2" y="639" width="221.3" height="18" rx="4" fill="#fff" fill-opacity=".96"/><text x="642.9" y="652" text-anchor="middle" font-size="14.5" fill="#1e2a3d">结束（最终文本 / NO_REPLY）</text>
+<circle cx="520.2" cy="648.0" r="8.5" fill="#2f6fed"/><text x="520.2" y="651.8" text-anchor="middle" font-size="10.5" font-weight="700" fill="#fff">12</text>
+<rect x="305.7" y="680" width="388.6" height="34" rx="5" fill="#fff" stroke="#7c5cd6" stroke-width="1.3"/>
+<text x="500.0" y="695.0" text-anchor="middle" font-size="14.5" fill="#1e2a3d">run ok → last_run_summary 写回 job → runs 历史</text>
+<line x1="500.0" y1="744" x2="928.6" y2="744" stroke="#7c5cd6" stroke-width="1.7" stroke-dasharray="6,4" marker-end="url(#ar-purple)"/>
+<rect x="443.3" y="719" width="542.1" height="18" rx="4" fill="#fff" fill-opacity=".96"/><text x="714.3" y="732" text-anchor="middle" font-size="14.5" fill="#1e2a3d">delivery=announce 时：渠道 + 主 session 一条摘要（S3 为 none，不发）</text>
+</svg></div>
+    </div>
+    <div class="col" style="flex:0 0 23%;">
+      <div class="panel">
+        <h2><span class="tag purple">run 状态机</span></h2>
+        <div class="flow vert" style="gap:.2em; font-size:.92em;">
+          <div class="node purpleb"><strong>queued</strong>触发到达、已回 200</div><div class="arr">→</div>
+          <div class="node hl"><strong>running</strong>agentTurn 执行中</div><div class="arr">→</div>
+          <div class="node warnb"><strong>waiting</strong>ask_user 挂起，答复后回 running</div><div class="arr">→</div>
+          <div class="node green"><strong>ok</strong>写 last_run_summary；announce 时交付</div>
+        </div>
+        <table style="margin-top:.4em; font-size:.82em;">
+          <tr><th>异常分支</th><th>run 终态</th></tr>
+          <tr><td>@9 重复 event_id / 过期 → 200，不执行</td><td class="nw"><strong>skipped</strong></td></tr>
+          <tr><td>@11 高危动作 → ask_user，答复后继续</td><td class="nw"><strong>waiting</strong></td></tr>
+          <tr><td>@12 失败 / 超时 → failureAlert</td><td class="nw"><strong>error</strong></td></tr>
+        </table>
+        <div class="callout blue" style="margin-top:.4em; font-size:.82em;"><b>job 与 run 分离：</b>job 长期存在，run 是一次触发；fire:false 不产生 run。</div>
+      </div>
+    </div>
+  </div>
+  <span class="pageno">16 / 17</span>
+</section>
+
+
+
+<!-- ═══════════ P17 拍板 · 可靠性 · 分期 ═══════════ -->
+<section class="slide">
+  <div class="crumb c4"><span class="ch">④ 验证与拍板</span>收尾</div>
+  <div class="header">
+    <h1><span class="hl">六项拍板</span> · 可靠性清单 · 分期 · 动手前待核实</h1>
+    <p class="subtitle">设计上要拍板的都在这一页；"待核实"是 openClaw 源码事实，不是设计问题</p>
+  </div>
+  <div class="cols">
+    <div class="col" style="flex:1.15;">
+      <div class="panel">
+        <h2><span class="tag warn">六项拍板</span>D1–D6</h2>
+        <table style="font-size:.75em;">
+          <tr><th>#</th><th style="width:22%;">问题</th><th>决定</th></tr>
+          <tr><td>D1</td><td><strong>fire 的语义</strong></td><td>= "需要执行一次 payload"，trigger 检测跃迁、message 说明动作类型；S6 分档、S7 上 / 下沙发一条 job 成立（P5）</td></tr>
+          <tr><td>D2</td><td><strong>脚本运行时边界</strong></td><td>cron service 沙箱；只读 <code>tools.call</code>（toolsAllow 内）；30s / 5 调用 / 16KB；<strong>失败 = fire:false + check error</strong>，不采用"失败算 fire"（避免误动作）（P8）</td></tr>
+          <tr><td>D3</td><td><strong>预授权</strong></td><td>一期：支付 / 卖出 / 对外发送一律 ask_user。二期：toolsAllow 参数级约束（<code>messaging.send.to ∈ {…}</code>、<code>maxCalls</code>）落地后，创建期确认过的范围免确认；支付永远 ask_user</td></tr>
+          <tr><td>D4</td><td><strong>跨 session ask_user</strong></td><td>run waiting → 问题经 delivery 渠道 → 答复回 run；可能 ask_user 的 job 强制 announce；超时 → error + failureAlert（P14）</td></tr>
+          <tr><td>D5</td><td><strong>事件入口</strong></td><td>默认 webhook <code>/hooks/eventhub</code>，同机切本机直调；一期前用原生 <code>stream</code> kind 做零改动可行性验证（附录 A9）</td></tr>
+          <tr><td>D6</td><td><strong>activeWindow 窗外</strong></td><td>事件 / self / sources 里的时间源 tick 仍进 trigger 维护 state，fire 不进 run；否则 S9 lead_since、S12 deadline 会断</td></tr>
+        </table>
+      </div>
+      <div class="panel fit">
+        <h2><span class="tag green">可靠性清单</span>必做</h2>
+        <table style="font-size:.72em;">
+          <tr><td><strong>重复</strong></td><td>event_id 幂等 24h；先回 200 再执行</td><td><strong>过期</strong></td><td>目录 staleAfter + openClaw 校验 occurred_at</td></tr>
+          <tr><td><strong>订阅漂移</strong></td><td>启动对账；未知 job_id 退订</td><td><strong>并发</strong></td><td>同 job 串行 + cooldown；跨 job maxConcurrentRuns</td></tr>
+          <tr><td><strong>state 写坏</strong></td><td>stateSchema 校验，不合保留旧值</td><td><strong>判定失控</strong></td><td>前置 script + maxChecksPerDay + 小模型；超预算暂停告警</td></tr>
+          <tr><td><strong>不可信输入</strong></td><td>信封 ② 标 external-data</td><td><strong>静默失败</strong></td><td>failureAlert 必配</td></tr>
+          <tr><td><strong>乱序 / 延迟</strong></td><td>事件间隔按 occurred_at 比较，不假设投递顺序</td><td><strong>state 竞争</strong></td><td>同 job 的 onTick 串行队列（V7）</td></tr>
+        </table>
+      </div>
+    </div>
+    <div class="col">
+      <div class="panel fit">
+        <h2><span class="tag">分期</span>一期把两种判定者都做出来，二期加护栏与放权</h2>
+        <table style="font-size:.76em;">
+          <tr><th style="width:14%;">期</th><th>新增</th><th>覆盖</th></tr>
+          <tr class="hl"><td><strong>一期</strong></td><td>sources[] + 事件适配器 · tick + nextCheckAt · limits · 目录进 prompt + phone.lookup · event_publish + publishes · D2 脚本边界 · trigger.agent 基础（prompt + trigger_result + 前置 script）</td><td>S1–S12 全部；派生事件</td></tr>
+          <tr><td><strong>二期</strong></td><td>postScript + stateSchema 强校验 · 多模态直接进判定信封 · 参数级 toolsAllow 约束 · 预授权放开</td><td>S7 完整形态；agent 可选项调优；免确认发送 / 卖出</td></tr>
+        </table>
+      </div>
+      <div class="panel">
+        <h2><span class="tag red">动手前到源码核实</span>V1–V7</h2>
+        <table style="font-size:.74em;">
+          <tr><td>V1</td><td><code>trigger.script</code> 沙箱：能否 <code>tools.call</code>、超时、失败默认语义（D2 要改则改哪里）</td></tr>
+          <tr><td>V2</td><td><code>stream</code> kind 的 tick 语义：每行一次 trigger？子进程生命周期随 job？</td></tr>
+          <tr><td>V3</td><td>自动化 run 里 <code>cron remove</code> 自己对 isolated 是否放开（S6 / S8 依赖）</td></tr>
+          <tr><td>V4</td><td>run waiting 的 ask_user 如何送达、如何恢复、超时默认（D4 依赖）</td></tr>
+          <tr><td>V5</td><td>toolsAllow 是否支持参数级约束；没有则二期自己加</td></tr>
+          <tr><td>V6</td><td><code>at</code> 的跑完自删能否配到 every / event（否则 <code>maxRunsTotal</code> 自己实现）</td></tr>
+          <tr><td>V7</td><td><code>onTick</code> 对同一 job 是否已串行（否则加 per-job 队列，S11 / S12 的 state 才不会被并发 tick 交叉读写）</td></tr>
+        </table>
+      </div>
+      <div class="callout blue" style="font-size:.84em;"><b>下一步：</b>① V1–V7 核实，一天；② <code>stream</code> 路径跑通 S3 验证事件链路；③ 一期五项，先 S1 / S2 / S3 / S9（script），再 S7（agent 基础）；④ 二期护栏与放权。</div>
+    </div>
+  </div>
+  <span class="pageno">17 / 17</span>
+</section>
+
+</body>
+</html>
