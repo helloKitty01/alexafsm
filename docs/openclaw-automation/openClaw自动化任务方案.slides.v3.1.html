@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>openClaw 自动化任务 v3.1：一个工具 · 一条路 · 五项新增（主稿 17 页 + 附录 10 页）</title>
+<title>openClaw 自动化任务 v3.1：一个工具 · 一条路 · 五项新增（主稿 18 页 + 附录 10 页）</title>
 <style>
   :root {
     --bg: #e9eef6;
@@ -186,29 +186,87 @@
 <!-- ═══════════ P1 目录 ═══════════ -->
 <section class="slide cover">
   <div class="title">openClaw 自动化任务 <span class="hl">v3.1</span><br>一个工具 · 一条路 · 五项新增</div>
-  <p class="lead">把 openClaw 的定时任务扩展为统一的自动化任务：<strong>时间</strong>到点、<strong>事件</strong>到达、<strong>脚本</strong>判定、<strong>模型</strong>判定，全部汇入 cron service 同一条执行路径。前提：存在统一事件中心（EventHub，订阅即推送、单事件 filter、publish 接口）；openClaw 可改源码。<br>方案只做<strong>五项新增</strong>、<strong>三个新工具</strong>，字段集一页写完；一条路 <code>tick → trigger → fire → limits → run</code>，三道门各答一个问题；判定者 <code>script</code> 与 <code>agent</code> 是同一契约下的两个正式选项——有结构化数据源默认脚本（零 token），看图 / 读页面 / 语义判断选模型，十二个场景里只有 S7 必须选模型；<strong>六件事拍板</strong>（fire 语义、脚本边界、预授权分期、ask_user 路径、事件入口、窗外 tick）。主稿 17 页讲清逻辑与每个场景，规格细节在<strong>附录</strong>（第 18 页起，A1–A10）。</p>
+  <p class="lead">把 openClaw 的定时任务扩展为统一的自动化任务：<strong>时间</strong>到点、<strong>事件</strong>到达、<strong>脚本</strong>判定、<strong>模型</strong>判定，全部汇入 cron service 同一条执行路径。前提：存在统一事件中心（EventHub，订阅即推送、单事件 filter、publish 接口）；openClaw 可改源码。<br>方案只做<strong>五项新增</strong>、<strong>三个新工具</strong>，字段集一页写完；一条路 <code>tick → trigger → fire → limits → run</code>，三道门各答一个问题；判定者 <code>script</code> 与 <code>agent</code> 是同一契约下的两个正式选项——有结构化数据源默认脚本（零 token），看图 / 读页面 / 语义判断选模型，十二个场景里只有 S7 必须选模型；<strong>六件事拍板</strong>（fire 语义、脚本边界、预授权分期、ask_user 路径、事件入口、窗外 tick）。主稿 18 页讲清逻辑与每个场景，规格细节在<strong>附录</strong>（第 19 页起，A1–A10）。</p>
   <div class="toc">
-    <div class="ch"><h3>① 总体</h3><div class="pg">P2 – P4</div>
-      <ul><li><b>P2</b>十二个场景：谁叫醒、谁判定</li><li><b>P3</b>一页看懂：整体架构</li><li><b>P4</b>原生复用 vs 五项新增</li></ul></div>
-    <div class="ch c2"><h3>② 核心模型</h3><div class="pg">P5 – P12</div>
-      <ul><li><b>P5</b>一条路 · 三道门 · 名词</li><li><b>P6</b>最小字段集</li><li><b>P7</b>事件源：规格 · 入口 · 订阅</li><li><b>P8</b>trigger：脚本与模型同一契约</li><li><b>P9</b>agent 判定的完整形态</li><li><b>P10</b>limits 与 nextCheckAt</li><li><b>P11</b>组合条件：一种写法</li><li><b>P12</b>派生事件：只差 payload</li></ul></div>
-    <div class="ch c3"><h3>③ 编译与执行</h3><div class="pg">P13 – P14</div>
-      <ul><li><b>P13</b>编译：从一句话到 cron add</li><li><b>P14</b>执行：session · 工具面 · 信封</li></ul></div>
-    <div class="ch c4"><h3>④ 验证与拍板</h3><div class="pg">P15 – P17</div>
-      <ul><li><b>P15</b>十二场景全表</li><li><b>P16</b>时序：S3 到家开灯</li><li><b>P17</b>六项拍板 · 可靠性 · 分期 · 待核实</li></ul></div>
-    <div class="ch c5"><h3>附录（P18 起）</h3><div class="pg">A1 – A10</div>
+    <div class="ch"><h3>① 总体</h3><div class="pg">P2 – P5</div>
+      <ul><li><b>P2</b>一页看懂：四级台阶 · 一条路</li><li><b>P3</b>十二个场景：谁叫醒、谁判定</li><li><b>P4</b>整体架构：唯一中枢</li><li><b>P5</b>原生复用 vs 五项新增</li></ul></div>
+    <div class="ch c2"><h3>② 核心模型</h3><div class="pg">P6 – P13</div>
+      <ul><li><b>P6</b>一条路 · 三道门 · 名词</li><li><b>P7</b>最小字段集</li><li><b>P8</b>事件源：规格 · 入口 · 订阅</li><li><b>P9</b>trigger：脚本与模型同一契约</li><li><b>P10</b>agent 判定的完整形态</li><li><b>P11</b>limits 与 nextCheckAt</li><li><b>P12</b>组合条件：一种写法</li><li><b>P13</b>派生事件：只差 payload</li></ul></div>
+    <div class="ch c3"><h3>③ 编译与执行</h3><div class="pg">P14 – P15</div>
+      <ul><li><b>P14</b>编译：从一句话到 cron add</li><li><b>P15</b>执行：session · 工具面 · 信封</li></ul></div>
+    <div class="ch c4"><h3>④ 验证与拍板</h3><div class="pg">P16 – P18</div>
+      <ul><li><b>P16</b>十二场景全表</li><li><b>P17</b>时序：S3 到家开灯</li><li><b>P18</b>六项拍板 · 可靠性 · 分期 · 待核实</li></ul></div>
+    <div class="ch c5"><h3>附录（P19 起）</h3><div class="pg">A1 – A10</div>
       <ul><li><b>A2</b>事件目录 10 组 63 条</li><li><b>A3</b>filter 语法与校验</li><li><b>A4</b>编译模板三套</li><li><b>A5</b>时序 ②：派生事件接力</li><li><b>A6–A8</b>模型视角：地图 · 判定 · 动作</li><li><b>A9</b>事件入口传输四选一</li><li><b>A10</b>S7 完整 job：agent 判定示例</li></ul></div>
   </div>
   <div class="route">
-    <div class="r"><b>只看结论：</b>P3 架构 → P17 拍板与分期</div>
-    <div class="r"><b>要评审方案：</b>P2 → P5 一条路 → P6 字段 → P15 全表</div>
-    <div class="r"><b>要做实现：</b>P4 新增清单 → P6–P10 规格 → P17 待核实 → 附录 A2 / A3</div>
-    <div class="r"><b>要核对场景：</b>P2 归类 → P10 / P11 脚本 → P15 全表 → P16 时序</div>
+    <div class="r"><b>只看结论：</b>P2 一页看懂 → P4 架构 → P18 拍板与分期</div>
+    <div class="r"><b>要评审方案：</b>P3 → P6 一条路 → P7 字段 → P16 全表</div>
+    <div class="r"><b>要做实现：</b>P5 新增清单 → P7–P11 规格 → P18 待核实 → 附录 A2 / A3</div>
+    <div class="r"><b>要核对场景：</b>P3 归类 → P11 / P12 脚本 → P16 全表 → P17 时序</div>
   </div>
-  <span class="pageno">1 / 27</span>
+  <span class="pageno">1 / 28</span>
 </section>
 
-<!-- ═══════════ P2 十二个场景 ═══════════ -->
+<!-- ═══════════ P2 一页看懂 ═══════════ -->
+<section class="slide">
+  <div class="crumb"><span class="ch">① 总体</span>一页看懂</div>
+  <div class="header">
+    <h1>能力扩展是<span class="hl">四级台阶</span>，整体逻辑是<span class="hl">一条路</span></h1>
+    <p class="subtitle">每一级只比上一级多一件事，全部落在同一条 <code>cron add</code> 里；创建时模型参与一次，运行期默认不过模型</p>
+  </div>
+  <div class="cols">
+    <div class="col" style="flex:.95;">
+      <div class="panel">
+        <h2><span class="tag">背景 · 能力扩展</span>"叫醒"与"判定"是两个正交的轴</h2>
+        <div style="display:flex; flex-direction:column; gap:.45em; flex:1; justify-content:center;">
+          <div class="box p" style="margin-right:24%;"><strong>L0 定时<span class="badge native">原生已有</span>　S1</strong>"每天 9 点帮我看新闻"　→ <code>schedule.kind = cron</code></div>
+          <div class="box a" style="margin-left:8%; margin-right:16%;"><strong>L1 事件　S3 S4 S5</strong>"到家 / 张三来电 / 放票时帮我…"<br>多一件事：<strong>叫醒源从时间扩到外部事件</strong>，到达即执行　→ <code>sources[]: event</code></div>
+          <div class="box w" style="margin-left:16%; margin-right:8%;"><strong>L2 条件　S2 S6 S7 S8 S9</strong>"跌 10% 卖一半 / 持续领先 30 分钟 / 狗上沙发 5 分钟仍在"<br>多一件事：<strong>叫醒后还要判断"现在该不该动"</strong>，并记住上次（分档 · 持续 · 跃迁）　→ <code>trigger {script | agent, state, nextCheckAt}</code>。S2 是时间源 + 判定：两个轴互不绑定</div>
+          <div class="box g" style="margin-left:24%;"><strong>L3 组合　S10 S11 S12</strong>"到家且电量低 / 到家后 10 分钟内来电 / 离开 1 小时没到家"<br>多出的：<strong>没有新机制</strong>——L1 的多个源 + L2 的 state 记时间戳　→ <code>sources[]</code> 多写一个 + 同一段 script</div>
+        </div>
+        <div style="display:flex; gap:.6em; margin-top:.55em; font-size:.8em;">
+          <div class="frame" style="flex:1;"><strong>横切 · 限额</strong>　"只在晚上 / 一天一次 / 别连着来" → <code>limits</code></div>
+          <div class="frame" style="flex:1;"><strong>横切 · 权限</strong>　支付 / 卖出 / 对外发送 → <code>ask_user</code></div>
+        </div>
+      </div>
+    </div>
+    <div class="col" style="flex:1.3;">
+      <div class="panel fit">
+        <h2><span class="tag purple">编译期 · 创建时</span>模型参与一次，产物是一条冻结的 job</h2>
+        <div class="flow">
+          <div class="node"><strong>用户一句话</strong>"曼联持续领先 30 分钟通知张三"</div><div class="arr">→</div>
+          <div class="node purpleb" style="flex:1.3;"><strong>主 loop 编译</strong>按台阶定级 → 选叫醒源与判定者 → 查事件目录 / <code>phone.lookup</code> 填槽</div><div class="arr">→</div>
+          <div class="node hl" style="flex:1.3;"><strong>cron add</strong>谁叫醒 schedule · 谁判定 trigger · 限额 limits · 做什么 payload.message · 权限面 toolsAllow</div>
+        </div>
+      </div>
+      <div class="panel">
+        <h2><span class="tag">运行期 · 每次叫醒</span>一条路五个节点，三道门各答一个问题</h2>
+        <div class="flow">
+          <div class="node green"><strong>tick</strong>时间到点 / 事件到达 / 自设闹钟</div><div class="arr">→</div>
+          <div class="node purpleb"><strong>trigger</strong>脚本（默认，零 token）或只读模型（可选）</div><div class="arr">→</div>
+          <div class="node hl"><strong>fire</strong>= 需要执行一次 payload；message 写跃迁名</div><div class="arr">→</div>
+          <div class="node warnb"><strong>limits</strong>activeWindow · cooldown · 次数</div><div class="arr">→</div>
+          <div class="node"><strong>run</strong>isolated agentTurn，按跃迁 → 动作表执行</div>
+        </div>
+        <table style="margin-top:.45em; font-size:.72em;">
+          <tr><th style="width:10%;"></th><th>tick</th><th>trigger</th><th>fire</th><th>limits</th><th>run</th></tr>
+          <tr><td class="nw"><strong>归属</strong></td><td>事件中心 filter → cron service</td><td>checker：脚本沙箱 / 只读模型</td><td>cron service</td><td>cron service</td><td>isolated agentTurn</td></tr>
+          <tr><td class="nw"><strong>答什么</strong></td><td>这件事值不值得叫醒我</td><td>现在需要动作吗</td><td>—（定义）</td><td>此刻该不该跑</td><td>做；高权限先 ask_user</td></tr>
+          <tr><td class="nw"><strong>过模型</strong></td><td class="ok">否</td><td>默认否；选 agent 时一次只读 check</td><td class="ok">否</td><td class="ok">否</td><td class="no">一次 agentTurn</td></tr>
+        </table>
+        <div class="callout blue" style="margin-top:.45em; font-size:.76em;"><b>分工原则：</b>filter 写不了的不扩 filter，归 trigger 或 limits——事件中心永远不需要理解"之后 / 没有 / 持续"；复杂度全留在 openClaw 这一侧的一个 job 里，<code>cron get</code> 看得见。</div>
+      </div>
+    </div>
+  </div>
+  <div class="cols" style="flex:0 0 auto; margin-top:.5em; font-size:.82em;">
+    <div class="callout" style="flex:1.3;"><b>模型参与点：</b>编译期 1 次（主 loop）· 运行期默认 0 次（脚本判定）· 选模型判定时 +1 次只读 check · 真正动作时 1 次 agentTurn。十二个场景里<strong>只有 S7 必须选判定模型</strong>。</div>
+    <div class="callout warn" style="flex:1;"><b>不换轨：</b>原生 cron 的 schedule / trigger.script / payload / session / delivery / runs 全部复用；新增只有五项、三个工具（P5）。</div>
+  </div>
+  <span class="pageno">2 / 28</span>
+</section>
+
+<!-- ═══════════ P3 十二个场景 ═══════════ -->
 <section class="slide">
   <div class="crumb"><span class="ch">① 总体</span>场景</div>
   <div class="header">
@@ -238,21 +296,21 @@
     </div>
     <div class="col">
       <div class="reqs">
-        <div class="req key"><h3><span class="no">G1</span>一个任务工具，一张表</h3><p>模型只面对原生 <code>cron</code> 工具；job 表就是任务表。事件是 <strong>schedule 的一种 kind</strong>，模型判定是 <strong>trigger 的一种 kind</strong>；另加 3 个小工具（P4）。</p></div>
-        <div class="req key"><h3><span class="no">G2</span>判定默认是脚本，模型是可选项</h3><p>时间到 / 事件到 / 脚本命中零 token。有结构化数据源默认 <code>trigger.script</code>；<strong>看图、读页面、语义判断</strong>选 <code>trigger.agent</code>——同一契约，只读、有前置脚本门、有预算（P9）。</p></div>
-        <div class="req key"><h3><span class="no">G3</span>运行上下文 = 冻结的任务定义</h3><p>执行 Agent 拿到<strong>系统身份 + 触发事实 + 创建时冻结的任务</strong>，不读主对话历史（P14）。</p></div>
-        <div class="req"><h3><span class="no">G4</span>filter 归事件中心，判定与限额归 cron service</h3><p>事件中心只做目录 + 单事件 <code>filter</code> + 推送，不做 CEP；trigger state、<code>limits</code>、<code>nextCheckAt</code> 全在 cron service（P5）。</p></div>
-        <div class="req"><h3><span class="no">G5</span>派生事件是资产</h3><p>判定结果要给别人用时，payload 改成 <code>event_publish</code>，事件登进目录，谁要谁订（P12）。</p></div>
-        <div class="req warnk"><h3><span class="no">G6</span>高危动作分期放开</h3><p>支付永远 <code>ask_user</code>。卖出 / 对外发送：<strong>一期 ask_user</strong>，二期做 toolsAllow 参数级约束后按创建期确认范围免确认（P17 D3）。</p></div>
+        <div class="req key"><h3><span class="no">G1</span>一个任务工具，一张表</h3><p>模型只面对原生 <code>cron</code> 工具；job 表就是任务表。事件是 <strong>schedule 的一种 kind</strong>，模型判定是 <strong>trigger 的一种 kind</strong>；另加 3 个小工具（P5）。</p></div>
+        <div class="req key"><h3><span class="no">G2</span>判定默认是脚本，模型是可选项</h3><p>时间到 / 事件到 / 脚本命中零 token。有结构化数据源默认 <code>trigger.script</code>；<strong>看图、读页面、语义判断</strong>选 <code>trigger.agent</code>——同一契约，只读、有前置脚本门、有预算（P10）。</p></div>
+        <div class="req key"><h3><span class="no">G3</span>运行上下文 = 冻结的任务定义</h3><p>执行 Agent 拿到<strong>系统身份 + 触发事实 + 创建时冻结的任务</strong>，不读主对话历史（P15）。</p></div>
+        <div class="req"><h3><span class="no">G4</span>filter 归事件中心，判定与限额归 cron service</h3><p>事件中心只做目录 + 单事件 <code>filter</code> + 推送，不做 CEP；trigger state、<code>limits</code>、<code>nextCheckAt</code> 全在 cron service（P6）。</p></div>
+        <div class="req"><h3><span class="no">G5</span>派生事件是资产</h3><p>判定结果要给别人用时，payload 改成 <code>event_publish</code>，事件登进目录，谁要谁订（P13）。</p></div>
+        <div class="req warnk"><h3><span class="no">G6</span>高危动作分期放开</h3><p>支付永远 <code>ask_user</code>。卖出 / 对外发送：<strong>一期 ask_user</strong>，二期做 toolsAllow 参数级约束后按创建期确认范围免确认（P18 D3）。</p></div>
       </div>
     </div>
   </div>
-  <span class="pageno">2 / 27</span>
+  <span class="pageno">3 / 28</span>
 </section>
 
-<!-- ═══════════ P3 整体架构 ═══════════ -->
+<!-- ═══════════ P4 整体架构 ═══════════ -->
 <section class="slide">
-  <div class="crumb"><span class="ch">① 总体</span>一页看懂</div>
+  <div class="crumb"><span class="ch">① 总体</span>整体架构</div>
   <div class="header">
     <h1><span class="hl">整体架构</span>：cron service 是唯一中枢，所有叫醒源汇入同一条路</h1>
     <p class="subtitle"><span class="badge native">原生</span> 复用不改　<span class="badge new">新增</span> 本方案五项　<span class="badge ext">外部</span> 事件中心</p>
@@ -294,10 +352,10 @@
       </div>
     </div>
   </div>
-  <span class="pageno">3 / 27</span>
+  <span class="pageno">4 / 28</span>
 </section>
 
-<!-- ═══════════ P4 原生复用 vs 五项新增 ═══════════ -->
+<!-- ═══════════ P5 原生复用 vs 五项新增 ═══════════ -->
 <section class="slide">
   <div class="crumb"><span class="ch">① 总体</span>复用与新增</div>
   <div class="header">
@@ -337,11 +395,11 @@
         <h2><span class="tag warn">五项新增</span>全部在 cron service 与主 loop prompt 里</h2>
         <table style="font-size:.7em;">
           <tr><th>#</th><th>新增</th><th>内容</th><th style="width:12%;">页</th></tr>
-          <tr><td>①</td><td class="nw"><strong>sources[] + 事件适配器</strong></td><td><code>schedule.sources[]</code> 1..n，每项 kind ∈ at / every / cron / <code>event</code>；event 项 add / remove 时订阅 / 退订；入口去重、过期、回 200、转 tick</td><td>P7</td></tr>
-          <tr><td>②</td><td class="nw"><strong>tick + nextCheckAt</strong></td><td>三种叫醒统一成 tick 进 <code>onTick</code>；trigger 可返回 <code>nextCheckAt</code>，到点造 self tick</td><td>P10</td></tr>
-          <tr><td>③</td><td class="nw"><strong>limits 限额器</strong></td><td>fire 与 run 之间：activeWindow / cooldown / maxRunsPerDay / maxRunsTotal / maxChecksPerDay</td><td>P10</td></tr>
-          <tr><td>④</td><td class="nw"><strong>trigger.agent</strong></td><td>只读 isolated agentTurn 当判定者，<code>trigger_result</code> 收口，失败不算 fire；前置 script 门 + 可选 postScript</td><td>P8 / P9</td></tr>
-          <tr><td>⑤</td><td class="nw"><strong>编译期支撑</strong></td><td>目录（内建 + 派生）静态进 prompt；<code>phone.lookup</code>；<code>event_publish</code> + publishes 登记；三套模板</td><td>P13</td></tr>
+          <tr><td>①</td><td class="nw"><strong>sources[] + 事件适配器</strong></td><td><code>schedule.sources[]</code> 1..n，每项 kind ∈ at / every / cron / <code>event</code>；event 项 add / remove 时订阅 / 退订；入口去重、过期、回 200、转 tick</td><td>P8</td></tr>
+          <tr><td>②</td><td class="nw"><strong>tick + nextCheckAt</strong></td><td>三种叫醒统一成 tick 进 <code>onTick</code>；trigger 可返回 <code>nextCheckAt</code>，到点造 self tick</td><td>P11</td></tr>
+          <tr><td>③</td><td class="nw"><strong>limits 限额器</strong></td><td>fire 与 run 之间：activeWindow / cooldown / maxRunsPerDay / maxRunsTotal / maxChecksPerDay</td><td>P11</td></tr>
+          <tr><td>④</td><td class="nw"><strong>trigger.agent</strong></td><td>只读 isolated agentTurn 当判定者，<code>trigger_result</code> 收口，失败不算 fire；前置 script 门 + 可选 postScript</td><td>P9 / P10</td></tr>
+          <tr><td>⑤</td><td class="nw"><strong>编译期支撑</strong></td><td>目录（内建 + 派生）静态进 prompt；<code>phone.lookup</code>；<code>event_publish</code> + publishes 登记；三套模板</td><td>P14</td></tr>
         </table>
       </div>
       <div class="panel fit">
@@ -356,10 +414,10 @@
       <div class="callout warn" style="font-size:.78em;"><b>取舍原则：</b>每个机制都要能指出"没有它哪个场景跑不通"，指不出就不进字段集；不做 CEP、不加第二个任务工具、不让模型写订阅卫生参数；模板只有例子没有编号；判定动作一体的写法只用于离线验 prompt，不作方案项。</div>
     </div>
   </div>
-  <span class="pageno">4 / 27</span>
+  <span class="pageno">5 / 28</span>
 </section>
 
-<!-- ═══════════ P5 一条路 · 三道门 · 名词 ═══════════ -->
+<!-- ═══════════ P6 一条路 · 三道门 · 名词 ═══════════ -->
 <section class="slide">
   <div class="crumb c2"><span class="ch">② 核心模型</span>一条路 · 名词</div>
   <div class="header">
@@ -384,22 +442,22 @@
       <tr><td class="nw"><strong>tick</strong></td><td>job 被叫醒、给 trigger 一次判定机会的最小单位。三种来源：时间到点（at / every / cron）、订阅事件到达（event）、自设闹钟到期（self）</td><td>谁、何时叫醒我</td><td class="nw">cron service</td><td><code>tick = {source, event?, now}</code>，trigger 的输入</td></tr>
       <tr><td class="nw"><strong>trigger</strong></td><td>拿到 tick 后判定"现在是否需要动作"的一层，可选。script 由 checker 跑，agent 由判定模型跑；同一契约。<strong>负责检测跃迁</strong>（进入阈值、上 / 下沙发、到点仍领先）</td><td>需要动作吗</td><td class="nw">checker / 判定模型</td><td><code>trigger.kind</code>，返回 <code>{fire, message, state, nextCheckAt?}</code></td></tr>
       <tr class="hl"><td class="nw"><strong>fire</strong></td><td>trigger 返回 <code>fire:true</code>（无 trigger 时 = tick 到达）。含义是"需要跑一次 payload"，<code>message</code> 写<strong>跃迁名</strong>（不是动作名）；还要过 limits 才 run</td><td>要动了</td><td class="nw">cron service</td><td>内部状态；runs 里记为 fired / skipped</td></tr>
-      <tr><td class="nw"><strong>limits</strong></td><td>fire 之后、run 之前的 job 级闸门。四种叫醒源共用，用户明说才写</td><td>此刻该不该跑</td><td class="nw">cron service</td><td><code>limits {…}</code>（P10）</td></tr>
+      <tr><td class="nw"><strong>limits</strong></td><td>fire 之后、run 之前的 job 级闸门。四种叫醒源共用，用户明说才写</td><td>此刻该不该跑</td><td class="nw">cron service</td><td><code>limits {…}</code>（P11）</td></tr>
       <tr><td class="nw"><strong>run</strong></td><td>通过 limits 后真正执行 payload 一次；有 run 记录、delivery、failureAlert</td><td>跑什么、在哪跑</td><td class="nw">cron service → 会话</td><td><code>payload</code> · <code>sessionTarget</code> · <code>toolsAllow</code></td></tr>
       <tr><td class="nw"><strong>filter</strong></td><td>单事件布尔表达式，只引用目录 <code>fields</code>，在事件中心侧评估；不过就不推</td><td>值不值得叫醒我</td><td class="nw">事件中心</td><td><code>sources[].filter</code>（附录 A3）</td></tr>
-      <tr><td class="nw"><strong>nextCheckAt</strong></td><td>trigger 自设的一次 self tick 时刻。<strong>只加一个 tick，不减任何 tick</strong>；新值覆盖旧值，清空即作废</td><td>下次何时再看</td><td class="nw">cron service</td><td>trigger 返回值（P10）</td></tr>
+      <tr><td class="nw"><strong>nextCheckAt</strong></td><td>trigger 自设的一次 self tick 时刻。<strong>只加一个 tick，不减任何 tick</strong>；新值覆盖旧值，清空即作废</td><td>下次何时再看</td><td class="nw">cron service</td><td>trigger 返回值（P11）</td></tr>
       <tr><td class="nw"><strong>state</strong></td><td>trigger 的跨 tick 记忆（阶段、时间戳、基线），≤16KB；<code>stateSchema</code> 可选，声明结构供 checker 校验</td><td>上次看到什么</td><td class="nw">cron service 存</td><td><code>trigger.state</code> 初值 · 返回值 <code>state</code></td></tr>
-      <tr><td class="nw"><strong>派生事件</strong></td><td>某条 job 的 payload 调 <code>event_publish</code> 发布、登进目录的事件；与内建事件同构</td><td>结果给谁用</td><td class="nw">事件中心</td><td><code>payload.kind="script"</code> + <code>publishes</code>（P12）</td></tr>
+      <tr><td class="nw"><strong>派生事件</strong></td><td>某条 job 的 payload 调 <code>event_publish</code> 发布、登进目录的事件；与内建事件同构</td><td>结果给谁用</td><td class="nw">事件中心</td><td><code>payload.kind="script"</code> + <code>publishes</code>（P13）</td></tr>
     </table>
   </div>
   <div class="cols" style="flex:0 0 auto; margin-top:.4em; font-size:.84em;">
     <div class="callout blue" style="flex:1.25;"><b>fire 的定义（拍板 D1）：</b>S6 "跌 10% 卖一半、跌 30% 清仓"是两次不同动作，S7 "下沙发停声"里条件是变假。若 fire = 条件为真，两个场景都要两条 job；若 fire = 需要动作，trigger 检测跃迁、message 写跃迁名（<code>stage_1 / stage_2</code>、<code>entered_sofa / still_on_sofa_5m / left_sofa</code>），跃迁 → 动作的映射写在 payload.message 策略段，一条 job 就够。</div>
     <div class="callout" style="flex:1;"><b>三道门不重叠：</b>filter 管事件"是不是我要的"（事件级），trigger 管"需不需要动"（条件级，有 state），limits 管"此刻该不该跑"（job 级）。凡 filter 写不了的不扩 filter，分别归 trigger 与 limits。</div>
   </div>
-  <span class="pageno">5 / 27</span>
+  <span class="pageno">6 / 28</span>
 </section>
 
-<!-- ═══════════ P6 最小字段集 ═══════════ -->
+<!-- ═══════════ P7 最小字段集 ═══════════ -->
 <section class="slide">
   <div class="crumb c2"><span class="ch">② 核心模型</span>字段集</div>
   <div class="header">
@@ -419,7 +477,7 @@
   <span class="k">"trigger"</span>:  { "kind": "script | <span class="w">agent</span>",
                 "script": "…",            <span class="c">// script 必填；agent 时可选 = 零 token 前置门</span>
                 <span class="w">"prompt"</span>: "…",            <span class="c">// agent 必填，三段模板（附录 A4）</span>
-                <span class="w">"postScript"</span>: "…",        <span class="c">// agent 可选：收 trigger_result 算计时 / 计数（P9）</span>
+                <span class="w">"postScript"</span>: "…",        <span class="c">// agent 可选：收 trigger_result 算计时 / 计数（P10）</span>
                 "state": {}, <span class="w">"stateSchema"</span>: {},   <span class="c">// 初值 · 可选结构校验</span>
                 "toolsAllow": ["sports_api"] },   <span class="c">// 判定只读工具面</span>
   <span class="w">"limits"</span>:   { "activeWindow": "18:00-23:00 Asia/Shanghai",
@@ -448,7 +506,7 @@ tick = { source: { kind: "time" | "event" | "self", index?, eventType? }, event?
           <tr><td><code>sources[].filter</code></td><td>模型</td><td>只比较目录 fields；must_filter 字段必须约束</td></tr>
           <tr><td><code>trigger</code></td><td>模型</td><td>条件不是"到点 / 事件到了就干"时才有；先 script，写不出才 agent</td></tr>
           <tr class="hl"><td><code>limits</code></td><td>模型</td><td>用户说了"只在…时段 / 别一直 / 每天一次 / 只一次"或确认了 Agent 提议</td></tr>
-          <tr><td><code>payload.message</code></td><td>模型</td><td>必填三段，编译核心产物（P13）</td></tr>
+          <tr><td><code>payload.message</code></td><td>模型</td><td>必填三段，编译核心产物（P14）</td></tr>
           <tr><td><code>toolsAllow</code></td><td>模型</td><td>按动作反推收窄；判定面只读</td></tr>
           <tr><td><code>subscription_ids[]</code></td><td>cron service</td><td>订阅副作用写回，模型不可见</td></tr>
           <tr><td><code>debounce / staleAfter</code></td><td>cron service</td><td>订阅时取目录 internal，模型不写</td></tr>
@@ -458,10 +516,10 @@ tick = { source: { kind: "time" | "event" | "self", index?, eventType? }, event?
       <div class="callout" style="font-size:.84em;"><b>三种"时间"的分工：</b>绝对时间点 → sources 里的时间源（<code>cron 0 20 * * *</code>）；相对某次事件的时间点 → <code>nextCheckAt</code>（离开后 1 小时、领先后 30 分钟）；只在某时段允许跑 → <code>limits.activeWindow</code>。</div>
     </div>
   </div>
-  <span class="pageno">6 / 27</span>
+  <span class="pageno">7 / 28</span>
 </section>
 
-<!-- ═══════════ P7 事件源 ═══════════ -->
+<!-- ═══════════ P8 事件源 ═══════════ -->
 <section class="slide">
   <div class="crumb c2"><span class="ch">② 核心模型</span>事件源</div>
   <div class="header">
@@ -517,10 +575,10 @@ EventHub.subscribe({ eventType, filter, tag: job_id,
       <div class="callout blue" style="font-size:.84em;"><b>入口选定（拍板 D5）：</b>默认 webhook；同机部署切本机直调，入口函数不变。传输四选一与原生 <code>stream</code> 零改动验证路径见附录 A9。</div>
     </div>
   </div>
-  <span class="pageno">7 / 27</span>
+  <span class="pageno">8 / 28</span>
 </section>
 
-<!-- ═══════════ P8 trigger ═══════════ -->
+<!-- ═══════════ P9 trigger ═══════════ -->
 <section class="slide">
   <div class="crumb c2"><span class="ch">② 核心模型</span>trigger</div>
   <div class="header">
@@ -540,7 +598,7 @@ EventHub.subscribe({ eventType, filter, tag: job_id,
     state: {…},            <span class="c">// 写回 job，下 tick 原样传入</span>
     nextCheckAt?: ts }     <span class="c">// 到点再给我一个 self tick</span>
 <span class="c">// agent：前置 script 的 message 进判定信封 tick 块；
-//        有 postScript 时 trigger_result → trigger.result，postScript 的返回才是结果（P9）</span></pre>
+//        有 postScript 时 trigger_result → trigger.result，postScript 的返回才是结果（P10）</span></pre>
       </div>
       <div class="panel">
         <h2><span class="tag warn">脚本运行时边界</span>拍板 D2——全部数值规则场景成立的前提</h2>
@@ -579,13 +637,13 @@ EventHub.subscribe({ eventType, filter, tag: job_id,
   "state": { "on_sofa_since": null, "alerted": false } }</pre>
         <p style="margin-top:.3em; font-size:.78em;">script fire:false → 模型不起、state 照存；fire:true → 起判定模型，其 <code>trigger_result</code> 才是最终结果。S7 有运动或到 5 分钟闹钟才花 token。</p>
       </div>
-      <div class="callout" style="font-size:.76em;"><b>编译规则：</b>有结构化数据源 → 默认 script；只有图像 / 页面 → agent；两者都行 → 默认 script，用户要更强的语义判断时选 agent。选 agent 必配前置 script 门与 <code>maxChecksPerDay</code>（P9）。</div>
+      <div class="callout" style="font-size:.76em;"><b>编译规则：</b>有结构化数据源 → 默认 script；只有图像 / 页面 → agent；两者都行 → 默认 script，用户要更强的语义判断时选 agent。选 agent 必配前置 script 门与 <code>maxChecksPerDay</code>（P10）。</div>
     </div>
   </div>
-  <span class="pageno">8 / 27</span>
+  <span class="pageno">9 / 28</span>
 </section>
 
-<!-- ═══════════ P9 agent 判定 ═══════════ -->
+<!-- ═══════════ P10 agent 判定 ═══════════ -->
 <section class="slide">
   <div class="crumb c2"><span class="ch">② 核心模型</span>agent 判定</div>
   <div class="header">
@@ -651,10 +709,10 @@ EventHub.subscribe({ eventType, filter, tag: job_id,
       <div class="callout blue" style="font-size:.8em;"><b>trigger 报告跃迁，不报告动作：</b>message 是 <code>entered_sofa / still_on_sofa_5m / left_sofa</code>；"播声 / 通知 / 停声"写在 payload.message 策略段的跃迁 → 动作表里。判定 prompt 里不出现任何动作工具名。</div>
     </div>
   </div>
-  <span class="pageno">9 / 27</span>
+  <span class="pageno">10 / 28</span>
 </section>
 
-<!-- ═══════════ P10 limits 与 nextCheckAt ═══════════ -->
+<!-- ═══════════ P11 limits 与 nextCheckAt ═══════════ -->
 <section class="slide">
   <div class="crumb c2"><span class="ch">② 核心模型</span>limits · nextCheckAt</div>
   <div class="header">
@@ -711,10 +769,10 @@ return json({ fire: false, state: s });</pre>
       <div class="callout" style="font-size:.8em;"><b>成本：</b>155 个 tick 全是脚本，零 token；只有 22:40 起一次动作 agentTurn。若选 agent 判定，同一逻辑写进 prompt，前置 script 只在比分变化或 self tick 时放行，一场球 5–6 次判定（附录 A7）。</div>
     </div>
   </div>
-  <span class="pageno">10 / 27</span>
+  <span class="pageno">11 / 28</span>
 </section>
 
-<!-- ═══════════ P11 组合条件 ═══════════ -->
+<!-- ═══════════ P12 组合条件 ═══════════ -->
 <section class="slide">
   <div class="crumb c2"><span class="ch">② 核心模型</span>组合条件</div>
   <div class="header">
@@ -799,12 +857,12 @@ return json({ fire: false, state: s });" }</pre>
   <div class="cols" style="flex:0 0 auto; margin-top:.5em; font-size:.84em;">
     <div class="callout" style="flex:1;"><b>为什么不做 CEP：</b>组合 state 要能被 <code>stateSchema</code> 校验、被 runs 对账、被 <code>cron get</code> 看到，只有放在 job 里才做得到；事件中心永远不需要理解"之后 / 没有"。</div>
     <div class="callout warn" style="flex:1;"><b>时间戳规则：</b>事件与事件之间的间隔用 <code>tick.event.occurred_at</code>（投递可能延迟、重试）；deadline / nextCheckAt 的到点用 <code>tick.now</code>（cron service 自己的钟）。不假设投递顺序，同 job 的 tick 串行处理。</div>
-    <div class="callout blue" style="flex:1;"><b>编译期填槽：</b>三段脚本是附录 A4 的模板，模型只填 sources 下标、W 秒数、跃迁名；更复杂的组合直接写脚本，或改 agent 判定（P9）。</div>
+    <div class="callout blue" style="flex:1;"><b>编译期填槽：</b>三段脚本是附录 A4 的模板，模型只填 sources 下标、W 秒数、跃迁名；更复杂的组合直接写脚本，或改 agent 判定（P10）。</div>
   </div>
-  <span class="pageno">11 / 27</span>
+  <span class="pageno">12 / 28</span>
 </section>
 
-<!-- ═══════════ P12 派生事件 ═══════════ -->
+<!-- ═══════════ P13 派生事件 ═══════════ -->
 <section class="slide">
   <div class="crumb c2"><span class="ch">② 核心模型</span>派生事件</div>
   <div class="header">
@@ -857,10 +915,10 @@ return json({ fire: false, state: s });" }</pre>
       <div class="callout warn" style="font-size:.86em;"><b><code>event_publish</code> 可见范围：</b>payload script ✓；动作 agentTurn 按 toolsAllow 默认关；判定 agent ✗；主 loop ✗。派生条目进目录后与内建条目同样静态注入编译期 prompt。</div>
     </div>
   </div>
-  <span class="pageno">12 / 27</span>
+  <span class="pageno">13 / 28</span>
 </section>
 
-<!-- ═══════════ P13 编译 ═══════════ -->
+<!-- ═══════════ P14 编译 ═══════════ -->
 <section class="slide">
   <div class="crumb c3"><span class="ch">③ 编译与执行</span>编译</div>
   <div class="header">
@@ -910,10 +968,10 @@ return json({ fire: false, state: s });" }</pre>
       </div>
     </div>
   </div>
-  <span class="pageno">13 / 27</span>
+  <span class="pageno">14 / 28</span>
 </section>
 
-<!-- ═══════════ P14 执行 ═══════════ -->
+<!-- ═══════════ P15 执行 ═══════════ -->
 <section class="slide">
   <div class="crumb c3"><span class="ch">③ 编译与执行</span>执行</div>
   <div class="header">
@@ -970,10 +1028,10 @@ U: 到家的时候帮我把客厅灯开了 / A: 工作日晚 6 点后触发，�
       <div class="callout warn" style="font-size:.84em;"><b>ask_user 的路径（拍板 D4）：</b>动作模型遇到必确认动作 → run 进 <code>waiting</code> → 问题经 <code>delivery</code> 渠道送到用户 → 答复回到该 run 继续。因此<b>可能 ask_user 的 job 强制 announce</b>，否则问题无处可去；超时未答 → run error + failureAlert。S5 支付、S8 支付走这条路。</div>
     </div>
   </div>
-  <span class="pageno">14 / 27</span>
+  <span class="pageno">15 / 28</span>
 </section>
 
-<!-- ═══════════ P15 十二场景全表 ═══════════ -->
+<!-- ═══════════ P16 十二场景全表 ═══════════ -->
 <section class="slide">
   <div class="crumb c4"><span class="ch">④ 验证与拍板</span>场景全表</div>
   <div class="header">
@@ -989,9 +1047,9 @@ U: 到家的时候帮我把客厅灯开了 / A: 工作日晚 6 点后触发，�
       <tr><td>S4</td><td>张三来电</td><td><code>event</code> phone.call_incoming contact_id=='c_12'</td><td>—</td><td>—</td><td>—</td><td>agentTurn；来电字段标外部数据</td><td>按 xxx</td><td class="ok">否</td><td>对外发送 → 一期 ask_user</td></tr>
       <tr><td>S5</td><td>放票抢票</td><td><code>at</code> 放票前 30s exact（编译期问清车次）</td><td>—</td><td>—</td><td>—</td><td>browser 下单 → 支付 ask_user</td><td>browser</td><td class="ok">否</td><td>支付 ask_user</td></tr>
       <tr><td>S6</td><td>跌 10% 卖一半 / 30% 清仓</td><td><code>every 1m</code></td><td>script 查行情；stage 跃迁 fire，message stage_1 / stage_2（可选 agent）</td><td>activeWindow 交易时段</td><td>{baseline, stage}</td><td>broker 卖出；stage=2 后 cron remove 自己</td><td>broker, cron</td><td>可选</td><td>卖出 → 一期 ask_user</td></tr>
-      <tr class="hl"><td>S7</td><td>狗上沙发</td><td><code>every 30s</code></td><td><strong>agent 看快照</strong>；前置 script 有运动 || self；postScript 算跃迁（P9）</td><td>maxChecksPerDay 400</td><td>{on_sofa_since, alerted}</td><td>策略段映射跃迁 → 播放 / 发消息 / 停音</td><td>speaker, messaging</td><td class="no">是</td><td>对外发送 → 一期 ask_user</td></tr>
+      <tr class="hl"><td>S7</td><td>狗上沙发</td><td><code>every 30s</code></td><td><strong>agent 看快照</strong>；前置 script 有运动 || self；postScript 算跃迁（P10）</td><td>maxChecksPerDay 400</td><td>{on_sofa_since, alerted}</td><td>策略段映射跃迁 → 播放 / 发消息 / 停音</td><td>speaker, messaging</td><td class="no">是</td><td>对外发送 → 一期 ask_user</td></tr>
       <tr><td>S8</td><td>开售后买卧铺，没买到继续盯</td><td><code>every 30s</code></td><td>script 查余票 或 agent 读页；有卧铺 → fire</td><td>activeWindow 开售后 · cooldown 2m</td><td>{attempts}</td><td>下单 → 支付 ask_user → 成功后 cron remove 自己</td><td>browser, cron</td><td>可选</td><td>支付 ask_user</td></tr>
-      <tr><td>S9</td><td>曼联持续领先 30 分钟</td><td><code>every 1m</code></td><td>script 或 agent 查比分；lead_since + nextCheckAt +30m；self 仍领先 → fire（P10）</td><td>activeWindow 赛程 · maxRunsTotal 1</td><td>{lead_since}</td><td>messaging 发张三</td><td>messaging</td><td>可选</td><td>对外发送 → 一期 ask_user</td></tr>
+      <tr><td>S9</td><td>曼联持续领先 30 分钟</td><td><code>every 1m</code></td><td>script 或 agent 查比分；lead_since + nextCheckAt +30m；self 仍领先 → fire（P11）</td><td>activeWindow 赛程 · maxRunsTotal 1</td><td>{lead_since}</td><td>messaging 发张三</td><td>messaging</td><td>可选</td><td>对外发送 → 一期 ask_user</td></tr>
       <tr><td>S10</td><td>到家且电量 &lt; 20%</td><td><code>event</code> geofence.enter zone=='home'</td><td>script 查 phone.lookup(state) battery &lt; 20</td><td>—</td><td>—</td><td>agentTurn 提醒，announce</td><td>—</td><td class="ok">否</td><td>—</td></tr>
       <tr><td>S11</td><td>到家后 10 分钟内来电</td><td><code>event</code> ×2：geofence.enter, phone.call_incoming</td><td>script：0 → 记 a_at；1 且 occurred_at−a_at ≤ 600 → fire</td><td>cooldown 30m</td><td>{a_at}</td><td>agentTurn 提醒</td><td>—</td><td class="ok">否</td><td>—</td></tr>
       <tr><td>S12</td><td>离开公司 1h 没到家</td><td><code>event</code> ×2：geofence.exit office, geofence.enter home</td><td>script：0 → deadline + nextCheckAt；1 → 清空；self 到点 → fire</td><td>maxRunsPerDay 1</td><td>{deadline}</td><td>messaging 发家人</td><td>messaging</td><td class="ok">否</td><td>对外发送 → 一期 ask_user</td></tr>
@@ -1002,10 +1060,10 @@ U: 到家的时候帮我把客厅灯开了 / A: 工作日晚 6 点后触发，�
     <div class="callout blue" style="flex:1;"><b>收尾都靠原生：</b>S6 / S8 用自动化 run 里的"对自己 cron remove"；S9 用 maxRunsTotal；S8 "刚试过别再试"用 cooldown；S5 编译期问清后是一条 at。</div>
     <div class="callout warn" style="flex:1;"><b>"一期 ask_user"</b>= 拍板 D3：二期有参数级 toolsAllow 约束后，创建期确认过的收件人 / 数量才免确认；支付永远 ask_user。</div>
   </div>
-  <span class="pageno">15 / 27</span>
+  <span class="pageno">16 / 28</span>
 </section>
 
-<!-- ═══════════ P16 时序 S3 ═══════════ -->
+<!-- ═══════════ P17 时序 S3 ═══════════ -->
 <section class="slide">
   <div class="crumb c4"><span class="ch">④ 验证与拍板</span>时序</div>
   <div class="header">
@@ -1115,12 +1173,12 @@ U: 到家的时候帮我把客厅灯开了 / A: 工作日晚 6 点后触发，�
       </div>
     </div>
   </div>
-  <span class="pageno">16 / 27</span>
+  <span class="pageno">17 / 28</span>
 </section>
 
 
 
-<!-- ═══════════ P17 拍板 · 可靠性 · 分期 ═══════════ -->
+<!-- ═══════════ P18 拍板 · 可靠性 · 分期 ═══════════ -->
 <section class="slide">
   <div class="crumb c4"><span class="ch">④ 验证与拍板</span>收尾</div>
   <div class="header">
@@ -1133,10 +1191,10 @@ U: 到家的时候帮我把客厅灯开了 / A: 工作日晚 6 点后触发，�
         <h2><span class="tag warn">六项拍板</span>D1–D6</h2>
         <table style="font-size:.75em;">
           <tr><th>#</th><th style="width:22%;">问题</th><th>决定</th></tr>
-          <tr><td>D1</td><td><strong>fire 的语义</strong></td><td>= "需要执行一次 payload"，trigger 检测跃迁、message 说明动作类型；S6 分档、S7 上 / 下沙发一条 job 成立（P5）</td></tr>
-          <tr><td>D2</td><td><strong>脚本运行时边界</strong></td><td>cron service 沙箱；只读 <code>tools.call</code>（toolsAllow 内）；30s / 5 调用 / 16KB；<strong>失败 = fire:false + check error</strong>，不采用"失败算 fire"（避免误动作）（P8）</td></tr>
+          <tr><td>D1</td><td><strong>fire 的语义</strong></td><td>= "需要执行一次 payload"，trigger 检测跃迁、message 说明动作类型；S6 分档、S7 上 / 下沙发一条 job 成立（P6）</td></tr>
+          <tr><td>D2</td><td><strong>脚本运行时边界</strong></td><td>cron service 沙箱；只读 <code>tools.call</code>（toolsAllow 内）；30s / 5 调用 / 16KB；<strong>失败 = fire:false + check error</strong>，不采用"失败算 fire"（避免误动作）（P9）</td></tr>
           <tr><td>D3</td><td><strong>预授权</strong></td><td>一期：支付 / 卖出 / 对外发送一律 ask_user。二期：toolsAllow 参数级约束（<code>messaging.send.to ∈ {…}</code>、<code>maxCalls</code>）落地后，创建期确认过的范围免确认；支付永远 ask_user</td></tr>
-          <tr><td>D4</td><td><strong>跨 session ask_user</strong></td><td>run waiting → 问题经 delivery 渠道 → 答复回 run；可能 ask_user 的 job 强制 announce；超时 → error + failureAlert（P14）</td></tr>
+          <tr><td>D4</td><td><strong>跨 session ask_user</strong></td><td>run waiting → 问题经 delivery 渠道 → 答复回 run；可能 ask_user 的 job 强制 announce；超时 → error + failureAlert（P15）</td></tr>
           <tr><td>D5</td><td><strong>事件入口</strong></td><td>默认 webhook <code>/hooks/eventhub</code>，同机切本机直调；一期前用原生 <code>stream</code> kind 做零改动可行性验证（附录 A9）</td></tr>
           <tr><td>D6</td><td><strong>activeWindow 窗外</strong></td><td>事件 / self / sources 里的时间源 tick 仍进 trigger 维护 state，fire 不进 run；否则 S9 lead_since、S12 deadline 会断</td></tr>
         </table>
@@ -1176,13 +1234,13 @@ U: 到家的时候帮我把客厅灯开了 / A: 工作日晚 6 点后触发，�
       <div class="callout blue" style="font-size:.84em;"><b>下一步：</b>① V1–V7 核实，一天；② <code>stream</code> 路径跑通 S3 验证事件链路；③ 一期五项，先 S1 / S2 / S3 / S9（script），再 S7（agent 基础）；④ 二期护栏与放权。</div>
     </div>
   </div>
-  <span class="pageno">17 / 27</span>
+  <span class="pageno">18 / 28</span>
 </section>
 
 <!-- ═══════════ A1 目录 ═══════════ -->
 <section class="slide cover">
   <div class="title">附录 <span class="hl">A1 – A10</span><br>规格细节 · 模板 · 模型视角</div>
-  <p class="lead">前 17 页主稿讲逻辑与场景；附录 10 页放<strong>实现者才需要的细节</strong>：事件目录与 filter 语法、三套编译模板、派生事件时序、三个模型出场位置的完整输入输出、事件入口的传输选型，以及一份完整的 agent 判定 job（S7）。术语与字段以主稿 P5 / P6 为准；本附录不引入任何新机制。</p>
+  <p class="lead">前 18 页主稿讲逻辑与场景；附录 10 页放<strong>实现者才需要的细节</strong>：事件目录与 filter 语法、三套编译模板、派生事件时序、三个模型出场位置的完整输入输出、事件入口的传输选型，以及一份完整的 agent 判定 job（S7）。术语与字段以主稿 P6 / P7 为准；本附录不引入任何新机制。</p>
   <div class="toc" style="grid-template-columns: repeat(4, 1fr);">
     <div class="ch c2"><h3>规格</h3><div class="pg">A2 – A3</div>
       <ul><li><b>A2</b>事件目录：条目 schema · 10 组 63 条</li><li><b>A3</b>filter 语法 · 校验 · 写不了的归哪</li></ul></div>
@@ -1195,11 +1253,11 @@ U: 到家的时候帮我把客厅灯开了 / A: 工作日晚 6 点后触发，�
   </div>
   <div class="route">
     <div class="r"><b>写目录 / 校验器：</b>A2 → A3 → <code>02-event-catalog.md</code> 全文</div>
-    <div class="r"><b>写编译规则 prompt：</b>A4 → 主稿 P13</div>
-    <div class="r"><b>写判定 / 动作信封：</b>A6 → A7 → A8 → 主稿 P14</div>
-    <div class="r"><b>写 agent 判定 job：</b>主稿 P9 → A7 → A10</div>
+    <div class="r"><b>写编译规则 prompt：</b>A4 → 主稿 P14</div>
+    <div class="r"><b>写判定 / 动作信封：</b>A6 → A7 → A8 → 主稿 P15</div>
+    <div class="r"><b>写 agent 判定 job：</b>主稿 P10 → A7 → A10</div>
   </div>
-  <span class="pageno">18 / 27</span>
+  <span class="pageno">19 / 28</span>
 </section>
 
 <!-- ═══════════ A2 事件目录 ═══════════ -->
@@ -1254,7 +1312,7 @@ U: 到家的时候帮我把客厅灯开了 / A: 工作日晚 6 点后触发，�
       <div class="callout warn"><b>目录之外只有一个只读工具：</b><code>phone.lookup(kind, q)</code>，kind ∈ contacts / apps / bluetooth / places 把显示名解析成 key 字段（编译期），kind = state 读现况（trigger / 判定期）。目录（内建 + 已登记派生条目）静态注入编译期 prompt，不再有 <code>event_catalog</code> 工具。</div>
     </div>
   </div>
-  <span class="pageno">19 / 27</span>
+  <span class="pageno">20 / 28</span>
 </section>
 
 
@@ -1320,7 +1378,7 @@ string  := "'" … "'"                     <span class="c">// 单引号</span></
       <div class="callout" style="font-size:.86em;"><b>为什么限得这么死：</b>语法小才能在 cron add 时机械校验、才能在事件中心侧零成本评估、才不会让事件中心长成 CEP。语法之外的每一类需求都已有归属。</div>
     </div>
   </div>
-  <span class="pageno">20 / 27</span>
+  <span class="pageno">21 / 28</span>
 </section>
 
 <!-- ═══════════ A4 编译模板 ═══════════ -->
@@ -1349,7 +1407,7 @@ string  := "'" … "'"                     <span class="c">// 单引号</span></
 步骤：phase=<span class="w">{初始}</span> → <span class="w">{查什么}</span>；<span class="w">{阶段}</span> → <span class="w">{查什么，state 怎么改}</span>；
 　　　<span class="w">{时序条件}</span> → 记时间戳且 nextCheckAt=<span class="w">{到点}</span>；<span class="w">{成立}</span> → fire
 输出：只调 trigger_result，message 写<span class="w">{跃迁名}</span> + <span class="w">{证据字段}</span>；不出现动作名</pre>
-        <p style="margin-top:.4em;">配套产出 <code>state</code> 初值与 <code>stateSchema</code>；凡"等 N 分钟"必写 nextCheckAt。计时 / 计数交给 postScript 时，prompt 只剩"条件 + 输出分类字段"（主稿 P9）。</p>
+        <p style="margin-top:.4em;">配套产出 <code>state</code> 初值与 <code>stateSchema</code>；凡"等 N 分钟"必写 nextCheckAt。计时 / 计数交给 postScript 时，prompt 只剩"条件 + 输出分类字段"（主稿 P10）。</p>
       </div>
     </div>
     <div class="col" style="flex:1.35;">
@@ -1385,7 +1443,7 @@ return json({ fire:false, state:s });</pre>
       </div>
     </div>
   </div>
-  <span class="pageno">21 / 27</span>
+  <span class="pageno">22 / 28</span>
 </section>
 
 
@@ -1487,10 +1545,10 @@ return json({ fire:false, state:s });</pre>
         <h2><span class="tag warn">换成模型判定</span></h2>
         <p>第 2–3 步换成 <code>trigger.agent</code>：受限判定 agentTurn 用 <code>trigger_result</code> 返回同一契约，第 4 步之后完全相同。</p>
       </div>
-      <div class="callout"><b>对比"只给自己用"：</b>没有第 5–8 步，第 3 步 fire:true 直接进第 9 步起 agentTurn。少一次往返，但派生事件不进目录、不可复用（主稿 P12）。</div>
+      <div class="callout"><b>对比"只给自己用"：</b>没有第 5–8 步，第 3 步 fire:true 直接进第 9 步起 agentTurn。少一次往返，但派生事件不进目录、不可复用（主稿 P13）。</div>
     </div>
   </div>
-  <span class="pageno">22 / 27</span>
+  <span class="pageno">23 / 28</span>
 </section>
 
 
@@ -1499,7 +1557,7 @@ return json({ fire:false, state:s });</pre>
   <div class="crumb c5"><span class="ch">附录 · 模型视角</span>出场地图</div>
   <div class="header">
     <h1>大模型的 <span class="hl">三个出场位置</span>：没有共享对话，只靠冻结字段与结构化契约</h1>
-    <p class="subtitle">S3 十二步时序里只有 1 / 2 / 3 / 6 / 11 五步过模型（主稿 P16）；其余——事件中心、cron service、脚本 checker、去重 / 过期 / 拼信封——<strong>全部零 token</strong></p>
+    <p class="subtitle">S3 十二步时序里只有 1 / 2 / 3 / 6 / 11 五步过模型（主稿 P17）；其余——事件中心、cron service、脚本 checker、去重 / 过期 / 拼信封——<strong>全部零 token</strong></p>
   </div>
   <div class="cols">
     <div class="col" style="flex: 0 0 60%;">
@@ -1509,9 +1567,9 @@ return json({ fire:false, state:s });</pre>
           <tr><th>位置</th><th>何时</th><th>session · 模型</th><th>输入</th><th>输出</th><th>唯一出口</th><th>量级</th></tr>
           <tr class="hl"><td class="nw"><strong>① 编译</strong></td><td>用户委托时，一次</td><td>主 session · 主模型</td><td>原话 + 主对话 + 目录（prompt 静态段）+ phone.lookup 结果 + 编译规则</td><td><code>cron add</code> JSON + 回读一句</td><td><code>cron add</code></td><td>一次</td></tr>
           <tr class="hl"><td class="nw"><strong>② 判定</strong></td><td>每 tick，前置 script 为真后</td><td>isolated · fast · light</td><td>判定 prompt（静态）+ state 快照 + 新数据</td><td><code>trigger_result</code> {fire, message, state}</td><td><code>trigger_result</code></td><td>2–4K / 次，≤ maxChecksPerDay</td></tr>
-          <tr class="hl"><td class="nw"><strong>③ 动作</strong></td><td>fire / 事件到达后</td><td>isolated · 可 light</td><td>五块信封（主稿 P14）</td><td>工具调用 + 最终文本 / NO_REPLY + 摘要一行</td><td>delivery</td><td>5–10K / 次</td></tr>
+          <tr class="hl"><td class="nw"><strong>③ 动作</strong></td><td>fire / 事件到达后</td><td>isolated · 可 light</td><td>五块信封（主稿 P15）</td><td>工具调用 + 最终文本 / NO_REPLY + 摘要一行</td><td>delivery</td><td>5–10K / 次</td></tr>
           </table>
-        <div class="callout blue" style="margin-top:.6em;"><b>三个位置就够：</b>S5 的确认在编译期（① 里完成），运行期没有 current 位置；位置 ② 是可选项——有结构化数据源默认 script（零 token），看图 / 读页面 / 语义判断选 agent；"判定动作一体"只用于离线验证判定 prompt，不作方案项（主稿 P9）。</div>
+        <div class="callout blue" style="margin-top:.6em;"><b>三个位置就够：</b>S5 的确认在编译期（① 里完成），运行期没有 current 位置；位置 ② 是可选项——有结构化数据源默认 script（零 token），看图 / 读页面 / 语义判断选 agent；"判定动作一体"只用于离线验证判定 prompt，不作方案项（主稿 P10）。</div>
       </div>
     </div>
     <div class="col">
@@ -1533,7 +1591,7 @@ return json({ fire:false, state:s });</pre>
       </div>
     </div>
   </div>
-  <span class="pageno">23 / 27</span>
+  <span class="pageno">24 / 28</span>
 </section>
 
 
@@ -1592,10 +1650,10 @@ source: self（你在 22:10 设的 nextCheckAt 到点）  now: 22:40:02
           <tr><td>未调 <code>trigger_result</code> / 不合契约或 stateSchema / 超 60s</td><td>判定失败：记 check error，<strong>state 保留旧值</strong>，下 tick 重试；连续 N 次 → failureAlert</td><td class="no">仅告警</td></tr>
         </table>
       </div>
-      <div class="callout blue"><b>为什么是 self tick 而不是第 N 个每分钟 tick：</b>前置 script 只在"比分有变化"时放行判定，22:40 比分没变，判定不会被唤起。所以判定在 22:10 自己设 nextCheckAt，到点造 self tick，前置 script 对 <code>tick.source.kind=="self"</code> 放行；"到点"由判定自己声明。<b>本页是 S9 选 agent 判定的形态</b>；选 script 时同一逻辑写成脚本（主稿 P10），零 token——两者是同一契约下的两个正式选项。</div>
+      <div class="callout blue"><b>为什么是 self tick 而不是第 N 个每分钟 tick：</b>前置 script 只在"比分有变化"时放行判定，22:40 比分没变，判定不会被唤起。所以判定在 22:10 自己设 nextCheckAt，到点造 self tick，前置 script 对 <code>tick.source.kind=="self"</code> 放行；"到点"由判定自己声明。<b>本页是 S9 选 agent 判定的形态</b>；选 script 时同一逻辑写成脚本（主稿 P11），零 token——两者是同一契约下的两个正式选项。</div>
     </div>
   </div>
-  <span class="pageno">24 / 27</span>
+  <span class="pageno">25 / 28</span>
 </section>
 
 
@@ -1609,7 +1667,7 @@ source: self（你在 22:10 设的 nextCheckAt 到点）  now: 22:40:02
   <div class="cols">
     <div class="col" style="flex: 0 0 50%;">
       <div class="panel pre-lg">
-        <h2><span class="tag purple">输入</span>S9 动作信封（五块，主稿 P14 结构）</h2>
+        <h2><span class="tag purple">输入</span>S9 动作信封（五块，主稿 P15 结构）</h2>
 <pre class="grow"><span class="h">[trigger:agent job:job_s9 run:run_0c4d]</span>   <span class="c">① 触发头，与 runs 对账</span>
 
 <span class="c">② 触发事实（位置 ② 的输出），显式标外部数据</span>
@@ -1655,7 +1713,7 @@ A: 只发张三一条，"我赢了 + 比分"，对吗？ / U: 对
       <div class="callout red"><b>预授权在输出侧机械校验（拍板 D3，二期）：</b>策略段"仅此收件人、仅一条"只是给模型看的。一期对外发送一律 <code>ask_user</code>；二期在 <code>toolsAllow</code> 层加参数约束（<code>messaging.send.to ∈ {contact:zhang_san}</code>、<code>maxCalls 1</code>），越界即拦截并转 ask_user，创建期确认过的范围才免确认。动作模型对 limits 与参数约束零感知，只在越界时收到 ask_user 的结果。</div>
     </div>
   </div>
-  <span class="pageno">25 / 27</span>
+  <span class="pageno">26 / 28</span>
 </section>
 
 
@@ -1708,7 +1766,7 @@ A: 只发张三一条，"我赢了 + 比分"，对吗？ / U: 对
       </div>
     </div>
   </div>
-  <span class="pageno">26 / 27</span>
+  <span class="pageno">27 / 28</span>
 </section>
 
 
@@ -1769,7 +1827,7 @@ A: 只发张三一条，"我赢了 + 比分"，对吗？ / U: 对
       <div class="callout warn" style="font-size:.78em;"><b>换成 script 判定：</b>若摄像头 SDK 提供 <code>pets_on_furniture</code> 之类的结构化字段，把 prompt 删掉、postScript 的 <code>r</code> 换成 tools.call 结果，其余一个字不改——这就是"同一契约"的意思。</div>
     </div>
   </div>
-  <span class="pageno">27 / 27</span>
+  <span class="pageno">28 / 28</span>
 </section>
 
 </body>

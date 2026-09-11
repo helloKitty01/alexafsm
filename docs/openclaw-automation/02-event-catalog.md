@@ -1,12 +1,12 @@
 # 02 · 事件目录（event catalog）规范与内建条目
 
-> 配套 `openClaw自动化任务方案.slides.v3.1.html` P7 / P11 与附录 A2 / A3 / A4。本文是目录的**完整文本版**：条目 schema、filter 语法、命名规则、10 组 63 条内建事件（含模型不可见的 internal 字段）。幻灯片只放分组总览，细节以本文为准。
+> 配套 `openClaw自动化任务方案.slides.v3.1.html` P8 / P12 与附录 A2 / A3 / A4。本文是目录的**完整文本版**：条目 schema、filter 语法、命名规则、10 组 63 条内建事件（含模型不可见的 internal 字段）。幻灯片只放分组总览，细节以本文为准。
 
 ## 1. 设计约束
 
 1. **模型只看目录的可见部分**：`type / group / desc / fields / must_filter / pair / state_query`。`rate / debounce / stale_after / sensitivity` 是 internal，cron service 在订阅时从目录取用，模型不写、不感知。
 2. **目录静态进 system prompt**：内建 63 条 + 已登记的派生条目，一行一条约 3–4K token，作为编译期 system prompt 的静态段（KV cache 前缀命中）。**没有目录查询工具**：派生条目数量有限，登记后同样静态注入；编译期 prompt 在会话开始时取目录快照。
-3. **filter 只做单事件布尔**：字段只能来自该条目的 `fields`；没有函数、时间、跨事件引用、state。时间窗归 `limits.activeWindow`；跨事件组合归 trigger + state（主稿 P11）；绝对时间点作为 `sources[]` 里的时间源（`kind: at / every / cron`）与事件源混排，事件目录不参与。
+3. **filter 只做单事件布尔**：字段只能来自该条目的 `fields`；没有函数、时间、跨事件引用、state。时间窗归 `limits.activeWindow`；跨事件组合归 trigger + state（主稿 P12）；绝对时间点作为 `sources[]` 里的时间源（`kind: at / every / cron`）与事件源混排，事件目录不参与。
 4. **事件中心不做 CEP**：目录 + 单事件 filter + at-least-once 推送，其余（trigger state、limits、nextCheckAt）都在 cron service。
 5. **`occurred_at` 不在 payload 里**：它是推送信封字段（`event_id / job_id / event_type / occurred_at / payload`），进 tick 时放在 `tick.event.occurred_at`。
 
@@ -99,7 +99,7 @@ phone.lookup(kind, q?, fields?)
 | `apps` | 名称片段 | `[{package_name, app_name}]` | `app.* / notification.*` 的 `package_name` | 编译期填槽 |
 | `bluetooth` | — | `[{device_addr, device_name, type}]` | `bluetooth.device_*` 的 `device_addr` | 编译期填槽 |
 | `places` | — | `[{zone, label}]` | `geofence.*` 的 `zone` | 编译期填槽 |
-| `state` | `fields[]` | `{screen, locked, battery{level, charging}, dnd, ringer, airplane, wifi{connected, ssid, bssid}, bluetooth{on, devices[]}, headset, zones[], activity, foreground_app}` | "事件且状态"组合的现况查询（主稿 P10 S10）；判定 prompt 里的现况 | trigger 脚本 / 判定 agent / 动作 agentTurn / 主 loop |
+| `state` | `fields[]` | `{screen, locked, battery{level, charging}, dnd, ringer, airplane, wifi{connected, ssid, bssid}, bluetooth{on, devices[]}, headset, zones[], activity, foreground_app}` | "事件且状态"组合的现况查询（主稿 P12 S10）；判定 prompt 里的现况 | trigger 脚本 / 判定 agent / 动作 agentTurn / 主 loop |
 
 全部只读；没有任何写手机状态的工具。
 
