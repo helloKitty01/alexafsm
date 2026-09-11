@@ -1,13 +1,13 @@
 # 02 · 事件目录（event catalog）规范与内建条目
 
-> 配套 `openClaw自动化任务方案.slides.v2.2.html` P7 / P12 / P13 / P18。本文是目录的**完整文本版**：条目 schema、filter 语法、命名规则、10 组 63 条内建事件（含模型不可见的 internal 字段）。幻灯片只放分组总览，细节以本文为准。
+> 配套 `openClaw自动化任务方案.slides.v3.0.html` P7 / P10 与附录 A2 / A3 / A4。本文是目录的**完整文本版**：条目 schema、filter 语法、命名规则、10 组 63 条内建事件（含模型不可见的 internal 字段）。幻灯片只放分组总览，细节以本文为准。
 
 ## 1. 设计约束
 
 1. **模型只看目录的可见部分**：`type / group / desc / fields / must_filter / pair / state_query`。`rate / debounce / stale_after / sensitivity` 是 internal，cron service 在订阅时从目录取用，模型不写、不感知。
-2. **目录静态进 system prompt**：63 条一行一条约 3–4K token，作为编译期 system prompt 的静态段（KV cache 前缀命中）。`event_catalog` 工具只保留 `get(type)`（返回完整可见条目）与派生事件查询（路 B publish 出来的、不在内建表里的类型）。
-3. **filter 只做单事件布尔**：字段只能来自该条目的 `fields`；没有函数、时间、跨事件引用、state。时间窗归 `limits.activeWindow`；跨事件组合归 trigger + state（幻灯片 P12）。
-4. **事件中心不做 CEP、没有 guards**：目录 + 单事件 filter + at-least-once 推送，其余都在 cron service。
+2. **目录静态进 system prompt**：内建 63 条 + 已登记的派生条目，一行一条约 3–4K token，作为编译期 system prompt 的静态段（KV cache 前缀命中）。**没有 `event_catalog` 工具**（v3.0 删除）：派生条目数量有限，登记后同样静态注入；编译期 prompt 在会话开始时取目录快照。
+3. **filter 只做单事件布尔**：字段只能来自该条目的 `fields`；没有函数、时间、跨事件引用、state。时间窗归 `limits.activeWindow`；跨事件组合归 trigger + state（主稿 P10）。
+4. **事件中心不做 CEP**：目录 + 单事件 filter + at-least-once 推送，其余（trigger state、limits、nextCheckAt）都在 cron service。
 5. **`occurred_at` 不在 payload 里**：它是推送信封字段（`event_id / job_id / event_type / occurred_at / payload`），进 tick 时放在 `tick.event.occurred_at`。
 
 ## 2. 条目 schema
@@ -17,11 +17,11 @@ type:        <group>.<noun>_<verb|state>     # 唯一键，小写下划线；成
 group:       device | setting | connectivity | geofence | activity | phone | alarm | app | calendar | notification
 desc:        一句话中文描述（≤ 20 字）
 fields:                                       # payload 字段；"!" 标 key 字段（可被填槽解析工具解析成稳定 id）
-  - name: zone        type: string   key: true   desc: 围栏名（places.list）
+  - name: zone        type: string   key: true   desc: 围栏名（phone.lookup(places)）
   - name: confidence  type: number   range: 0–1
 must_filter: [zone]                           # 订阅时必须约束的字段；缺失 → cron add 校验失败
 pair:        geofence.exit                    # 成对事件（编译期做时序 / 缺席组合时用）
-state_query: phone_state.get(zones)           # 对应的"当前状态"查询；供 T1 状态门用
+state_query: phone.lookup(state, zones)       # 对应的"当前状态"查询；供"事件且状态"组合用
 internal:                                     # 模型不可见
   rate:        low | mid | high | burst       # 典型频率，决定是否要求 must_filter
   debounce:    5m                             # 同 job 同 filter 的合并窗口，事件中心评估
@@ -36,7 +36,7 @@ internal:                                     # 模型不可见
 - `must_filter` 列出的字段必须在 filter 中被约束（`==`、`in`、`startsWith` 任一）。
 - `rate: high | burst` 的条目若无 `must_filter`，编译规则要求回读时提醒用户"会很频繁"。
 
-**派生事件条目（路 B，v2.3 补）**
+**派生事件条目（payload 为 `script → event_publish` 的 job）**
 
 派生事件是某条 job 的 payload 调 `event_publish(type, payload)` 发出的事件，与内建事件同构，登进同一张目录：
 
@@ -44,7 +44,7 @@ internal:                                     # 模型不可见
 - **group**：固定为生产者声明的业务组名（如 `weather`、`ticket`、`press`），不得复用 10 个内建组名；`type` 同样 `group.noun_verb`，如 `weather.rain_tomorrow`、`ticket.on_sale`、`press.conference_ended`。
 - **fields**：由生产者定，规则同内建（key 字段可标 `!`，枚举写全）。消费者 job 的 filter 只能引用这些字段，`cron add` 校验一致。
 - **internal**：`rate` 由生产者的 schedule 推出（`cron 0 20 * * *` → low），`debounce / stale_after` 取组默认（1m / 24h，天气类事件"过期"的含义与围栏不同，生产者可覆盖），`sensitivity` 继承生产者 payload 的最高级别。
-- **模型怎么看到**：不进静态 prompt（数量不定），主 loop 用 `event_catalog.get(type)` 或 `event_catalog.search(q)` 查派生事件；回读时把字段列给用户。
+- **模型怎么看到**：与内建条目一样静态注入编译期 prompt（会话开始时取快照，数量有限）；回读时把字段列给用户。
 
 ## 3. filter 语法（一页）
 
@@ -69,7 +69,7 @@ literal  := 'string' | number | true | false | null
 | 用户话 | filter |
 |---|---|
 | 到家 | `zone == 'home'` |
-| 张三来电（张三 → contacts.search → `c_12`） | `contact_id == 'c_12'` |
+| 张三来电（张三 → phone.lookup(contacts) → `c_12`） | `contact_id == 'c_12'` |
 | 微信或钉钉的通知 | `package_name in ['com.tencent.mm', 'com.alibaba.android.rimet']` |
 | 电量低于 15%（battery_low 自带 level） | `level <= 15` |
 | 连上家里 WiFi | `bssid == 'a4:…'` 或 `ssid == 'Home-5G'` |
@@ -85,20 +85,23 @@ literal  := 'string' | number | true | false | null
 - key 字段命名：`contact_id`、`package_name`、`device_addr`、`bssid`、`zone`、`event_id`（日历）。显示名字段（`contact_name`、`app_name`、`device_name`、`ssid`）保留在 payload 供 message 使用，但**编译期优先用 key 字段写 filter**。
 - 位置类事件不暴露经纬度给模型：`latitude / longitude` 归 internal（只在推送信封 payload 里出现，模型看到的目录不列出、filter 不能用）。
 
-## 5. 填槽解析工具（编译期，主 loop 可见，只读）
+## 5. 唯一的只读查询工具 `phone.lookup`
 
-| 工具 | 输入 | 输出 | 用途 |
-|---|---|---|---|
-| `contacts.search(q)` | 姓名 / 昵称 / 号码片段 | `[{contact_id, name, numbers[]}]` | `phone.* / sms.received` 的 `contact_id` |
-| `apps.list(q?)` | 名称片段 | `[{package_name, app_name}]` | `app.* / notification.*` 的 `package_name` |
-| `bluetooth.paired()` | — | `[{device_addr, device_name, type}]` | `bluetooth.device_*` 的 `device_addr` |
-| `places.list()` | — | `[{zone, label}]` | `geofence.*` 的 `zone` |
+v3.0 把原来的四个解析工具（`contacts.search / apps.list / bluetooth.paired / places.list`）和 `phone_state.get` 合成一个工具，减少工具 schema 占用的 prompt，并让 trigger 脚本、判定 agent、动作 agentTurn 与主 loop 看到同一个名字。
 
-运行期（trigger 脚本 / 判定 agentTurn / 动作 agentTurn）只读工具：
+```
+phone.lookup(kind, q?, fields?)
+```
 
-| 工具 | 返回 | 用途 |
-|---|---|---|
-| `phone_state.get(fields[])` | `{screen, locked, battery, charging, dnd, ringer, airplane, wifi{connected, ssid, bssid}, bluetooth{on, devices[]}, headset, zones[], activity, foreground_app}` | 组合条件的"状态门"（T1），判定 prompt 里的现况查询 |
+| kind | 输入 | 输出 | 用途 | 谁可见 |
+|---|---|---|---|---|
+| `contacts` | 姓名 / 昵称 / 号码片段 | `[{contact_id, name, numbers[]}]` | `phone.* / sms.received` 的 `contact_id` | 编译期填槽 |
+| `apps` | 名称片段 | `[{package_name, app_name}]` | `app.* / notification.*` 的 `package_name` | 编译期填槽 |
+| `bluetooth` | — | `[{device_addr, device_name, type}]` | `bluetooth.device_*` 的 `device_addr` | 编译期填槽 |
+| `places` | — | `[{zone, label}]` | `geofence.*` 的 `zone` | 编译期填槽 |
+| `state` | `fields[]` | `{screen, locked, battery{level, charging}, dnd, ringer, airplane, wifi{connected, ssid, bssid}, bluetooth{on, devices[]}, headset, zones[], activity, foreground_app}` | "事件且状态"组合的现况查询（主稿 P10 S10）；判定 prompt 里的现况 | trigger 脚本 / 判定 agent / 动作 agentTurn / 主 loop |
+
+全部只读；没有任何写手机状态的工具。
 
 ## 6. 内建条目（10 组 63 条）
 
@@ -233,3 +236,5 @@ internal 额外字段：`latitude / longitude` 出现在推送 payload 中，但
 | payload 含 `occurred_at` | 移到推送信封 | 每条事件都有，不是 payload 语义 |
 | `notification.posted` 无约束 | `must_filter: package_name 或 category` | burst 级频率，裸订阅会淹没 job |
 | 无 internal | `rate / debounce / stale_after / sensitivity` | 订阅卫生参数从模型手里收回，由 cron service 按目录带上 |
+| `event_catalog` 工具 + 四个解析工具 + `phone_state.get`（v2.x） | 目录静态注入 + 一个 `phone.lookup(kind, …)`（v3.0） | 7 个工具的 schema 占 prompt；目录已静态可见，不需要查询工具 |
+| `state_query` 写 `phone_state.get(...)`（v2.x） | `phone.lookup(state, ...)`（v3.0） | 同上 |
