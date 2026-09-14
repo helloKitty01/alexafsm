@@ -1,0 +1,635 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>图片搜索 × 创建相册 · 需求与方案 v2 · 8 页</title>
+<style>
+  :root {
+    --bg: #e9edf4;
+    --slide-bg: linear-gradient(135deg, #ffffff 0%, #f7f9fd 60%, #eef3fb 100%);
+    --card: #f7f9fc;
+    --card-border: #dfe5ee;
+    --text: #1f2a3d;
+    --muted: #5c6b84;
+    --accent: #2563eb;
+    --good: #059669;
+    --warn: #d97706;
+    --bad: #dc2626;
+    --violet: #7c3aed;
+    --mono: "SF Mono", "JetBrains Mono", Consolas, "Courier New", monospace;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { background: var(--bg); height: 100%; }
+  body {
+    font-family: "PingFang SC", "Microsoft YaHei", "Noto Sans SC", -apple-system, sans-serif;
+    color: var(--text);
+    display: flex; justify-content: center; align-items: center;
+    padding: 16px 12px; min-height: 100vh;
+  }
+  .deck { position: relative; width: min(96vw, calc((100vh - 32px) * 1.7778)); }
+  .slide {
+    width: 100%; aspect-ratio: 16 / 9;
+    background: var(--slide-bg);
+    border: 1px solid var(--card-border); border-radius: 18px;
+    box-shadow: 0 18px 50px rgba(31,42,61,.16);
+    padding: 1.8% 2.6%;
+    display: none; flex-direction: column; gap: .45em;
+    overflow: hidden; position: relative;
+    font-size: clamp(10px, min(1.27vw, 2.26vh), 26px);
+  }
+  .slide.active { display: flex; }
+  /* 内容较稀的页放大字号 */
+  .slide.dense  { font-size: clamp(11px, min(1.5vw, 2.67vh), 30px); }
+  .slide.denser { font-size: clamp(12px, min(1.65vw, 2.93vh), 33px); }
+  .slide.dense h2 { font-size: 1.02em; } .slide.denser h2 { font-size: .94em; }
+  .slide::before {
+    content: ""; position: absolute; inset: 0 0 auto 0; height: 5px;
+    background: linear-gradient(90deg, var(--accent), var(--good));
+    border-radius: 18px 18px 0 0;
+  }
+  h2 { font-size: 1.16em; font-weight: 700; margin-bottom: .15em; line-height: 1.3; }
+  h2 .hl { color: var(--accent); }
+  h2 .num { color: var(--muted); font-weight: 600; margin-right: .4em; font-size: .78em; }
+  h2 small { font-size: .66em; font-weight: 500; color: var(--muted); margin-left: .55em; }
+
+  .card { background: var(--card); border: 1px solid var(--card-border); border-radius: 12px; padding: .5em .75em; overflow: hidden; min-width: 0; }
+  .card h3 { font-size: .86em; margin-bottom: .25em; color: var(--text); display: flex; align-items: center; gap: .6em; flex-wrap: wrap; }
+  .card h3 .sub { font-size: .78em; font-weight: 500; color: var(--muted); }
+  .card p, .card li { color: var(--muted); font-size: .72em; line-height: 1.45; }
+  .card li { margin-left: 1.15em; margin-bottom: .18em; }
+  .card b { color: var(--text); font-weight: 700; }
+  .card.acc { border-color: rgba(37,99,235,.35); background: linear-gradient(180deg, #fff, rgba(37,99,235,.04)); }
+  .card.good { border-color: rgba(5,150,105,.35); background: linear-gradient(180deg, #fff, rgba(5,150,105,.05)); }
+  .card.warn { border-color: rgba(217,119,6,.4); background: linear-gradient(180deg, #fff, rgba(217,119,6,.05)); }
+  .card.bad { border-color: rgba(220,38,38,.35); background: linear-gradient(180deg, #fff, rgba(220,38,38,.04)); }
+  .mono { font-family: var(--mono); }
+  .goodc { color: var(--good) !important; } .badc { color: var(--bad) !important; } .warnc { color: var(--warn) !important; } .accc { color: var(--accent) !important; }
+  .row { display: flex; gap: .6em; min-height: 0; }
+  .col { display: flex; flex-direction: column; gap: .45em; min-width: 0; }
+  .grow { flex: 1; min-height: 0; min-width: 0; }
+  .tag { display: inline-block; border-radius: 999px; padding: .02em .5em; font-size: .8em; font-weight: 700; white-space: nowrap; vertical-align: middle; }
+  .tag.ok { background: rgba(5,150,105,.12); color: var(--good); }
+  .tag.mid { background: rgba(37,99,235,.12); color: var(--accent); }
+  .tag.est { background: rgba(217,119,6,.12); color: var(--warn); }
+  .tag.bad { background: rgba(220,38,38,.12); color: var(--bad); }
+  .tag.new { background: rgba(124,58,237,.12); color: var(--violet); }
+
+  table { border-collapse: collapse; width: 100%; font-size: .7em; }
+  th, td { text-align: left; padding: .26em .45em; border-bottom: 1px solid var(--card-border); vertical-align: top; }
+  th { color: var(--accent); font-weight: 700; white-space: nowrap; }
+  td { color: var(--muted); line-height: 1.38; }
+  td b { color: var(--text); }
+  td.id { font-family: var(--mono); font-weight: 800; color: var(--accent); white-space: nowrap; }
+  td.nm { font-weight: 700; color: var(--text); white-space: nowrap; }
+  tr.hl td { background: rgba(217,119,6,.06); }
+
+  .banner {
+    border-radius: 10px; padding: .38em .85em; font-size: .72em;
+    background: linear-gradient(90deg, rgba(37,99,235,.08), rgba(5,150,105,.07));
+    border: 1px solid rgba(37,99,235,.28); color: var(--text); line-height: 1.42;
+  }
+  .banner b { color: var(--accent); }
+  .footer { margin-top: auto; padding-top: .25em; padding-left: 11.5em; display: flex; justify-content: space-between; color: var(--muted); font-size: .56em; gap: 1em; line-height: 1.35; }
+  .footer b { color: var(--text); }
+  .footer > div:last-child { margin-right: 13.5em; white-space: nowrap; }
+
+  /* 分层架构图 */
+  .layers { display: flex; flex-direction: column; gap: .35em; }
+  .lane { display: grid; grid-template-columns: 5.2em 1fr; gap: .5em; align-items: stretch; }
+  .lane .lbl { display: flex; flex-direction: column; justify-content: center; border-radius: 8px; padding: .3em .45em; color: #fff; font-weight: 800; font-size: .7em; line-height: 1.25; }
+  .lane .lbl small { font-weight: 500; opacity: .9; font-size: .85em; }
+  .lane .lbl.user { background: var(--bad); } .lane .lbl.skill { background: var(--accent); } .lane .lbl.tool { background: var(--good); } .lane .lbl.svc { background: var(--violet); }
+  .lane .boxes { display: flex; gap: .45em; align-items: stretch; }
+  .lane .bx { flex: 1; min-width: 0; background: #fff; border: 1px solid var(--card-border); border-radius: 9px; padding: .35em .55em; display: flex; flex-direction: column; gap: .1em; position: relative; }
+  .lane .bx .t { font-size: .74em; font-weight: 800; color: var(--text); }
+  .lane .bx .d { font-size: .6em; color: var(--muted); line-height: 1.35; }
+  .lane .bx.skill { border-color: rgba(37,99,235,.5); } .lane .bx.tool { border-color: rgba(5,150,105,.5); } .lane .bx.svc { border-color: rgba(124,58,237,.5); } .lane .bx.user { border-color: rgba(220,38,38,.4); }
+  .lane .bx.ghost { border-style: dashed; background: transparent; }
+  .lane .bx .t .tag { margin-left: .4em; }
+  .lane .arr { align-self: center; color: var(--accent); font-weight: 800; font-size: .8em; white-space: nowrap; padding: 0 .1em; flex: none; }
+  .lane .arr small { display: block; font-size: .7em; color: var(--muted); font-weight: 600; text-align: center; }
+
+  /* 流程 */
+  .flow { display: flex; align-items: stretch; gap: .3em; }
+  .fstep { flex: 1; min-width: 0; background: #fff; border: 1px solid var(--card-border); border-radius: 9px; padding: .35em .45em; display: flex; flex-direction: column; gap: .08em; }
+  .fstep .fn { font-size: .7em; font-weight: 800; color: var(--accent); line-height: 1.3; }
+  .fstep .fd { font-size: .58em; color: var(--muted); line-height: 1.32; }
+  .fstep .fd b { color: var(--text); }
+  .fstep.user { border-color: rgba(220,38,38,.45); } .fstep.user .fn { color: var(--bad); }
+  .fstep.tool { border-color: rgba(5,150,105,.45); } .fstep.tool .fn { color: var(--good); }
+  .fstep.svc { border-color: rgba(124,58,237,.45); } .fstep.svc .fn { color: var(--violet); }
+  .farr { display: flex; align-items: center; color: var(--muted); font-size: .9em; flex: none; }
+
+  /* 对比框 */
+  .pair { display: flex; gap: .45em; }
+  .pair .box { flex: 1; min-width: 0; border-radius: 9px; padding: .38em .55em; font-size: .66em; line-height: 1.4; color: var(--muted); }
+  .pair .box b { display: block; margin-bottom: .1em; font-size: 1.05em; }
+  .pair .box p b { display: inline; font-size: 1em; color: var(--text); }
+  .pair .cur { background: rgba(220,38,38,.06); border: 1px solid rgba(220,38,38,.3); } .pair .cur > b { color: var(--bad); }
+  .pair .mid { background: rgba(217,119,6,.06); border: 1px solid rgba(217,119,6,.35); } .pair .mid > b { color: var(--warn); }
+  .pair .tgt { background: rgba(5,150,105,.06); border: 1px solid rgba(5,150,105,.3); } .pair .tgt > b { color: var(--good); }
+
+  pre.code { font-family: var(--mono); background: #fff; border: 1px solid var(--card-border); border-radius: 8px; padding: .4em .6em; font-size: .62em; line-height: 1.5; color: var(--text); overflow: hidden; white-space: pre; }
+  pre.code .c { color: var(--muted); } pre.code .k { color: var(--accent); font-weight: 700; } pre.code .n { color: var(--violet); font-weight: 800; } pre.code .g { color: var(--good); font-weight: 700; } pre.code .r { color: var(--bad); font-weight: 700; }
+  code.i { font-family: var(--mono); background: #fff; border: 1px solid var(--card-border); border-radius: 4px; padding: 0 .3em; font-size: .92em; color: var(--accent); }
+
+  /* 决策卡 */
+  .decision { display: flex; flex-direction: column; gap: .3em; }
+  .decision .head { display: flex; align-items: baseline; gap: .5em; }
+  .decision .head .no { font-size: 1.3em; font-weight: 900; color: var(--accent); font-family: var(--mono); }
+  .decision .head h3 { margin: 0; }
+  .decision .verdict { background: #fff; border: 1px solid rgba(5,150,105,.35); border-left: 4px solid var(--good); border-radius: 8px; padding: .32em .55em; font-size: .72em; color: var(--text); line-height: 1.4; }
+  .decision .verdict b { color: var(--good); }
+  .decision .kv { display: grid; grid-template-columns: 3.2em 1fr; gap: .15em .4em; font-size: .66em; line-height: 1.4; }
+  .decision .kv .k { color: var(--accent); font-weight: 700; white-space: nowrap; }
+  .decision .kv .v { color: var(--muted); } .decision .kv .v b { color: var(--text); }
+
+  .steps { display: grid; grid-template-columns: 1fr 1fr; gap: .4em; }
+  .step { border-radius: 10px; padding: .4em .55em; background: #fff; border: 1px solid var(--card-border); display: flex; flex-direction: column; gap: .12em; }
+  .step .no { font-size: .62em; font-weight: 800; color: var(--accent); }
+  .step h4 { font-size: .76em; font-weight: 800; color: var(--text); line-height: 1.3; }
+  .step p { font-size: .62em; color: var(--muted); line-height: 1.4; }
+  .step p b { color: var(--text); }
+
+  .nav { position: absolute; bottom: 3.2%; right: 3%; display: flex; gap: .5em; align-items: center; z-index: 10; font-size: clamp(10px, min(1.1vw, 1.95vh), 22px); }
+  .nav button { background: #fff; border: 1px solid var(--card-border); color: var(--text); border-radius: 8px; width: 2.1em; height: 2.1em; cursor: pointer; font-size: 1em; }
+  .nav button:hover { border-color: var(--accent); color: var(--accent); }
+  .nav .pg { color: var(--muted); font-family: var(--mono); font-size: .88em; padding: 0 .35em; }
+  .dots { position: absolute; bottom: 3.9%; left: 3%; display: flex; gap: .42em; z-index: 10; }
+  .dots i { width: .46em; height: .46em; border-radius: 50%; background: #c9d2e0; cursor: pointer; }
+  .dots i.on { background: var(--accent); }
+  @media print { body { padding: 0; } .deck { width: 100%; } .slide { display: flex !important; page-break-after: always; box-shadow: none; border-radius: 0; margin-bottom: 0; } .nav, .dots { display: none; } }
+</style>
+</head>
+<body>
+<div class="deck">
+
+<!-- ============ P1 问题与分层架构 ============ -->
+<section class="slide active">
+  <h2><span class="num">01</span>问题与分层架构:<span class="hl">按语义找一批图放进相册,同一句话再来只加「还不在册」的图</span><small>两个 skill 单向依赖 · 搜索工具单次 ≤ 500 张 · 增量靠搜索工具的可选排除字段</small></h2>
+
+  <div class="row" style="flex:none;">
+    <div class="card" style="flex:1.1;">
+      <h3>讨论起点 <span class="sub">原话压缩</span></h3>
+      <ul>
+        <li>两个 skill:<b>图片搜索</b>、<b>创建相册</b>;相册依赖搜图,搜图<b>不强依赖</b>相册</li>
+        <li>搜索工具每次最多返回 <b>500 张</b>,超出要多次调用</li>
+        <li>「帮我把小猫的图片创建一个相册」→ 先找小猫再建册;一周后同一句话,期望只加<b>新增的小猫</b></li>
+        <li>需要给搜索工具加一个<b>排除字段</b>(排除小猫相册)</li>
+      </ul>
+    </div>
+    <div class="card acc" style="flex:1;">
+      <h3>拆成三个子问题 <span class="sub">分开说,合起来做</span></h3>
+      <ul>
+        <li><b>① 依赖</b>:相册用搜图,搜图不认相册 → 单向</li>
+        <li><b>② 500 上限</b>:不漏页、不提前停、不重复加 → 由工具吞掉翻页,模型不感知(P4 / P5)</li>
+        <li><b>③ 增量</b>:<code class="i">exclude_album</code> 排除「成员 ∪ 已移出」,排除在分页之前(P6)</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="card grow" style="display:flex; flex-direction:column;">
+    <h3>分层架构与依赖方向 <span class="sub">skill 层单向依赖;工具层各自独立;服务层共享同一份相册数据。<span class="tag new">新增</span> 标出本方案新加的能力</span></h3>
+    <div class="layers grow" style="justify-content:space-evenly;">
+      <div class="lane">
+        <div class="lbl user">用户<small>话术</small></div>
+        <div class="boxes">
+          <div class="bx user"><div class="t">「找一下小猫的照片」</div><div class="d">只搜,不建册(S1)</div></div>
+          <div class="bx user" style="flex:2;"><div class="t">「帮我把小猫的图片创建一个相册」</div><div class="d">首次 → 建册;已有同名册 → 增量(默认);「再做一本」→ 新建</div></div>
+        </div>
+      </div>
+      <div class="lane">
+        <div class="lbl skill">skill 层<small>说明书</small></div>
+        <div class="boxes">
+          <div class="bx skill"><div class="t">图片搜索 skill</div><div class="d">怎么查、结果怎么交给下游;<b>exclude_album 是可选参数</b>,不填就是普通搜索;正文不写相册流程</div></div>
+          <div class="arr">◀ 依赖<small>单向</small></div>
+          <div class="bx skill" style="flex:1.4;"><div class="t">创建相册 skill</div><div class="d">找册 → 判断新建 / 增量 → 搜一次报数(带 exclude)→ 确认 → 一次调用完成加入 → 汇报;搜图用法直接写在正文(编译期 include)</div></div>
+        </div>
+      </div>
+      <div class="lane">
+        <div class="lbl tool">工具层<small>模型可调</small></div>
+        <div class="boxes">
+          <div class="bx tool"><div class="t">search<span class="tag new">+ exclude_album</span></div><div class="d">query / limit ≤ 500 / cursor? / exclude_album? → items, total, has_more</div></div>
+          <div class="bx tool"><div class="t">find_album · create_album</div><div class="d">按名查找返回 0 / 1 / 多本(带成员数、修改时间);创建</div></div>
+          <div class="bx tool"><div class="t">add_to_album</div><div class="d">幂等批量加入:已在册跳过</div></div>
+          <div class="bx tool" style="border-width:2px;"><div class="t">add_from_search<span class="tag new">复合</span></div><div class="d">(album, query) 内部循环「排除搜索 → 加入」直到为空;<b>翻页在这里被吞掉</b>;长耗时走异步</div></div>
+        </div>
+      </div>
+      <div class="lane">
+        <div class="lbl svc">服务层<small>设备内</small></div>
+        <div class="boxes">
+          <div class="bx svc" style="flex:1.2;"><div class="t">图库检索引擎</div><div class="d">语义检索;<b>在引擎内做 query ∧ ¬in(集合) 再取 limit</b>;相册成员要有索引</div></div>
+          <div class="bx svc" style="flex:1.2;"><div class="t">相册服务<span class="tag new">+ removed</span></div><div class="d">members + <b>removed(用户移出记录)</b>;「从相册移除」操作写 removed;排除语义 = members ∪ removed</div></div>
+          <div class="bx svc ghost"><div class="t">框架:结果句柄</div><div class="d">模型引用 <span class="mono">${r.items}</span> 不抄 ID;复合工具落地后主流程已不需要</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="footer">
+    <div><b>本稿结构</b>:P2 场景矩阵 → P3 三项拍板 → P4 排除即翻页(替代游标) → P5 翻页由工具吞掉 → P6 工具契约与移出记录 → P7 收敛后的主流程 → P8 依赖、挑战与下一步。</div>
+    <div>图片搜索 × 创建相册 · v2 · P1 架构</div>
+  </div>
+</section>
+
+<!-- ============ P2 场景矩阵 ============ -->
+<section class="slide denser">
+  <h2><span class="num">02</span>场景矩阵:<span class="hl">10 条场景,每条带触发话术 / 期望动作 / 成功标准</span><small>S3 与 S6 话术相似、策略相反,必须并列写;方案每改一版按这 10 条过一遍</small></h2>
+  <div class="card grow" style="display:flex; flex-direction:column;">
+    <table>
+      <thead><tr><th>ID</th><th>场景</th><th>触发话术</th><th>期望动作</th><th>成功标准</th></tr></thead>
+      <tbody>
+        <tr><td class="id">S1</td><td class="nm">只搜</td><td>「找一下小猫的照片」</td><td>只走搜图,不建相册</td><td>能翻页(cursor);能告诉用户大约多少张</td></tr>
+        <tr><td class="id">S2</td><td class="nm">首次建册</td><td>「帮我把小猫的图片创建一个相册」</td><td>找册无 → 建册 → 全部加入</td><td>相册存在;成员 = 本次全部命中(可能远超 500)</td></tr>
+        <tr class="hl"><td class="id">S3</td><td class="nm">增量更新</td><td>一周后同一句话</td><td>找到已有「小猫」册 → 排除该册搜 → 只加新图</td><td>旧图不重复进册;用户感知「新增了 N 张」</td></tr>
+        <tr><td class="id">S4</td><td class="nm">超过 500</td><td>命中 1200 张</td><td>工具内部分 3 批加入,模型只调一次</td><td>不丢批、不提前停、不重复加</td></tr>
+        <tr class="hl"><td class="id">S5</td><td class="nm">增量也超过 500</td><td>排除后仍有 800 张新图</td><td>排除后再取 500,分 2 批</td><td>500 是「排除后的一批」,不是「先取 500 再过滤」</td></tr>
+        <tr class="hl"><td class="id">S6</td><td class="nm">再做一本</td><td>「再创建一个小猫相册」「重新做一本」</td><td>新建,不增量</td><td>不写进旧相册;新册名加后缀不冲突</td></tr>
+        <tr><td class="id">S7</td><td class="nm">增量为空</td><td>一周后没有新小猫</td><td>告知「已是最新」</td><td>不空跑、不误报「已添加」</td></tr>
+        <tr><td class="id">S8</td><td class="nm">重名相册</td><td>已有两本叫「小猫」</td><td>先问用哪本,再增量</td><td>不默默写进错的那本;问句带成员数、修改时间</td></tr>
+        <tr><td class="id">S9</td><td class="nm">中途失败</td><td>加到一半超时</td><td>重跑即可续</td><td>加入幂等,重跑不产生重复</td></tr>
+        <tr><td class="id">S10</td><td class="nm">跨会话</td><td>一周后是新会话,没有上周上下文</td><td>靠 find_album 发现已有册</td><td>不依赖聊天记忆里的相册 ID</td></tr>
+        <tr class="hl"><td class="id">S11</td><td class="nm">手动移出</td><td>上周从相册里移出了 12 张误判的图</td><td>增量<b>不把它们加回</b></td><td>排除语义 = members ∪ removed(P6)</td></tr>
+      </tbody>
+    </table>
+    <div class="row" style="margin-top:.45em; flex:none;">
+      <div class="card" style="flex:1;">
+        <h3>两条边界,先写明</h3>
+        <ul>
+          <li><b>只加不删</b>:相册里已有、这次不再命中的图默认保留;同步删除是另一条需求</li>
+          <li><b>排除键是成员关系,不是时间</b>:不用「上周之后拍的」代替「不在小猫相册里」——用户可能手动加过、拿掉过(S11 就是这么来的)</li>
+        </ul>
+      </div>
+      <div class="card" style="flex:1;">
+        <h3>怎么用这张表</h3>
+        <p>S1–S3 是主线;S4 / S5 检验分页与排除的正确性;S6 / S8 检验意图与身份消歧;S7 / S9 / S10 检验汇报、幂等与跨会话;S11 检验相册服务的移出记录。</p>
+      </div>
+    </div>
+  </div>
+  <div class="footer">
+    <div><b>相对 v1 的变化</b>:S4 / S5 的期望动作从「模型翻 N 页」改为「工具内部分批、模型只调一次」;新增 S11 手动移出。</div>
+    <div>图片搜索 × 创建相册 · v2 · P2 场景</div>
+  </div>
+</section>
+
+<!-- ============ P3 三项拍板 ============ -->
+<section class="slide denser">
+  <h2><span class="num">03</span>三项拍板:<span class="hl">默认增量 · 排除语义含移出记录 · 翻页由工具吞掉</span><small>这三件定了,skill 怎么写、工具 schema 怎么加字段就不会来回改</small></h2>
+  <div class="row grow">
+    <div class="card grow decision">
+      <div class="head"><span class="no">①</span><h3>同名相册,默认怎么办</h3></div>
+      <div class="verdict"><b>已定:默认增量,只有多本同名才问用户。</b>「再创建一个 / 重新做一本」显式走新建。</div>
+      <div class="kv">
+        <span class="k">找册</span><span class="v">对话历史里有本意图产生的相册句柄(如 <span class="mono">${r3.album}</span>)→ 直接用,<b>工具端校验</b>存在性;否则 <span class="mono">find_album(name)</span></span>
+        <span class="k">出口</span><span class="v">0 本 → 首次建册;1 本 → 增量不问;多本 → 问「用哪本」,问句带各本<b>成员数与最近修改时间</b></span>
+        <span class="k">确认</span><span class="v">增量前先报数:「已有 320 张,又找到 18 张新的」;N 小直接加,N 大(阈值待定)再确认</span>
+        <span class="k">失效</span><span class="v">历史句柄指向的相册已删 / 改名 → 校验失败回落到按名查找,不报错给用户</span>
+      </div>
+    </div>
+    <div class="card grow decision">
+      <div class="head"><span class="no">②</span><h3>排除什么,记在哪</h3></div>
+      <div class="verdict"><b>已定:<span class="mono">exclude_album=A</span> 的语义 = ¬in(A.members ∪ A.removed),移出记录由相册服务维护。</b></div>
+      <div class="kv">
+        <span class="k">写入</span><span class="v">相册服务的「从相册移除」操作写 <span class="mono">removed</span>(图库 UI 移出、助手移出都走它);skill 与搜索工具<b>不感知</b></span>
+        <span class="k">清除</span><span class="v">用户手动把该图加回相册 → 从 removed 移出;图从图库删除 → GC;「重新做一本」是新相册,没有 removed</span>
+        <span class="k">为什么</span><span class="v">只加不删 + 排除键 = 成员,组合起来会把用户主动拿掉的图加回去(S11);记录放相册服务是唯一不扯的位置——助手自己记 add_log 再做差集,依赖助手侧持久化且要给搜索传 ID 列表,不采纳</span>
+        <span class="k">话术</span><span class="v">可选:「另有 12 张是你之前移出的,不会加回」</span>
+      </div>
+    </div>
+    <div class="card grow decision">
+      <div class="head"><span class="no">③</span><h3>翻页谁来做</h3></div>
+      <div class="verdict"><b>已定:相册流程里模型不翻页。</b>复合工具 <span class="mono">add_from_search</span> 内部用「排除即翻页」循环吞掉分页;cursor 只保留给纯搜索(S1)。</div>
+      <div class="kv">
+        <span class="k">为什么</span><span class="v">主要挑战是<b>模型挑战</b>:翻完第一页就停、漏传 cursor、抄错 ID。让模型理解「翻页 + 排除 + 幂等」三件事叠加,不如让它一件都不用理解</span>
+        <span class="k">机制</span><span class="v">P4:exclude 指向正在加的相册 → 每次搜到的天然是「下一批不在册的 500 张」,不需要游标;P5:循环放进工具</span>
+        <span class="k">loop</span><span class="v">首次 1200 张:v1 是 8 个 loop;现在 <b>3 个 loop</b>,且<b>与张数无关</b></span>
+        <span class="k">代价</span><span class="v">相册工具实现要能调搜索服务(服务层依赖,skill 层单向不变);长耗时必须有异步形态</span>
+      </div>
+    </div>
+  </div>
+  <div class="banner"><b>三项的关系</b>:① 决定要不要走增量;② 决定「不在册」怎么定义;③ 决定增量怎么执行。①② 是产品 / 服务层的事,③ 是工具形态的事——三者正交,可以分头推进。</div>
+  <div class="footer">
+    <div><b>待定阈值</b>:①里「N 大再确认」的 N;②里 removed 是否对用户可见(相册设置里能不能清空)。</div>
+    <div>图片搜索 × 创建相册 · v2 · P3 拍板</div>
+  </div>
+</section>
+
+<!-- ============ P4 排除即翻页 ============ -->
+<section class="slide denser">
+  <h2><span class="num">04</span>排除即翻页:<span class="hl">exclude 能不能替代游标——在相册流程里可以,而且更简单</span><small>三种翻页方式对比;offset 在这个场景下不是「不够好」而是必错</small></h2>
+
+  <div class="pair" style="flex:none;">
+    <div class="box cur">
+      <b>✗ offset:边加边搜必漏</b>
+      <p>排除后有 1300 张新图。第 1 页 <span class="mono">offset=0</span> 拿 500 张并加入 → 「不在册」只剩 800 张。第 2 页 <span class="mono">offset=500</span> = 跳过<b>剩下 800 张的前 500</b> → 只返回 300 张,原第 501~1000 张<b>永远漏掉</b>,且 has_more=false 看起来一切正常。</p>
+    </div>
+    <div class="box mid">
+      <b>△ cursor:正确,但要模型接力</b>
+      <p>keyset 游标编码「排序中的位置」(上一页最后一张的 score + photo_id),下一页 = 该位置之后且不在册。排除集变大只会让列表变短,位置不漂。<b>但</b>:模型要接力传不透明串、可能过期、顺序要稳定(同分按 id 打破平局)。适合纯搜索 S1 的浏览翻页。</p>
+    </div>
+    <div class="box tgt">
+      <b>✓ 排除即翻页:相册流程首选</b>
+      <p><span class="mono">exclude_album</span> 指向的正是要加的那本 A。反复调 <span class="mono">search(q, exclude_album=A, limit=500)</span>,每次拿到的天然是「<b>下一批还不在册的 500 张</b>」,加进去,直到返回空。<b>不需要游标,首次与增量是同一个循环</b>,中途失败直接重跑。</p>
+    </div>
+  </div>
+
+  <div class="row grow">
+    <div class="card good grow" style="display:flex; flex-direction:column;">
+      <h3>循环长什么样 <span class="sub">首次建册先建空相册 A,之后与增量完全一致</span></h3>
+      <pre class="code grow"><span class="k">A</span> = find_album(q) <span class="c">or</span> create_album(q)   <span class="c"># 首次 A 为空册;增量 A 已有成员</span>
+<span class="k">loop</span>:
+  page = search(q, <span class="n">exclude_album</span>=A, limit=500)
+        <span class="c"># 引擎内 q ∧ ¬in(A.members ∪ A.removed) 再取 500</span>
+  <span class="k">if</span> page.items 为空: <span class="k">break</span>             <span class="c"># 自然终止,不看 has_more</span>
+  res = add_to_album(A, page.items)        <span class="c"># 幂等:已在册跳过</span>
+  <span class="k">if</span> res.added == 0: <span class="r">raise 索引未更新</span>      <span class="c"># 护栏:同一页又回来了</span>
+  added += res.added
+<span class="g">return</span> {added, rounds}</pre>
+      <p style="margin-top:.35em;">终止条件是「搜出来为空」而不是 <span class="mono">has_more</span>,所以<b>翻页状态就是相册本身</b>——重跑、断点续跑、幂等三件事一次拿到。</p>
+    </div>
+    <div class="col" style="flex:1;">
+      <div class="card">
+        <h3>成立的两个前提 <span class="tag est">待核实</span></h3>
+        <ul>
+          <li><b>读己之写</b>:<span class="mono">add_to_album</span> 返回后,下一次 <span class="mono">search</span> 的排除过滤立刻能看到新成员。若成员索引异步更新,会重复拿到同一页——护栏是 <span class="mono">added == 0</span> 即停并报错,不会死循环,但该轮会少加</li>
+          <li><b>排除在引擎内</b>:每轮都重算 <span class="mono">q ∧ ¬in(A)</span>,相册成员必须有索引;2000 张成员做差集不能是拉全量再过滤</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>边界</h3>
+        <ul>
+          <li><b>翻页期间新入库的图</b>:本轮可能漏,下轮增量按成员关系照样补上——增量本来就是相对当前成员,不是相对上次结果快照</li>
+          <li><b>语义检索是排序不是过滤</b>:命中按相似度排,后几批精度下降;增量拿到的是首次没进前 N 的图。<span class="mono">total</span> 口径按阈值以上计数,或不承诺</li>
+          <li><b>S1 纯搜索仍要 cursor</b>:没有相册可排除,用户「再看一页」只能靠游标。两条并存,搜索工具两个参数都保留</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+  <div class="footer">
+    <div><b>一句话</b>:在相册流程里,exclude 让分页「自推进」,游标从必需变为可选;这是能把循环塞进工具、让模型完全不感知翻页的前提(P5)。</div>
+    <div>图片搜索 × 创建相册 · v2 · P4 排除即翻页</div>
+  </div>
+</section>
+
+<!-- ============ P5 翻页由工具吞掉 ============ -->
+<section class="slide dense">
+  <h2><span class="num">05</span>翻页由工具内部吞掉:<span class="hl">循环从模型挪到确定性代码,模型一次调用完成一个用户动作</span><small>现状是模型多次调用;两条落法,推荐相册侧复合工具</small></h2>
+
+  <div class="row grow">
+    <div class="col" style="flex:1;">
+      <div class="card bad">
+        <h3>现状:模型驱动循环 <span class="sub">1200 张 = 3 搜 + 3 加</span></h3>
+        <div class="flow">
+          <div class="fstep"><div class="fn">模型</div><div class="fd">search p1</div></div><div class="farr">→</div>
+          <div class="fstep"><div class="fn">模型</div><div class="fd">add p1</div></div><div class="farr">→</div>
+          <div class="fstep"><div class="fn">模型</div><div class="fd">search p2 …</div></div><div class="farr">→</div>
+          <div class="fstep"><div class="fn">模型</div><div class="fd">add p3</div></div>
+        </div>
+        <ul style="margin-top:.35em;">
+          <li>每页 2 个 loop,每 loop 5~11 s;张数越多越慢</li>
+          <li>失败模式全是<b>模型挑战</b>:翻完第一页就停 / 漏传 cursor / 抄错 ID / 把 has_more 理解反</li>
+          <li>skill 要教「翻页协议 + 排除 + 幂等」三件事,正文变长、走错分支概率上升</li>
+        </ul>
+      </div>
+      <div class="card good grow">
+        <h3>目标:相册侧复合工具 <span class="tag ok">推荐</span> <span class="sub">模型 1 次调用,与张数无关</span></h3>
+        <div class="flow">
+          <div class="fstep"><div class="fn">模型</div><div class="fd">add_from_search(A, q)</div></div><div class="farr">→</div>
+          <div class="fstep tool" style="flex:2.6;"><div class="fn">相册工具内部</div><div class="fd">loop { 搜索服务.search(q, exclude=A) → 相册服务.add(A, items) } 直到为空<br><b>循环是代码,不是提示词</b></div></div><div class="farr">→</div>
+          <div class="fstep"><div class="fn">返回</div><div class="fd">{added, skipped, rounds}<br>或 task 句柄</div></div>
+        </div>
+        <ul style="margin-top:.35em;">
+          <li>相册工具在<b>服务层</b>调搜索服务(进程 / 服务调用,不经过模型);skill 层「相册依赖搜图、搜图不认相册」<b>不变</b></li>
+          <li>「一次调用 ≈ 一个用户可感知的完整动作」;<span class="mono">exclude</span> 与幂等 add 都在工具内部,模型不需要理解翻页</li>
+          <li>500 张 ID <b>从不进上下文</b>,变量句柄在主流程里也用不上了</li>
+        </ul>
+      </div>
+    </div>
+    <div class="col" style="flex:1;">
+      <div class="card">
+        <h3>另一条落法:框架代练 <span class="tag mid">备选</span></h3>
+        <p>搜索工具、相册工具都不改。框架在结果信封里认出分页(<span class="mono">has_more / next_cursor</span>),当模型引用 <span class="mono">${r1.all_items}</span> 这类「全集」句柄时,Resolver 在替换变量前自己把剩余页拉完,合并进 Working Memory 再喂给 add。</p>
+        <ul>
+          <li>优点:工具零改动,是变量句柄方案 v4 的自然扩展(从「存已返回的值」到「按需物化分页」)</li>
+          <li>代价:500 × N 个 ID 都要过框架内存;框架多了一个「懂分页」的通用协议;仍需 cursor</li>
+          <li>适用:相册工具改不动、但框架变量方案已落地时</li>
+        </ul>
+      </div>
+      <div class="card acc">
+        <h3>复合工具的三条设计要求 <span class="sub">对齐工具接入要求 04</span></h3>
+        <ul>
+          <li><b>异步形态</b>:1200 张要十几秒,属 long 档。同步返回阈值内(如 ≤ 2 轮)的结果;超过则返回任务句柄,后续查进度 / 完成回调,产品侧可显示「已加入 800 / 约 1200」</li>
+          <li><b>可中断、可续</b>:用户取消时返回已加入数;重跑走同一循环,幂等保证不重复</li>
+          <li><b>报数在前</b>:复合工具不负责确认。相册 skill 先用 <span class="mono">search(q, exclude_album=A, limit=5)</span> 拿 <span class="mono">total</span> 报数(这一步仍是搜图 skill 的用法,依赖关系由此保住),用户点头后再调 add_from_search</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>什么时候不该合成复合工具</h3>
+        <p>工具接入要求 §4.3 说复合工具应由日志里「高频 + 稳定」的序列驱动。这里的 search → add 循环<b>结构固定、次数由数据决定、模型不需要在中间做判断</b>——正是最该内化的一类;若中间需要模型判断(比如每页让用户挑),就不该合。</p>
+      </div>
+    </div>
+  </div>
+  <div class="footer">
+    <div><b>结论</b>:相册主流程用复合工具吞掉翻页;搜索工具保留 cursor 给 S1;框架代练作为工具改不动时的备选,不并行做。</div>
+    <div>图片搜索 × 创建相册 · v2 · P5 工具吞掉翻页</div>
+  </div>
+</section>
+
+<!-- ============ P6 工具契约与移出记录 ============ -->
+<section class="slide dense">
+  <h2><span class="num">06</span>工具契约与移出记录:<span class="hl">搜索工具加两个可选参数,相册加一个复合工具,相册服务加一份 removed</span><small>模型填可读名 / 句柄,不填内部 ID</small></h2>
+  <div class="row grow">
+    <div class="col" style="flex:1.1;">
+      <div class="card grow" style="display:flex; flex-direction:column;">
+        <h3>搜索工具 <span class="sub">在现有基础上只加可选参数,老调用方不受影响</span></h3>
+        <pre class="code grow">search(
+  query:          string          <span class="c"># 语义描述,如「小猫」</span>
+  limit:          int ≤ 500       <span class="c"># 单次上限(现有约束)</span>
+  cursor:         string?         <span class="c"># 纯搜索翻页用;相册流程不用</span>
+  <span class="n">exclude_album</span>:  string?         <span class="c"># 新增:排除已在该相册的图(members ∪ removed)</span>
+) → {
+  items:        [...]             <span class="c"># 本批 ≤ 500</span>
+  total:        int?              <span class="c"># 排除后的总数(阈值以上),用于报数与确认</span>
+  has_more:     bool
+  next_cursor:  string?
+}</pre>
+        <p style="margin-top:.3em;"><b>正确性约束</b>:排除在引擎内、<b>取 limit 之前</b>完成——<span class="mono">q ∧ ¬in(A)</span> 再排序取 500。先取 500 再过滤,S5 直接做错。</p>
+      </div>
+    </div>
+    <div class="col" style="flex:1;">
+      <div class="card">
+        <h3>相册工具</h3>
+        <pre class="code">find_album(name)   → [{album, name, count, updated_at}]  <span class="c"># 0/1/多</span>
+create_album(name) → album
+add_to_album(album, items) → {added, skipped}          <span class="c"># 幂等</span>
+<span class="n">add_from_search</span>(album, query)                          <span class="c"># 新增,复合</span>
+  → {added, skipped, rounds} | {task_id}               <span class="c"># 长耗时异步</span></pre>
+      </div>
+      <div class="card warn grow">
+        <h3>相册服务:移出记录 removed <span class="tag new">数据模型变更</span></h3>
+        <div class="kv" style="display:grid; grid-template-columns:4.2em 1fr; gap:.15em .4em; font-size:.68em; line-height:1.42;">
+          <span class="accc" style="font-weight:700;">存什么</span><span style="color:var(--muted);">每本相册除 <span class="mono">members</span> 外多一个 <span class="mono">removed: Set&lt;photo_id&gt;</span>——用户从这本相册显式移出过的图</span>
+          <span class="accc" style="font-weight:700;">谁写</span><span style="color:var(--muted);">相册服务的「从相册移除」操作。图库 UI 移出、助手移出都经过它;<b style="color:var(--text);">skill、搜索工具零感知</b></span>
+          <span class="accc" style="font-weight:700;">谁读</span><span style="color:var(--muted);">检索引擎在解析 <span class="mono">exclude_album=A</span> 时读 <span class="mono">A.members ∪ A.removed</span> 作为排除集</span>
+          <span class="accc" style="font-weight:700;">何时清</span><span style="color:var(--muted);">用户手动把该图加回 A → 从 removed 删;图从图库删除 → GC;新建相册没有 removed</span>
+          <span class="accc" style="font-weight:700;">不做的</span><span style="color:var(--muted);">不在助手侧记「我加过什么」再做差集——依赖助手持久化、还要给搜索传 ID 列表,放错了位置</span>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="banner"><b>改动清单</b>:搜索工具 +1 可选参数(exclude_album)+ 1 返回字段(total);相册工具 +1 复合工具(add_from_search),find_album 返回加 count / updated_at;相册服务 +1 集合(removed)并挂到移除操作上;检索引擎支持「命中 ∩ 不在集合」下推。skill 文本两份,见 P7。</div>
+  <div class="footer">
+    <div><b>不变的</b>:add_to_album 保留给零散加入(「把这几张也放进去」);cursor 保留给 S1;模型不填任何内部 ID,相册用可读名或对话历史里的句柄。</div>
+    <div>图片搜索 × 创建相册 · v2 · P6 契约</div>
+  </div>
+</section>
+
+<!-- ============ P7 收敛后的主流程 ============ -->
+<section class="slide denser">
+  <h2><span class="num">07</span>收敛后的主流程:<span class="hl">首次与增量同一条链路,3 个 loop,与张数无关</span><small>差别只在 find_album 是否命中;模型不接触任何图 ID,不翻页</small></h2>
+
+  <div class="card grow" style="display:flex; flex-direction:column;">
+    <h3>「帮我把小猫的图片创建一个相册」 <span class="sub">上:首次,命中 1200 张 · 下:一周后,相册已有 320 张、用户移出过 12 张</span></h3>
+    <div class="flow" style="margin-top:.2em;">
+      <div class="fstep tool"><div class="fn">① find_album("小猫")</div><div class="fd">→ 0 本<br><b>create_album("小猫")</b> → A(空)</div></div><div class="farr">→</div>
+      <div class="fstep tool"><div class="fn">② search("小猫", exclude_album=A, limit=5)</div><div class="fd">→ total=1200, 5 张预览<br>A 为空,排除不生效</div></div><div class="farr">→</div>
+      <div class="fstep user"><div class="fn">③ 报数 / 确认</div><div class="fd">「找到约 1200 张,要创建相册吗?」<br>N 大 → 问;N 小 → 直接做</div></div><div class="farr">→</div>
+      <div class="fstep tool"><div class="fn">④ add_from_search(A, "小猫")</div><div class="fd">内部 3 轮「排除搜索 → 加入」<br>→ {added: 1200, rounds: 3} 或 task_id</div></div><div class="farr">→</div>
+      <div class="fstep user"><div class="fn">⑤ 汇报</div><div class="fd">已创建「小猫」相册,加入 1200 张</div></div>
+    </div>
+    <div class="flow" style="margin-top:.45em;">
+      <div class="fstep tool"><div class="fn">① find_album("小猫")</div><div class="fd">→ 1 本 A(320 张)<br>多本 → S8 问;历史有句柄 → 直接用</div></div><div class="farr">→</div>
+      <div class="fstep tool"><div class="fn">② search("小猫", exclude_album=A, limit=5)</div><div class="fd">→ total=18(已排除 320 成员 + 12 移出)</div></div><div class="farr">→</div>
+      <div class="fstep user"><div class="fn">③ 报数 / 确认</div><div class="fd">「已有 320 张,又找到 18 张新的,加进去吗?」<br>total=0 → S7「已是最新」,结束</div></div><div class="farr">→</div>
+      <div class="fstep tool"><div class="fn">④ add_from_search(A, "小猫")</div><div class="fd">内部 1 轮 → {added: 18}</div></div><div class="farr">→</div>
+      <div class="fstep user"><div class="fn">⑤ 汇报</div><div class="fd">已新增 18 张;(可选)12 张你之前移出的未加回</div></div>
+    </div>
+
+    <div class="row grow" style="margin-top:.5em;">
+      <div class="card" style="flex:1;">
+        <h3>loop 账 <span class="sub">对照 v1</span></h3>
+        <ul>
+          <li>v1(模型翻页):首次 1200 张 = 1 找 + 3 搜 + 1 建 + 3 加 = <b class="badc">8 个 loop</b>;增量 18 张 = 3 个</li>
+          <li>v2:首次与增量都是 find → search 报数 → add_from_search = <b class="goodc">3 个 loop</b> + 1 次可选确认;<b>与张数无关</b></li>
+          <li>①② 可并行发出(都是只读),压到 2 个 loop</li>
+        </ul>
+      </div>
+      <div class="card" style="flex:1;">
+        <h3>skill 文本分工</h3>
+        <ul>
+          <li><b>搜图 skill</b>:search 的用法、cursor 翻页(S1)、一句「要排除某相册里的图时填 exclude_album」。不写相册流程</li>
+          <li><b>相册 skill</b>:找册(历史句柄优先 → find_album)→ 0/1/多 三出口 → 带 exclude 搜一次报数 → 确认门槛 → add_from_search → 汇报;「再做一本」走新建。搜图用法编译期 include 进正文</li>
+        </ul>
+      </div>
+      <div class="card" style="flex:1;">
+        <h3>模型需要理解的东西</h3>
+        <ul>
+          <li>要不要增量(找册结果 + 话术)</li>
+          <li>要不要先问(total 与阈值)</li>
+          <li>把相册名 / 句柄和 query 填对</li>
+        </ul>
+        <p style="margin-top:.2em;">不需要理解:翻页、游标、排除怎么实现、幂等、ID。这就是把主要挑战从模型侧挪走。</p>
+      </div>
+    </div>
+  </div>
+  <div class="footer">
+    <div><b>步骤 ②</b> 是搜图 skill 在相册流程里唯一的直接用法,依赖关系由此保住;它给出确认所需的 total,与 ④ 内部搜索共用同一套排除语义。</div>
+    <div>图片搜索 × 创建相册 · v2 · P7 主流程</div>
+  </div>
+</section>
+
+<!-- ============ P8 依赖、挑战与下一步 ============ -->
+<section class="slide dense">
+  <h2><span class="num">08</span>依赖、挑战与下一步:<span class="hl">模型侧挑战基本消掉,剩下的都在引擎与服务层</span><small>依赖按层列;挑战按「会不会把方案做穿」排序</small></h2>
+  <div class="row grow">
+    <div class="card" style="flex:1;">
+      <h3>方案依赖 <span class="sub">按层</span></h3>
+      <div class="steps">
+        <div class="step"><div class="no">检索引擎</div><h4>排除下推 + 成员索引</h4><p><span class="mono">q ∧ ¬in(A.members ∪ A.removed)</span> 在取 limit 之前完成;成员变更后<b>立刻可见</b>(读己之写)</p></div>
+        <div class="step"><div class="no">相册服务</div><h4>removed 集合 + 幂等 add</h4><p>移除操作写 removed;add 已在册跳过;find 返回 count / updated_at</p></div>
+        <div class="step"><div class="no">工具层</div><h4>exclude_album / total / add_from_search</h4><p>复合工具能在服务层调搜索;long 档提供异步形态、可取消、返回已加入数</p></div>
+        <div class="step"><div class="no">产品 / skill</div><h4>确认阈值 + 两份 skill 文本</h4><p>N 大再问的 N;S6 的显式话术清单;搜图 skill 保持通用,相册 skill 写完整流程</p></div>
+      </div>
+    </div>
+    <div class="card" style="flex:1.15;">
+      <h3>挑战 <span class="sub">按风险排序;<span class="tag bad">做穿</span> 不解决方案不成立</span></h3>
+      <ol style="padding-left:.2em;">
+        <li><span class="tag bad">做穿</span> <b>排除 × 取数的正确性</b>:exclude 不在引擎内做,500 上限就系统性漏图;客户端过滤不算支持</li>
+        <li><span class="tag bad">做穿</span> <b>读己之写</b>:add 后 search 若看不到新成员,「排除即翻页」会重复拿同一批;护栏 added=0 即停,但要确认索引更新时延</li>
+        <li><span class="tag est">重要</span> <b>长耗时执行</b>:复合工具 3000 张可能几十秒,必须异步 + 进度 + 可取消,否则「创建相册」是一次静默长写入</li>
+        <li><span class="tag est">重要</span> <b>相册服务改动面</b>:removed 是数据模型变更,涉及图库 UI 的移除路径;若图库 app 不在掌控内,S11 只能降级为话术提示</li>
+        <li><span class="tag mid">意图</span> <b>S3 vs S6</b>:「创建相册」既像首次也像整理成册;默认增量 + 显式新建话术,需要评估集验证</li>
+        <li><span class="tag mid">语义</span> <b>检索是排序不是过滤</b>:增量拿到的图相关度低于首次;total 口径与阈值要说清</li>
+        <li><span class="tag mid">身份</span> <b>相册身份</b>:重名 / 改名 / 已删各有出口;历史句柄必须经工具校验</li>
+      </ol>
+      <p style="margin-top:.25em;"><b>v1 里的挑战 2(模型翻页)、5(500 个 ID 进上下文)、6(模型侧幂等)</b>——在复合工具方案下已不存在。</p>
+    </div>
+    <div class="col" style="flex:.9;">
+      <div class="card acc grow">
+        <h3>动手前先核实 <span class="tag est">V1–V5</span></h3>
+        <ul>
+          <li><b>V1</b> 引擎能否把「不在某集合」下推到取数之前;相册成员有没有索引</li>
+          <li><b>V2</b> add 之后成员索引多久可见(同步 / 异步)</li>
+          <li><b>V3</b> 500 是每次上限还是引擎 top-K 总量上限;后者 exclude 是唯一解</li>
+          <li><b>V4</b> 相册服务能否加 removed,图库 UI 的移除是否走同一接口</li>
+          <li><b>V5</b> 相册工具能否在服务层调搜索(同进程 / IPC)</li>
+        </ul>
+      </div>
+      <div class="card good">
+        <h3>下一步</h3>
+        <ol style="padding-left:.2em;">
+          <li>V1–V5 逐条核实,V1 / V2 不成立则退回 cursor + 框架代练</li>
+          <li>定 search / add_from_search 的 schema 与异步形态</li>
+          <li>写两份 skill 文本,S6 话术清单</li>
+          <li>按 S1–S11 过验收,重点 S5 / S9 / S11</li>
+        </ol>
+      </div>
+    </div>
+  </div>
+  <div class="footer">
+    <div><b>一句话</b>:排除即翻页 + 复合工具,把「翻页 / 游标 / 幂等 / ID」四件事从模型手里拿走;模型只判断增量还是新建、要不要先问。</div>
+    <div>图片搜索 × 创建相册 · v2 · P8 依赖与挑战</div>
+  </div>
+</section>
+
+<div class="dots" id="dots"></div>
+<div class="nav">
+  <button id="prev" title="上一页">‹</button>
+  <span class="pg" id="pg">1 / 8</span>
+  <button id="next" title="下一页">›</button>
+</div>
+</div>
+
+<script>
+(function () {
+  var slides = [].slice.call(document.querySelectorAll('.slide'));
+  var dotsBox = document.getElementById('dots');
+  var curIdx = 0;
+  slides.forEach(function (_, i) {
+    var d = document.createElement('i');
+    if (i === 0) d.classList.add('on');
+    d.onclick = function () { go(i); };
+    dotsBox.appendChild(d);
+  });
+  var dots = [].slice.call(dotsBox.children);
+  function go(i) {
+    curIdx = (i + slides.length) % slides.length;
+    slides.forEach(function (s, j) { s.classList.toggle('active', j === curIdx); });
+    dots.forEach(function (d, j) { d.classList.toggle('on', j === curIdx); });
+    document.getElementById('pg').textContent = (curIdx + 1) + ' / ' + slides.length;
+    history.replaceState(null, '', '#' + (curIdx + 1));
+  }
+  document.getElementById('prev').onclick = function () { go(curIdx - 1); };
+  document.getElementById('next').onclick = function () { go(curIdx + 1); };
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'ArrowRight' || e.key === ' ' || e.key === 'PageDown') go(curIdx + 1);
+    if (e.key === 'ArrowLeft' || e.key === 'PageUp') go(curIdx - 1);
+    if (e.key === 'Home') go(0);
+    if (e.key === 'End') go(slides.length - 1);
+  });
+  go((parseInt(location.hash.slice(1), 10) || 1) - 1);
+})();
+</script>
+</body>
+</html>
