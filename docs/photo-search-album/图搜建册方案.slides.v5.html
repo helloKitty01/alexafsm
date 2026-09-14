@@ -1,0 +1,572 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>照片搜索 × 相册整理 · 需求与方案 · 5 页</title>
+<style>
+  :root {
+    --bg: #e9edf4;
+    --slide-bg: linear-gradient(135deg, #ffffff 0%, #f7f9fd 60%, #eef3fb 100%);
+    --card: #f7f9fc;
+    --card-border: #dfe5ee;
+    --text: #1f2a3d;
+    --muted: #5c6b84;
+    --accent: #2563eb;
+    --good: #059669;
+    --warn: #d97706;
+    --bad: #dc2626;
+    --violet: #7c3aed;
+    --mono: "SF Mono", "JetBrains Mono", Consolas, "Courier New", monospace;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { background: var(--bg); height: 100%; }
+  body {
+    font-family: "PingFang SC", "Microsoft YaHei", "Noto Sans SC", -apple-system, sans-serif;
+    color: var(--text);
+    display: flex; justify-content: center; align-items: center;
+    padding: 16px 12px; min-height: 100vh;
+  }
+  .deck { position: relative; width: min(96vw, calc((100vh - 32px) * 1.7778)); }
+  .slide {
+    width: 100%; aspect-ratio: 16 / 9;
+    background: var(--slide-bg);
+    border: 1px solid var(--card-border); border-radius: 18px;
+    box-shadow: 0 18px 50px rgba(31,42,61,.16);
+    padding: 1.8% 2.6%;
+    display: none; flex-direction: column; gap: .45em;
+    overflow: hidden; position: relative;
+    font-size: clamp(10px, min(1.27vw, 2.26vh), 26px);
+  }
+  .slide.active { display: flex; }
+  /* 内容较稀的页放大字号 */
+  .slide.dense  { font-size: clamp(11px, min(1.5vw, 2.67vh), 30px); }
+  .slide.denser { font-size: clamp(12px, min(1.65vw, 2.93vh), 33px); }
+  .slide.xl { font-size: clamp(13px, min(2.0vw, 3.55vh), 40px); }
+  .slide.dense h2 { font-size: 1.02em; } .slide.denser h2 { font-size: .94em; } .slide.xl h2 { font-size: .8em; }
+  .slide.xl .footer { font-size: .48em; }
+  .slide::before {
+    content: ""; position: absolute; inset: 0 0 auto 0; height: 5px;
+    background: linear-gradient(90deg, var(--accent), var(--good));
+    border-radius: 18px 18px 0 0;
+  }
+  h2 { font-size: 1.16em; font-weight: 700; margin-bottom: .15em; line-height: 1.3; }
+  h2 .hl { color: var(--accent); }
+  h2 .num { color: var(--muted); font-weight: 600; margin-right: .4em; font-size: .78em; }
+  h2 small { font-size: .66em; font-weight: 500; color: var(--muted); margin-left: .55em; }
+
+  .card { background: var(--card); border: 1px solid var(--card-border); border-radius: 12px; padding: .5em .75em; overflow: hidden; min-width: 0; }
+  .card h3 { font-size: .86em; margin-bottom: .25em; color: var(--text); display: flex; align-items: center; gap: .6em; flex-wrap: wrap; }
+  .card h3 .sub { font-size: .78em; font-weight: 500; color: var(--muted); }
+  .card p, .card li { color: var(--muted); font-size: .72em; line-height: 1.45; }
+  .card li { margin-left: 1.15em; margin-bottom: .18em; }
+  .card b { color: var(--text); font-weight: 700; }
+  .card.acc { border-color: rgba(37,99,235,.35); background: linear-gradient(180deg, #fff, rgba(37,99,235,.04)); }
+  .card.good { border-color: rgba(5,150,105,.35); background: linear-gradient(180deg, #fff, rgba(5,150,105,.05)); }
+  .card.warn { border-color: rgba(217,119,6,.4); background: linear-gradient(180deg, #fff, rgba(217,119,6,.05)); }
+  .card.bad { border-color: rgba(220,38,38,.35); background: linear-gradient(180deg, #fff, rgba(220,38,38,.04)); }
+  .mono { font-family: var(--mono); }
+  .goodc { color: var(--good) !important; } .badc { color: var(--bad) !important; } .warnc { color: var(--warn) !important; } .accc { color: var(--accent) !important; }
+  .row { display: flex; gap: .6em; min-height: 0; }
+  .col { display: flex; flex-direction: column; gap: .45em; min-width: 0; }
+  .grow { flex: 1; min-height: 0; min-width: 0; }
+  .tag { display: inline-block; border-radius: 999px; padding: .02em .5em; font-size: .8em; font-weight: 700; white-space: nowrap; vertical-align: middle; }
+  .tag.ok { background: rgba(5,150,105,.12); color: var(--good); }
+  .tag.mid { background: rgba(37,99,235,.12); color: var(--accent); }
+  .tag.est { background: rgba(217,119,6,.12); color: var(--warn); }
+  .tag.bad { background: rgba(220,38,38,.12); color: var(--bad); }
+  .tag.new { background: rgba(124,58,237,.12); color: var(--violet); }
+
+  table { border-collapse: collapse; width: 100%; font-size: .7em; }
+  th, td { text-align: left; padding: .26em .45em; border-bottom: 1px solid var(--card-border); vertical-align: top; }
+  th { color: var(--accent); font-weight: 700; white-space: nowrap; }
+  td { color: var(--muted); line-height: 1.38; }
+  td b { color: var(--text); }
+  td.id { font-family: var(--mono); font-weight: 800; color: var(--accent); white-space: nowrap; }
+  td.nm { font-weight: 700; color: var(--text); white-space: nowrap; }
+  tr.hl td { background: rgba(217,119,6,.06); }
+
+  .banner {
+    border-radius: 10px; padding: .38em .85em; font-size: .72em;
+    background: linear-gradient(90deg, rgba(37,99,235,.08), rgba(5,150,105,.07));
+    border: 1px solid rgba(37,99,235,.28); color: var(--text); line-height: 1.42;
+  }
+  .banner b { color: var(--accent); }
+  .footer { margin-top: auto; padding-top: .25em; padding-left: 95px; display: flex; justify-content: space-between; color: var(--muted); font-size: .56em; gap: 1em; line-height: 1.35; }
+  .footer b { color: var(--text); }
+  .footer > div:last-child { margin-right: 205px; white-space: nowrap; }
+
+  /* 分层架构图 */
+  .layers { display: flex; flex-direction: column; gap: .35em; }
+  .lane { display: grid; grid-template-columns: 5.2em 1fr; gap: .5em; align-items: stretch; }
+  .lane .lbl { display: flex; flex-direction: column; justify-content: center; border-radius: 8px; padding: .3em .45em; color: #fff; font-weight: 800; font-size: .7em; line-height: 1.25; }
+  .lane .lbl small { font-weight: 500; opacity: .9; font-size: .85em; }
+  .lane .lbl.user { background: var(--bad); } .lane .lbl.skill { background: var(--accent); } .lane .lbl.tool { background: var(--good); } .lane .lbl.svc { background: var(--violet); }
+  .lane .boxes { display: flex; gap: .45em; align-items: stretch; }
+  .lane .bx { flex: 1; min-width: 0; background: #fff; border: 1px solid var(--card-border); border-radius: 9px; padding: .35em .55em; display: flex; flex-direction: column; gap: .1em; position: relative; }
+  .lane .bx .t { font-size: .74em; font-weight: 800; color: var(--text); }
+  .lane .bx .d { font-size: .6em; color: var(--muted); line-height: 1.35; }
+  .lane .bx.skill { border-color: rgba(37,99,235,.5); } .lane .bx.tool { border-color: rgba(5,150,105,.5); } .lane .bx.svc { border-color: rgba(124,58,237,.5); } .lane .bx.user { border-color: rgba(220,38,38,.4); }
+  .lane .bx.ghost { border-style: dashed; background: transparent; }
+  .lane .bx .t .tag { margin-left: .4em; }
+  .lane .arr { align-self: center; color: var(--accent); font-weight: 800; font-size: .8em; white-space: nowrap; padding: 0 .1em; flex: none; }
+  .lane .arr small { display: block; font-size: .7em; color: var(--muted); font-weight: 600; text-align: center; }
+
+  /* 流程 */
+  .flow { display: flex; align-items: stretch; gap: .3em; }
+  .fstep { flex: 1; min-width: 0; background: #fff; border: 1px solid var(--card-border); border-radius: 9px; padding: .35em .45em; display: flex; flex-direction: column; gap: .08em; }
+  .fstep .fn { font-size: .7em; font-weight: 800; color: var(--accent); line-height: 1.3; }
+  .fstep .fd { font-size: .58em; color: var(--muted); line-height: 1.32; }
+  .fstep .fd b { color: var(--text); }
+  .fstep.user { border-color: rgba(220,38,38,.45); } .fstep.user .fn { color: var(--bad); }
+  .fstep.tool { border-color: rgba(5,150,105,.45); } .fstep.tool .fn { color: var(--good); }
+  .fstep.svc { border-color: rgba(124,58,237,.45); } .fstep.svc .fn { color: var(--violet); }
+  .farr { display: flex; align-items: center; color: var(--muted); font-size: .9em; flex: none; }
+
+  /* 对比框 */
+  .pair { display: flex; gap: .45em; }
+  .pair .box { flex: 1; min-width: 0; border-radius: 9px; padding: .38em .55em; font-size: .66em; line-height: 1.4; color: var(--muted); }
+  .pair .box b { display: block; margin-bottom: .1em; font-size: 1.05em; }
+  .pair .box p b { display: inline; font-size: 1em; color: var(--text); }
+  .pair .cur { background: rgba(220,38,38,.06); border: 1px solid rgba(220,38,38,.3); } .pair .cur > b { color: var(--bad); }
+  .pair .mid { background: rgba(217,119,6,.06); border: 1px solid rgba(217,119,6,.35); } .pair .mid > b { color: var(--warn); }
+  .pair .tgt { background: rgba(5,150,105,.06); border: 1px solid rgba(5,150,105,.3); } .pair .tgt > b { color: var(--good); }
+
+  pre.code { font-family: var(--mono); background: #fff; border: 1px solid var(--card-border); border-radius: 8px; padding: .4em .6em; font-size: .62em; line-height: 1.5; color: var(--text); overflow: hidden; white-space: pre; }
+  pre.code .c { color: var(--muted); } pre.code .k { color: var(--accent); font-weight: 700; } pre.code .n { color: var(--violet); font-weight: 800; } pre.code .g { color: var(--good); font-weight: 700; } pre.code .r { color: var(--bad); font-weight: 700; }
+  code.i { font-family: var(--mono); background: #fff; border: 1px solid var(--card-border); border-radius: 4px; padding: 0 .3em; font-size: .92em; color: var(--accent); }
+
+  /* 决策卡 */
+  .decision { display: flex; flex-direction: column; gap: .3em; }
+  .decision .head { display: flex; align-items: baseline; gap: .5em; }
+  .decision .head .no { font-size: 1.3em; font-weight: 900; color: var(--accent); font-family: var(--mono); }
+  .decision .head h3 { margin: 0; }
+  .decision .verdict { background: #fff; border: 1px solid rgba(5,150,105,.35); border-left: 4px solid var(--good); border-radius: 8px; padding: .32em .55em; font-size: .72em; color: var(--text); line-height: 1.4; }
+  .decision .verdict b { color: var(--good); }
+  .decision .kv { display: grid; grid-template-columns: 3.2em 1fr; gap: .15em .4em; font-size: .66em; line-height: 1.4; }
+  .decision .kv .k { color: var(--accent); font-weight: 700; white-space: nowrap; }
+  .decision .kv .v { color: var(--muted); } .decision .kv .v b { color: var(--text); }
+
+  .steps { display: grid; grid-template-columns: 1fr 1fr; gap: .4em; }
+  .step { border-radius: 10px; padding: .4em .55em; background: #fff; border: 1px solid var(--card-border); display: flex; flex-direction: column; gap: .12em; }
+  .step .no { font-size: .62em; font-weight: 800; color: var(--accent); }
+  .step h4 { font-size: .76em; font-weight: 800; color: var(--text); line-height: 1.3; }
+  .step p { font-size: .62em; color: var(--muted); line-height: 1.4; }
+  .step p b { color: var(--text); }
+
+  .nav { position: absolute; bottom: 3.2%; right: 3%; display: flex; gap: .5em; align-items: center; z-index: 10; font-size: clamp(10px, min(1.1vw, 1.95vh), 22px); }
+  .nav button { background: #fff; border: 1px solid var(--card-border); color: var(--text); border-radius: 8px; width: 2.1em; height: 2.1em; cursor: pointer; font-size: 1em; }
+  .nav button:hover { border-color: var(--accent); color: var(--accent); }
+  .nav .pg { color: var(--muted); font-family: var(--mono); font-size: .88em; padding: 0 .35em; }
+  .dots { position: absolute; bottom: 3.9%; left: 3%; display: flex; gap: .42em; z-index: 10; font-size: 13px; }
+  .dots i { width: .46em; height: .46em; border-radius: 50%; background: #c9d2e0; cursor: pointer; }
+  .dots i.on { background: var(--accent); }
+
+  /* ===== v2.1 新增 ===== */
+  .lane .bx.chg { border-color: var(--violet); border-width: 2px; background: linear-gradient(180deg, #fff, rgba(124,58,237,.05)); }
+  .lane .bx.dim { opacity: .62; }
+  .lane .bx.prob { border-color: rgba(220,38,38,.55); background: linear-gradient(180deg, #fff, rgba(220,38,38,.04)); }
+  .lane .bx .t .tag { margin-left: .35em; font-size: .72em; }
+  .legend2 { display: flex; gap: 1em; font-size: .62em; color: var(--muted); align-items: center; margin-left: auto; }
+  .legend2 i { display: inline-block; width: 1.1em; height: .7em; border-radius: 3px; margin-right: .3em; vertical-align: -.05em; border: 1.5px solid; background: #fff; }
+  .legend2 i.chg { border-color: var(--violet); } .legend2 i.prob { border-color: var(--bad); } .legend2 i.dim { border-color: #c3ccda; opacity: .6; }
+  /* 时间轴 */
+  .tline { display: flex; align-items: stretch; gap: 0; position: relative; margin: .3em 0 .2em; }
+  .tline .ev { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: center; text-align: center; gap: .18em; position: relative; }
+  .tline .ev::before { content: ""; position: absolute; top: .78em; left: 50%; right: -50%; height: 3px; background: #c9d2e0; z-index: 0; }
+  .tline .ev:last-child::before { display: none; }
+  .tline .ev.gap::before { background: repeating-linear-gradient(90deg, var(--warn) 0 6px, transparent 6px 12px); }
+  .tline .dot { width: 1.6em; height: 1.6em; border-radius: 50%; background: #fff; border: 3px solid var(--accent); z-index: 1; display: flex; align-items: center; justify-content: center; font-size: .6em; font-weight: 800; color: var(--accent); }
+  .tline .ev.bad .dot { border-color: var(--bad); color: var(--bad); } .tline .ev.warn .dot { border-color: var(--warn); color: var(--warn); } .tline .ev.ok .dot { border-color: var(--good); color: var(--good); }
+  .tline .t { font-size: .68em; font-weight: 800; color: var(--text); line-height: 1.25; }
+  .tline .d { font-size: .56em; color: var(--muted); line-height: 1.3; padding: 0 .3em; }
+  .tline .d b { color: var(--text); }
+  .tline .when { font-size: .54em; font-family: var(--mono); color: var(--muted); }
+  /* 优化点表 */
+  table.opt td.no { font-family: var(--mono); font-weight: 800; color: var(--violet); white-space: nowrap; }
+  table.opt td.cur { color: var(--bad); } table.opt td.tgt { color: var(--good); font-weight: 600; }
+  table.opt td.cur b { color: var(--bad); } table.opt td.tgt b { color: var(--good); }
+  .pair .box ul { font-size: 1em; margin-left: 1.1em; color: var(--muted); line-height: 1.42; }
+  .pair .box ul b { display: inline; font-size: 1em; color: var(--text); }
+  .pair .box .flow { font-size: 1.25em; margin: .5em 0; }
+  .tline { font-size: 1.22em; }
+  .three { display: grid; grid-template-columns: repeat(3, 1fr); gap: .5em; }
+  .kv2 { display: grid; grid-template-columns: 4.6em 1fr; gap: .15em .4em; font-size: .68em; line-height: 1.42; }
+  .kv2 .k { color: var(--accent); font-weight: 700; white-space: nowrap; } .kv2 .v { color: var(--muted); } .kv2 .v b { color: var(--text); }
+  @media print { body { padding: 0; } .deck { width: 100%; } .slide { display: flex !important; page-break-after: always; box-shadow: none; border-radius: 0; margin-bottom: 0; } .nav, .dots { display: none; } }
+</style>
+</head>
+<body>
+<div class="deck">
+
+
+
+<!-- ============ P1 背景与场景 ============ -->
+<section class="slide active dense">
+  <h2><span class="num">01</span>背景与场景:<span class="hl">按语义找一批照片进相册;同一句话再来只追加「还不在册」的;单次搜索 ≤ 500 张</span><small>两个 skill 单向依赖 · 现有能力盘点 · 场景即验收口径</small></h2>
+  <div class="row" style="flex:none;">
+    <div class="card" style="flex:1.3;">
+      <h3>现有能力盘点</h3>
+      <div class="kv2" style="grid-template-columns:6.4em 1fr;">
+        <span class="k">照片搜索 skill</span><span class="v"><b>searchTool</b>:query · 是否出卡 · 游标 | offset · filter(表达式,支持 <span class="mono">字段 in [...]</span> / <span class="mono">not in [...]</span>)→ 每次 ≤ 500 张,只有 hasMore 没有总数。出卡 = 给用户展示结果卡片</span>
+        <span class="k">相册整理 skill</span><span class="v"><b>createAlbum</b>(name) → album;<b>appendAlbum</b>(album, items)。依赖照片搜索 skill;照片搜索<b>不强依赖</b>相册整理</span>
+        <span class="k">已有规则</span><span class="v">同名相册默认追加、多本才问;用户从相册移出的照片有移出记录,不会被再次追加</span>
+      </div>
+    </div>
+    <div class="card acc" style="flex:1;">
+      <h3>问题拆成三个子问题</h3>
+      <ul>
+        <li><b>① 依赖</b>:相册整理用搜索,搜索不认相册 → 相册侧的需求只能以<b>搜索工具的通用能力</b>出现</li>
+        <li><b>② 500 上限</b>:命中 1200 张要多批取数,不漏、不早停、不重复追加</li>
+        <li><b>③ 增量</b>:一周后同一句话只追加不在册的;「不在册」怎么表达、在哪一层过滤</li>
+      </ul>
+    </div>
+    <div class="card" style="flex:.85;">
+      <h3>两条边界</h3>
+      <ul>
+        <li><b>只加不删</b>:已在册、这次不再命中的照片保留</li>
+        <li><b>排除键是成员关系,不是时间</b>:不用「上周之后拍的」代替「不在小猫相册」;用户手动加过、移出过都要尊重</li>
+      </ul>
+    </div>
+  </div>
+  <div class="card grow" style="display:flex; flex-direction:column;">
+    <h3>场景矩阵 <span class="sub">S3 与 S6 话术相似、策略相反;方案每改一版按这张表过一遍</span></h3>
+    <table style="font-size:.64em;">
+      <thead><tr><th>ID</th><th>场景</th><th>触发话术 / 条件</th><th>期望动作</th><th>成功标准</th></tr></thead>
+      <tbody>
+        <tr><td class="id">S1</td><td class="nm">只搜</td><td>「找一下小猫的照片」</td><td>只走照片搜索,出卡</td><td>能翻页;能说还有没有更多</td></tr>
+        <tr><td class="id">S2</td><td class="nm">首次建册</td><td>「帮我把小猫的照片建一个相册」</td><td>找册无 → createAlbum → 全部追加</td><td>成员 = 本次全部命中(可能远超 500)</td></tr>
+        <tr class="hl"><td class="id">S3</td><td class="nm">增量追加</td><td>一周后同一句话</td><td>找到已有「小猫」册 → 排除该册搜 → 只追加新照片</td><td>旧照片不重复;用户感知「新增 N 张」</td></tr>
+        <tr><td class="id">S4</td><td class="nm">超过 500</td><td>命中 1200 张</td><td>分 3 批追加,模型只调一次</td><td>不丢批、不早停、不重复</td></tr>
+        <tr class="hl"><td class="id">S5</td><td class="nm">增量也超过 500</td><td>排除后仍有 800 张新照片</td><td>排除后再取 500,分 2 批</td><td>500 是「排除后的一批」;<b>索引延迟 30 s 下仍全部追加</b></td></tr>
+        <tr><td class="id">S6</td><td class="nm">再做一本</td><td>「再建一个小猫相册」「重新做一本」</td><td>新建,不追加旧册</td><td>新册名加后缀不冲突</td></tr>
+        <tr><td class="id">S7</td><td class="nm">增量为空</td><td>一周后没有新小猫</td><td>appendAlbum 返回 added=0 → 告知「已是最新」</td><td>不误报「已添加」</td></tr>
+        <tr><td class="id">S8</td><td class="nm">中途失败</td><td>追加到一半超时</td><td>重跑即可续</td><td>appendAlbum 幂等,不产生重复</td></tr>
+        <tr><td class="id">S9</td><td class="nm">跨会话</td><td>一周后是新会话</td><td>靠找册发现已有册</td><td>不依赖聊天记忆里的相册 ID</td></tr>
+        <tr class="hl"><td class="id">S10</td><td class="nm">手动移出</td><td>上周从相册移出 12 张误判的</td><td>增量<b>不把它们加回</b></td><td>排除语义 = 成员 ∪ 移出记录</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="footer">
+    <div><b>现状的失败点</b>:S4 模型翻完第一页就停;S5 没有取数前排除,先取 500 再过滤会系统性漏图;S8 幂等未声明;S1 以外的场景都要模型接力游标、把 500 个 ID 抄进 appendAlbum。</div>
+    <div>照片搜索 × 相册整理 · P1 背景与场景</div>
+  </div>
+</section>
+
+<!-- ============ P2 整体方案 ============ -->
+<section class="slide dense">
+  <h2><span class="num">02</span>整体方案:<span class="hl">排除用 searchTool 的 filter 表达,循环进 appendAlbum;模型一次调用完成一个用户动作</span><small>一张图标清已有 / 新增 / 待决策</small></h2>
+  <div class="row grow">
+    <div class="card grow" style="flex:1.6; display:flex; flex-direction:column;">
+      <h3>分层架构 <span class="legend2"><span><i class="dim"></i>已有</span><span><i class="chg"></i>新增</span><span><i class="prob" style="border-color:var(--warn);"></i>待决策 / 待核实</span></span></h3>
+      <div class="layers grow" style="justify-content:space-evenly;">
+        <div class="lane">
+          <div class="lbl user">用户<small>话术</small></div>
+          <div class="boxes">
+            <div class="bx user dim"><div class="t">「找一下小猫的照片」</div><div class="d">S1 只搜,出卡</div></div>
+            <div class="bx user dim" style="flex:1.6;"><div class="t">「帮我把小猫的照片建一个相册」</div><div class="d">首次 / 增量同一句;已有规则:同名默认追加,「再建一个」显式新建</div></div>
+          </div>
+        </div>
+        <div class="lane">
+          <div class="lbl skill">skill 层<small>说明书</small></div>
+          <div class="boxes">
+            <div class="bx skill dim"><div class="t">照片搜索 skill</div><div class="d">searchTool 用法、游标翻页、出卡;<b>不写相册流程</b>;只多一句「排除某相册用 filter: album not in [A]」</div></div>
+            <div class="arr">◀ 依赖<small>单向</small></div>
+            <div class="bx skill chg" style="flex:1.4;"><div class="t">相册整理 skill<span class="tag new">改写:不再教翻页</span></div><div class="d">找册 → 0/1/多 三出口 → <b>appendAlbum(source=search) 一次调用</b> → 用返回的 added 汇报(0 → 已是最新)</div></div>
+          </div>
+        </div>
+        <div class="lane">
+          <div class="lbl tool">工具层<small>模型可调</small></div>
+          <div class="boxes">
+            <div class="bx tool" style="flex:1.3; border-color:var(--warn); border-width:2px;"><div class="t">searchTool<span class="tag est">D1</span></div><div class="d">query · 是否出卡 · 游标 | offset · pageSize · filter。<b>新增:filter 可用字段加 album</b>(<span class="mono">album not in [A]</span> 即排除)。没有总数,只有 hasMore。定义见 P3</div></div>
+            <div class="bx tool dim"><div class="t">createAlbum</div><div class="d">不变</div></div>
+            <div class="bx tool chg" style="flex:1.4;"><div class="t">appendAlbum<span class="tag new">+ source=search</span><span class="tag est">D2</span></div><div class="d">原 (album, items) 保留;新增 (album, source:{query, filter}):在服务层调搜索,内部循环「排除搜索 → 幂等追加」到为空;<b>翻页在这里被吞掉</b>;长耗时异步</div></div>
+          </div>
+        </div>
+        <div class="lane">
+          <div class="lbl svc">服务层<small>设备内</small></div>
+          <div class="boxes">
+            <div class="bx svc" style="flex:1.3; border-color:var(--warn); border-width:2px;"><div class="t">检索引擎<span class="tag est">V1 / V2</span></div><div class="d">filter 的 not in 必须在<b>取 pageSize 之前</b>下推;album 成员关系是烘进索引还是查询时读 → 决定索引时延,决定 D3</div></div>
+            <div class="bx svc dim" style="flex:1;"><div class="t">相册服务</div><div class="d">成员 + 移出记录(已有);appendAlbum 幂等(待声明)</div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="col" style="flex:1;">
+      <div class="card good">
+        <h3>主流程 · 首次与增量同一条 <span class="sub">2 个 loop</span></h3>
+        <pre class="code" style="font-size:.58em;">① 找册("小猫") → 0 本: createAlbum → A | 1 本: A | 多本: 问
+② appendAlbum(A, source:{query:"小猫",
+                         filter: album not in [A]})
+   → 一轮内完成: {added:18, skipped:0, rounds:1}
+   → 首轮 hasMore:  {task_id} + 进度「已追加 500 / 还有更多」
+③ 汇报: added=18 →「新增 18 张」; added=0 →「已是最新」</pre>
+        <p style="margin-top:.3em;">现状首次 1200 张 = 8 个 loop(3 搜 + 3 加 + 找 + 建);目标 2 个 loop,与张数无关。不做事前报数——搜索没有总数,事后用 added 汇报即可。模型不再接触翻页、游标、ID。</p>
+      </div>
+      <div class="card acc grow">
+        <h3>新增只有两项 + 一份 skill 文本</h3>
+        <ul>
+          <li><b>searchTool</b>:filter 可用字段加 <span class="mono">album</span>。in / not in、游标、hasMore、出卡开关都是已有能力,输出不变</li>
+          <li><b>appendAlbum</b>:增加 <span class="mono">source=search</span> 形态,循环与幂等在工具内</li>
+          <li><b>相册整理 skill</b>:改写为「找册 → 一次追加 → 用 added 汇报」,不再写翻页、不写排除实现</li>
+        </ul>
+        <p style="margin-top:.3em;"><b>依赖方向不变</b>:相册整理用的都是照片搜索的通用能力;appendAlbum 在服务层调搜索服务,不经过模型;照片搜索侧对相册零感知。</p>
+      </div>
+    </div>
+  </div>
+  <div class="footer">
+    <div><b>模型还需要判断的</b>只剩两件:追加还是新建(找册结果 + 话术)、把相册名和 query 填对。翻页、游标、排除实现、幂等、ID、张数都不需要。</div>
+    <div>照片搜索 × 相册整理 · P2 整体方案</div>
+  </div>
+</section>
+
+<!-- ============ P3 工具定义 ============ -->
+<section class="slide dense">
+  <h2><span class="num">03</span>工具定义:<span class="hl">searchTool 的输入 / 输出与 filter 表达式;appendAlbum 的两种形态</span><small>searchTool 只新增一个 filter 字段,输出不变;老调用方不受影响</small></h2>
+  <div class="row grow">
+    <div class="card grow" style="flex:1.45; display:flex; flex-direction:column;">
+      <h3>searchTool <span class="sub">照片搜索 skill 的唯一工具</span></h3>
+      <table style="font-size:.62em;">
+        <thead><tr><th style="width:9em;">输入</th><th style="width:7em;">类型</th><th>说明</th><th style="width:4.2em;">状态</th></tr></thead>
+        <tbody>
+          <tr><td class="nm">query</td><td class="mono">string</td><td>语义描述,如「小猫」</td><td>已有</td></tr>
+          <tr><td class="nm">showCard(是否出卡)</td><td class="mono">bool</td><td>true 给用户展示结果卡片;appendAlbum 内部的搜索 <b>false</b></td><td>已有</td></tr>
+          <tr><td class="nm">cursor | offset</td><td class="mono">string | int</td><td>翻页。相册流程只用 <b>cursor</b>(offset 边加边搜必漏,P4)</td><td>已有</td></tr>
+          <tr><td class="nm">pageSize</td><td class="mono">int ≤ 500</td><td>单次返回条数上限,默认 500;相册流程用默认值</td><td>已有</td></tr>
+          <tr class="hl"><td class="nm">filter</td><td class="mono">expr</td><td>过滤表达式,<span class="mono">字段 in [..]</span> / <span class="mono">字段 not in [..]</span>,可 and 组合;<b>新增可用字段 album</b>(相册名或句柄)</td><td><span class="tag new">字段新增</span></td></tr>
+        </tbody>
+      </table>
+      <table style="font-size:.62em; margin-top:.5em;">
+        <thead><tr><th style="width:9em;">输出</th><th style="width:7em;">类型</th><th>说明</th><th style="width:4.2em;">状态</th></tr></thead>
+        <tbody>
+          <tr><td class="nm">items</td><td class="mono">[photo]</td><td>本页结果,≤ pageSize;已按相关度排序,同分按 id 打破平局(顺序稳定)</td><td>已有</td></tr>
+          <tr><td class="nm">hasMore / nextCursor</td><td class="mono">bool / string</td><td>还有下一页 / 下一页游标(keyset:上页末张的 score + id)。<b>没有总数</b>:规模只能知道「还有没有更多」,所以不做事前报数</td><td>已有</td></tr>
+                  </tbody>
+      </table>
+      <div class="row" style="flex:none; margin-top:.5em; gap:.5em;">
+        <pre class="code" style="flex:1.15; margin:0;"><span class="c"># S1 只搜:出卡,翻页</span>
+searchTool(q:"小猫", showCard:true)
+searchTool(q:"小猫", showCard:true, cursor:c1)
+
+<span class="c"># appendAlbum 内部 · 第一轮:排除搜索</span>
+searchTool(q:"小猫", showCard:false,
+           filter: album not in ["小猫"])
+  → 500 张都不在册, hasMore:true, nextCursor:c2
+
+<span class="c"># appendAlbum 内部 · 后续轮:排除 + 游标</span>
+searchTool(q:"小猫", showCard:false, cursor:c2,
+           filter: album not in ["小猫"])</pre>
+        <div class="card warn" style="flex:1; margin:0;">
+          <h3>filter 的两条语义约束</h3>
+          <ul>
+            <li><b>位置</b>:在引擎内、<b>取 pageSize 之前</b>算——<span class="mono">q ∧ filter</span> 再排序再截断。先取 500 再过滤,S5 直接做错(前 500 可能全是旧成员)</li>
+            <li><b>album 字段的含义</b>:<span class="mono">album not in [A]</span> = 不在 <b>A.成员 ∪ A.移出记录</b>;移出记录由相册服务维护,搜索侧只是读一个集合</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+    <div class="col" style="flex:1;">
+      <div class="card">
+        <h3>createAlbum <span class="sub">不变</span></h3>
+        <pre class="code">createAlbum(name) → album</pre>
+      </div>
+      <div class="card good grow">
+        <h3>appendAlbum <span class="sub">两种形态</span></h3>
+        <pre class="code"><span class="c"># 形态一 · 已有:零散追加</span>
+appendAlbum(album, items) → {added, skipped}
+
+<span class="c"># 形态二 · 新增:从搜索追加</span>
+appendAlbum(album, source:{
+  query:  "小猫",
+  filter: album not in [album]   <span class="c"># 可省,默认排除自身</span>
+}) → {added, skipped, rounds}
+   | {task_id}                   <span class="c"># 首轮 hasMore 时异步</span></pre>
+        <div class="kv2" style="margin-top:.4em; grid-template-columns:4.6em 1fr;">
+          <span class="k">内部做什么</span><span class="v">服务层调搜索服务,循环「排除搜索 → 幂等追加」直到为空;翻页策略见 P4</span>
+          <span class="k">排除搜索</span><span class="v">带 <span class="mono">album not in [A]</span> 搜:引擎截断 500 之前先扔掉已在 A 的,返回的每张都「不在册」;相册侧不用比 ID</span>
+          <span class="k">幂等追加</span><span class="v">已在 A 的跳过计入 skipped,不报错不重复;同一批加两次结果一样——重跑 = 续跑(S8),索引延迟下也不出重复</span>
+          <span class="k">异步</span><span class="v">首轮 hasMore=true 即返回 task_id;进度「已追加 800、还有更多」;可取消</span>
+        </div>
+      </div>
+      <div class="card">
+        <h3>找册 <span class="sub">相册整理 skill 已有能力</span></h3>
+        <p>按名查 → 0 本建册 / 1 本追加 / 多本问「用哪本」;历史里有相册句柄时优先用、工具端校验。</p>
+      </div>
+    </div>
+  </div>
+  <div class="footer">
+    <div><b>改动清单</b>:searchTool +1 filter 字段(album),输出不变;appendAlbum +1 形态(source);createAlbum、出卡、游标、in / not in 都不动。模型填相册名或句柄,不填内部 ID。</div>
+    <div>照片搜索 × 相册整理 · P3 工具定义</div>
+  </div>
+</section>
+
+<!-- ============ P4 关键细节 ============ -->
+<section class="slide denser">
+  <h2><span class="num">04</span>关键细节:<span class="hl">排除定义「增量是什么」,游标定义「翻到哪了」,循环放进工具</span><small>为什么不是 offset、为什么不只靠排除、索引更新不及时怎么办</small></h2>
+  <div class="pair" style="flex:none;">
+    <div class="box cur">
+      <b>✗ offset:边加边搜必漏</b>
+      <p>排除后 1300 张新照片。第 1 页 offset=0 取 500 并追加 → 「不在册」只剩 800;第 2 页 offset=500 跳过剩下 800 的前 500 → 只回 300,原第 501~1000 张<b>永远漏掉</b>,且 hasMore=false 看似正常。</p>
+    </div>
+    <div class="box mid">
+      <b>△ 只靠排除:最简,但有前提</b>
+      <p>反复 <span class="mono">searchTool(q, filter: album not in [A])</span>,每次拿到的天然是「下一批不在册的 500 张」,直到为空;翻页状态就是相册本身。<b>前提:appendAlbum 之后 searchTool 立刻看到新成员</b>(读己之写)。</p>
+    </div>
+    <div class="box tgt">
+      <b>✓ 排除播种 + 游标定位</b>
+      <p>排除回答「哪些属于<b>这次的增量集合</b>」——跨运行,一周前的成员早已可见;游标回答「这次运行内<b>翻到哪了</b>」——已追加的照片位置在游标之前,<b>不会再回来,与索引时延无关</b>。两者对模型都不可见。</p>
+    </div>
+  </div>
+  <div class="row grow">
+    <div class="card good" style="flex:1.1; display:flex; flex-direction:column;">
+      <h3>appendAlbum(source=search) 内部 <span class="tag ok">推荐写法</span></h3>
+      <pre class="code">p = searchTool(q, filter: album not in [A])   <span class="c"># 播种:排除定义增量集合</span>
+loop:
+  if p.items 空: break
+  appendAlbum(A, p.items)                     <span class="c"># 幂等</span>
+  p = searchTool(q, filter: album not in [A],
+                 cursor = p.nextCursor)       <span class="c"># 定位:已加的不再出现</span>
+返回 {added, skipped, rounds}                 <span class="c"># 首轮 hasMore 时改为 task_id</span></pre>
+      <ul style="margin-top:.4em;">
+        <li>排序稳定(同分按 id)是游标正确的前提;filter 在取数前下推是排除正确的前提</li>
+        <li>翻页期间新入库的照片本轮可能漏,下轮增量按成员关系补上——增量相对当前成员,不相对上次快照</li>
+        <li>语义检索是排序不是过滤:后几批相关度下降;没有总数,进度只能报「已追加 N、还有更多」</li>
+      </ul>
+    </div>
+    <div class="col" style="flex:1;">
+      <div class="card bad">
+        <h3>如果只靠排除,索引更新不及时会发生什么</h3>
+        <div class="tline" style="font-size:1em; margin:.3em 0 .1em;">
+          <div class="ev ok"><div class="dot">1</div><div class="t">search → 500 张</div></div>
+          <div class="ev ok"><div class="dot">2</div><div class="t">append 成功</div><div class="d">成员表已写</div></div>
+          <div class="ev gap warn"><div class="dot">⏳</div><div class="t">索引同步窗口</div><div class="d">几十秒</div></div>
+          <div class="ev bad"><div class="dot">3</div><div class="t">search → 同一批 500</div><div class="d">排除集没变</div></div>
+          <div class="ev bad"><div class="dot">4</div><div class="t">append → added=0</div><div class="d">护栏即停</div></div>
+        </div>
+        <p style="margin-top:.2em;">1300 张只加了 500,汇报「新增 500」,剩 800 张<b>静默丢失</b>——比报错更糟。不加护栏则死循环;每轮等索引追上则 3 轮 ≈ 90 s。带游标后 ③ 拿到的是第 501 张起,问题不存在。</p>
+      </div>
+      <div class="card grow">
+        <h3>引擎能力决定用哪种写法 <span class="sub">对模型全部不可见,可后期切换</span></h3>
+        <table style="font-size:.62em;">
+          <thead><tr><th>引擎(V2 核实)</th><th>读己之写</th><th>采用</th></tr></thead>
+          <tbody>
+            <tr><td>排除集查询时从相册服务读(反连接)</td><td class="goodc">✓ 时延 ≈ 0</td><td>只靠排除即可;仍建议带游标,代价为零</td></tr>
+            <tr class="hl"><td>成员关系烘进索引、异步同步</td><td class="badc">✗ 几十秒</td><td><b>排除播种 + 游标定位</b>;幂等兜住重复批</td></tr>
+            <tr><td>top-K 有总量上限(V3)</td><td>—</td><td>排除是唯一解;运行内可用 <span class="mono">id not in [本轮已加]</span>,filter 本就支持</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+  <div class="footer">
+    <div><b>一句话</b>:排除负责增量语义、游标负责运行内正确、幂等负责可重跑、移出记录负责用户意愿——四件事都在工具与服务层,模型只判断追加还是新建。</div>
+    <div>照片搜索 × 相册整理 · P4 关键细节</div>
+  </div>
+</section>
+
+<!-- ============ P5 决策与下一步 ============ -->
+<section class="slide dense">
+  <h2><span class="num">05</span>决策、核实与验收:<span class="hl">四条决策各给推荐项,五项核实决定第三条怎么选</span><small>验收在 S1–S10 之外加两条延迟注入用例</small></h2>
+  <div class="row grow">
+    <div class="card grow" style="flex:1.3; display:flex; flex-direction:column;">
+      <h3>决策 D1–D4</h3>
+      <table style="font-size:.64em;">
+        <thead><tr><th style="width:2.2em;">#</th><th style="width:8em;">决策</th><th>推荐</th><th>备选</th><th style="width:9em;">取决于</th></tr></thead>
+        <tbody>
+          <tr><td class="id">D1</td><td class="nm">排除怎么表达</td><td class="goodc"><b>复用 filter</b>:<span class="mono">album not in [A]</span>,不加新参数;in / not in 已有</td><td>新增 excludeAlbum 参数</td><td>V1:album 能否成为 filter 字段</td></tr>
+          <tr><td class="id">D2</td><td class="nm">循环放哪</td><td class="goodc"><b>appendAlbum 工具内</b>(source=search):模型一次调用,ID 不进上下文</td><td>模型驱动循环;框架代练句柄(两个工具都不改,由 Resolver 拉完剩余页)</td><td>V4:appendAlbum 能否在服务层调搜索</td></tr>
+          <tr class="hl"><td class="id">D3</td><td class="nm">工具内翻页策略</td><td class="goodc"><b>排除播种 + 游标定位</b>:两种引擎实现下都正确</td><td>只靠排除(需读己之写);排除 + 有界等待(兜底)</td><td>V2:索引时延;V3:top-K 上限</td></tr>
+          <tr><td class="id">D4</td><td class="nm">确认与异步</td><td class="goodc"><b>不做事前确认</b>(搜索没有总数),直接追加、用 added 事后汇报;首轮 hasMore 走 task_id + 进度 + 可取消</td><td>先搜一页用 hasMore 提示「超过 500 张、可能要一会儿」再追加(多 1 个 loop)</td><td>产品:要不要那句提示</td></tr>
+        </tbody>
+      </table>
+      <div class="row" style="flex:none; margin-top:.5em;">
+        <div class="card acc" style="flex:1; margin:0;">
+          <h3>动手前先核实 V1–V5</h3>
+          <ul>
+            <li><b>V1</b> filter 的 not in 是取数前下推,还是取 top-N 后过滤;album 能否成为 filter 字段</li>
+            <li><b>V2</b> 成员关系烘进索引还是查询时读;索引时延 P50 / P95</li>
+            <li><b>V3</b> 500 是每页上限还是 top-K 总量上限</li>
+            <li><b>V4</b> appendAlbum 是否幂等;能否在服务层调搜索(同进程 / IPC)</li>
+            <li><b>V5</b> 大相册(万张)时 not in 集合下推的性能</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+    <div class="col" style="flex:1;">
+      <div class="card warn">
+        <h3>验收 <span class="sub">S1–S10 之外加两条,测试环境注入索引延迟</span></h3>
+        <table style="font-size:.62em;">
+          <thead><tr><th>用例</th><th>条件</th><th>通过标准</th></tr></thead>
+          <tbody>
+            <tr><td class="nm">S5-延迟</td><td>增量 1300 张;注入 30 s 索引时延</td><td>全部追加;rounds=3;不触发 added=0;总时长不含等待</td></tr>
+            <tr><td class="nm">连续调用</td><td>结束后 2 s 再说同一句(索引未追上)</td><td>幂等兜住:added=0 →「已是最新」;不出重复、不误报新增</td></tr>
+            <tr><td class="nm">S8-中断</td><td>第 2 轮后中断,重跑</td><td>补齐剩余;成员数正确;无重复</td></tr>
+          </tbody>
+        </table>
+        <p style="margin-top:.3em;"><b>观测</b>:索引时延分布;added=0 触发率(目标 ≈ 0);rounds 与 ⌈added / 500⌉ 的差值(偏大即有重复批)。</p>
+      </div>
+      <div class="card">
+        <h3>风险排序</h3>
+        <ol style="padding-left:.2em;">
+          <li><span class="tag bad">做穿</span> filter 不在取数前下推 → 500 上限下系统性漏图,客户端过滤不算支持</li>
+          <li><span class="tag est">已收口</span> 索引时延 → 游标定位绕开,验收注入延迟</li>
+          <li><span class="tag est">重要</span> 长耗时 → 必须异步 + 进度 + 可取消</li>
+          <li><span class="tag mid">意图</span> S3 vs S6 → 已有默认追加规则 + 显式新建话术,需评估集验证</li>
+        </ol>
+      </div>
+      <div class="card good grow">
+        <h3>下一步</h3>
+        <ol style="padding-left:.2em;">
+          <li>V1–V5 核实 → 定 D1–D3</li>
+          <li>定 searchTool 的 album 字段与 appendAlbum source 的 schema、异步形态</li>
+          <li>改写相册整理 skill、S6 话术清单;按 S1–S10 + 两条延迟用例验收</li>
+        </ol>
+      </div>
+    </div>
+  </div>
+  <div class="footer">
+    <div><b>改动规模</b>:searchTool 一个 filter 字段;appendAlbum 一种形态;一份 skill 文本;引擎一项下推能力。没有破坏性变更。</div>
+    <div>照片搜索 × 相册整理 · P5 决策与下一步</div>
+  </div>
+</section>
+
+<div class="dots" id="dots"></div>
+<div class="nav">
+  <button id="prev" title="上一页">‹</button>
+  <span class="pg" id="pg">1 / 5</span>
+  <button id="next" title="下一页">›</button>
+</div>
+</div>
+
+<script>
+(function () {
+  var slides = [].slice.call(document.querySelectorAll('.slide'));
+  var dotsBox = document.getElementById('dots');
+  var curIdx = 0;
+  slides.forEach(function (_, i) {
+    var d = document.createElement('i');
+    if (i === 0) d.classList.add('on');
+    d.onclick = function () { go(i); };
+    dotsBox.appendChild(d);
+  });
+  var dots = [].slice.call(dotsBox.children);
+  function go(i) {
+    curIdx = (i + slides.length) % slides.length;
+    slides.forEach(function (s, j) { s.classList.toggle('active', j === curIdx); });
+    dots.forEach(function (d, j) { d.classList.toggle('on', j === curIdx); });
+    document.getElementById('pg').textContent = (curIdx + 1) + ' / ' + slides.length;
+    history.replaceState(null, '', '#' + (curIdx + 1));
+  }
+  document.getElementById('prev').onclick = function () { go(curIdx - 1); };
+  document.getElementById('next').onclick = function () { go(curIdx + 1); };
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'ArrowRight' || e.key === ' ' || e.key === 'PageDown') go(curIdx + 1);
+    if (e.key === 'ArrowLeft' || e.key === 'PageUp') go(curIdx - 1);
+    if (e.key === 'Home') go(0);
+    if (e.key === 'End') go(slides.length - 1);
+  });
+  go((parseInt(location.hash.slice(1), 10) || 1) - 1);
+})();
+</script>
+</body>
+</html>
