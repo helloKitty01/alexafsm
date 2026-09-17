@@ -1,0 +1,217 @@
+{
+  "schema_version": 1,
+  "diagram_type": "sequence",
+  "meta": {
+    "title": "一个 Q 的两次模型调用:缓存在哪儿命中、在哪儿断",
+    "locale": "zh-CN",
+    "viewBox": [
+      760,
+      560
+    ],
+    "column_fit": "spread",
+    "quality_profile": "showcase"
+  },
+  "participants": [
+    {
+      "id": "user",
+      "type": "external",
+      "label": "用户",
+      "sublabel": "query"
+    },
+    {
+      "id": "app",
+      "type": "frontend",
+      "label": "Agent 应用",
+      "sublabel": "组装上下文"
+    },
+    {
+      "id": "engine",
+      "type": "backend",
+      "label": "推理引擎",
+      "sublabel": "prefill · decode"
+    },
+    {
+      "id": "cache",
+      "type": "database",
+      "label": "KV 缓存",
+      "sublabel": "前缀块匹配"
+    },
+    {
+      "id": "tool",
+      "type": "messagebus",
+      "label": "工具",
+      "sublabel": "webSearch · skill"
+    }
+  ],
+  "segments": [
+    {
+      "from": 150,
+      "to": 288,
+      "label": "Q 首调 · 调①"
+    },
+    {
+      "from": 296,
+      "to": 492,
+      "label": "loop · 调②"
+    }
+  ],
+  "messages": [
+    {
+      "id": "u",
+      "from": "user",
+      "to": "app",
+      "y": 162,
+      "label": "U + Δ动态",
+      "variant": "default"
+    },
+    {
+      "id": "call1",
+      "from": "app",
+      "to": "engine",
+      "y": 190,
+      "label": "调① 全量上下文",
+      "variant": "emphasis"
+    },
+    {
+      "id": "match1",
+      "from": "engine",
+      "to": "cache",
+      "y": 218,
+      "label": "前缀匹配,得 d",
+      "variant": "default"
+    },
+    {
+      "id": "miss1",
+      "from": "cache",
+      "to": "engine",
+      "y": 246,
+      "label": "d 之后全 prefill",
+      "variant": "return"
+    },
+    {
+      "id": "a1",
+      "from": "engine",
+      "to": "app",
+      "y": 274,
+      "label": "A:工具调用",
+      "variant": "return"
+    },
+    {
+      "id": "exec",
+      "from": "app",
+      "to": "tool",
+      "y": 306,
+      "label": "执行工具",
+      "variant": "default"
+    },
+    {
+      "id": "t",
+      "from": "tool",
+      "to": "app",
+      "y": 334,
+      "label": "T:工具结果",
+      "variant": "return"
+    },
+    {
+      "id": "call2",
+      "from": "app",
+      "to": "engine",
+      "y": 362,
+      "label": "调② 追加 A+T",
+      "variant": "emphasis"
+    },
+    {
+      "id": "match2",
+      "from": "engine",
+      "to": "cache",
+      "y": 390,
+      "label": "前缀匹配",
+      "variant": "dashed"
+    },
+    {
+      "id": "hit2",
+      "from": "cache",
+      "to": "engine",
+      "y": 418,
+      "label": "命中至 A+T 前",
+      "variant": "return"
+    },
+    {
+      "id": "a2",
+      "from": "engine",
+      "to": "app",
+      "y": 446,
+      "label": "A:融合回复",
+      "variant": "return"
+    },
+    {
+      "id": "reply",
+      "from": "app",
+      "to": "user",
+      "y": 474,
+      "label": "回复",
+      "variant": "return"
+    }
+  ],
+  "activations": [
+    {
+      "participant": "app",
+      "from": 158,
+      "to": 480,
+      "type": "frontend"
+    },
+    {
+      "participant": "engine",
+      "from": 186,
+      "to": 280,
+      "type": "backend"
+    },
+    {
+      "participant": "engine",
+      "from": 358,
+      "to": 452,
+      "type": "backend"
+    },
+    {
+      "participant": "cache",
+      "from": 214,
+      "to": 250,
+      "type": "database"
+    },
+    {
+      "participant": "cache",
+      "from": 386,
+      "to": 422,
+      "type": "database"
+    },
+    {
+      "participant": "tool",
+      "from": 302,
+      "to": 338,
+      "type": "messagebus"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "rose",
+      "title": "当前 · 调①",
+      "items": [
+        "断点停在 SP·固定末,其后 Tools / 历史 / 本会话史全部白算"
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "目标 · 调①",
+      "items": [
+        "前缀纯稳定,只算 U + Δ动态 + 上轮 A ≈ R2"
+      ]
+    },
+    {
+      "dot": "cyan",
+      "title": "调② 两边相同",
+      "items": [
+        "loop 只算 A + T;白算 > 1 块即报警"
+      ]
+    }
+  ]
+}

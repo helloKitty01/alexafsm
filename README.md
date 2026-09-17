@@ -15,7 +15,8 @@
 | 目录 | 内容 |
 | --- | --- |
 | [docs/latency-discussion/](./docs/latency-discussion/) | Agent loop 端到端时延优化讨论（单 loop 成本、loop 次数、快慢双系统、工具接入要求与共建倡议） |
-| [docs/kv-cache-discussion/](./docs/kv-cache-discussion/) | KV cache 命中率与 agent 上下文工程（分层排布、渐进式加载、压缩策略）的设计讨论；含**最终汇报版承载 `kv cache方案（汇报版）.v1.4`（9 页 + 附录 3 页；P1 数据基线 M1–M11 / K / R 为全稿单一事实来源并数据绑定，P2 组成对比 + 三尺子，P3 尺子与四步改造，P4–P6 任务 / 问答 / 闲聊逐 Q 账目按 v7.2 版式当前实测 vs 目标推演对照，已上线第一步实测与预热下沉附录）**、v2 汇报大纲（13）、实测数据需求（14）、上下文模块与长度基线（15）、逐调用实测 `token_breakdown.csv`、prompt 各段内容变化对照，以及 v2 单页幻灯片 P1 组成对比 v1.2 / P2 尺子与三方案 / P7 自动化统计；上一版整合材料 kvcache整体方案.v1 暂留对照 |
+| [docs/kv-cache-discussion/](./docs/kv-cache-discussion/) | KV cache 命中率与 agent 上下文工程（分层排布、渐进式加载、压缩策略）的设计讨论；含**最终汇报版承载 `kv cache方案（汇报版·升级版）.v1`（9 页 + 附录 4 页；内容与数据同 v1.4：P1 数据基线 M1–M11 / K / R 为全稿单一事实来源并数据绑定，P2 组成对比 + 三尺子，P3 尺子与四步改造，P4–P6 任务 / 问答 / 闲聊逐 Q 账目当前实测 vs 目标推演对照，附录 A 已上线第一步实测；按 archify 借鉴做样式升级——填充 + 描边色块、三段页头、自动图例、深链 / 演示 / 深浅色 / editorial 预设、三视口无溢出校验——附录 B 预热与新增附录 C "一个 Q 的两次调用"为 archify sequence 渲染的内联 SVG；v1.4 及更早留档 history/）**、v2 汇报大纲（13）、实测数据需求（14）、上下文模块与长度基线（15）、逐调用实测 `token_breakdown.csv`、prompt 各段内容变化对照，以及 v2 单页幻灯片 P1 组成对比 v1.2 / P2 尺子与三方案 / P7 自动化统计；上一版整合材料 kvcache整体方案.v1 暂留对照 |
+| [docs/slide-style/](./docs/slide-style/) | 幻灯片风格规范：对 [archify](https://github.com/tt-a1i/archify) skill 的借鉴分析（两套浅色 token 对照、九条可借鉴 + 我们要保留的 + 不采纳的、升级版 v1 逐条落地表、用 archify 给幻灯片画图的操作与校验失败修法）、七条新幻灯片约定，以及三视口逐页逐卡溢出校验脚本 `check_slides.py` |
 | [docs/reminder-discussion/](./docs/reminder-discussion/) | reminder 机制（内部代号 notion 方案）的业界洞察：Claude Code system-reminder、Manus recitation、Anthropic 官方模式 |
 | [docs/agent-variable-scheme/](./docs/agent-variable-scheme/) | Agent 变量句柄方案（当前版本 v4 文档 + v6 幻灯片，v1–v5 留档于 history/） |
 | [docs/variable-resolution/](./docs/variable-resolution/) | 工具参数变量解析机制方案（含单页幻灯片：深色原版、浅色版及同款 PPTX） |

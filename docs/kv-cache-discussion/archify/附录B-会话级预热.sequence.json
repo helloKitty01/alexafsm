@@ -1,0 +1,200 @@
+{
+  "schema_version": 1,
+  "diagram_type": "sequence",
+  "meta": {
+    "title": "会话级预热:两次后台 prefill 把首调等待挪走",
+    "locale": "zh-CN",
+    "viewBox": [
+      820,
+      510
+    ],
+    "column_fit": "spread",
+    "quality_profile": "showcase"
+  },
+  "participants": [
+    {
+      "id": "user",
+      "type": "external",
+      "label": "用户",
+      "sublabel": "语音 / 文本"
+    },
+    {
+      "id": "app",
+      "type": "frontend",
+      "label": "Agent 应用",
+      "sublabel": "会话管理"
+    },
+    {
+      "id": "engine",
+      "type": "backend",
+      "label": "推理引擎",
+      "sublabel": "prefill · decode"
+    },
+    {
+      "id": "cache",
+      "type": "database",
+      "label": "KV 缓存",
+      "sublabel": "前缀块 · 同一实例"
+    }
+  ],
+  "segments": [
+    {
+      "from": 150,
+      "to": 232,
+      "label": "① 会话创建"
+    },
+    {
+      "from": 240,
+      "to": 320,
+      "label": "② query / ASR 开始"
+    },
+    {
+      "from": 328,
+      "to": 440,
+      "label": "③ 真正推理"
+    }
+  ],
+  "messages": [
+    {
+      "id": "open",
+      "from": "user",
+      "to": "app",
+      "y": 162,
+      "label": "打开会话",
+      "variant": "default"
+    },
+    {
+      "id": "warm1",
+      "from": "app",
+      "to": "engine",
+      "y": 190,
+      "label": "预热① 会话级 + 历史 10 轮",
+      "variant": "emphasis"
+    },
+    {
+      "id": "write1",
+      "from": "engine",
+      "to": "cache",
+      "y": 218,
+      "label": "写入前缀块 d₀",
+      "variant": "dashed"
+    },
+    {
+      "id": "asr",
+      "from": "user",
+      "to": "app",
+      "y": 250,
+      "label": "开口 · ASR 进行中",
+      "variant": "default"
+    },
+    {
+      "id": "warm2",
+      "from": "app",
+      "to": "engine",
+      "y": 278,
+      "label": "预热② 灌上轮 answer",
+      "variant": "emphasis"
+    },
+    {
+      "id": "write2",
+      "from": "engine",
+      "to": "cache",
+      "y": 306,
+      "label": "续写前缀 · 保活防逐出",
+      "variant": "dashed"
+    },
+    {
+      "id": "u",
+      "from": "user",
+      "to": "app",
+      "y": 338,
+      "label": "U 到达",
+      "variant": "default"
+    },
+    {
+      "id": "infer",
+      "from": "app",
+      "to": "engine",
+      "y": 366,
+      "label": "推理 只算 U + Δ动态",
+      "variant": "emphasis"
+    },
+    {
+      "id": "hit",
+      "from": "cache",
+      "to": "engine",
+      "y": 394,
+      "label": "命中 ①② 全部前缀",
+      "variant": "return"
+    },
+    {
+      "id": "ttft",
+      "from": "engine",
+      "to": "app",
+      "y": 422,
+      "label": "首 token · TTFT ↓",
+      "variant": "return"
+    }
+  ],
+  "activations": [
+    {
+      "participant": "app",
+      "from": 158,
+      "to": 430,
+      "type": "frontend"
+    },
+    {
+      "participant": "engine",
+      "from": 186,
+      "to": 224,
+      "type": "backend"
+    },
+    {
+      "participant": "engine",
+      "from": 274,
+      "to": 312,
+      "type": "backend"
+    },
+    {
+      "participant": "engine",
+      "from": 362,
+      "to": 428,
+      "type": "backend"
+    },
+    {
+      "participant": "cache",
+      "from": 214,
+      "to": 222,
+      "type": "database"
+    },
+    {
+      "participant": "cache",
+      "from": 302,
+      "to": 310,
+      "type": "database"
+    },
+    {
+      "participant": "cache",
+      "from": 390,
+      "to": 398,
+      "type": "database"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "emerald",
+      "title": "两次预热",
+      "items": [
+        "① 会话创建后台 prefill 会话级 + 历史",
+        "② ASR 期间灌上轮 answer 并保活"
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "不进账本",
+      "items": [
+        "总算力不变,只是挪出用户等待路径"
+      ]
+    }
+  ]
+}
