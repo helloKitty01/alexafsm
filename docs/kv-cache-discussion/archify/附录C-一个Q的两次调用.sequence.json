@@ -9,7 +9,28 @@
       560
     ],
     "column_fit": "spread",
-    "quality_profile": "showcase"
+    "animation": "trace",
+    "quality_profile": "showcase",
+    "views": [
+      {
+        "id": "call1",
+        "label": "调① 前缀匹配得 d",
+        "focus": ["user", "app", "engine", "cache"],
+        "note": "d 之后全部 prefill:当前停在 SP·固定末,目标推到上轮末。"
+      },
+      {
+        "id": "tool",
+        "label": "工具往返",
+        "focus": ["app", "tool"],
+        "note": "A 触发工具,T 回到应用,准备追加进上下文。"
+      },
+      {
+        "id": "call2",
+        "label": "调② 只追加 A + T",
+        "focus": ["user", "app", "engine", "cache"],
+        "note": "前缀不变,命中至 A+T 前;miss = 新增 = R4,白算应恒为 0。"
+      }
+    ]
   },
   "participants": [
     {

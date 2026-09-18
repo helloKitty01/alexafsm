@@ -1,0 +1,196 @@
+{
+  "schema_version": 1,
+  "diagram_type": "dataflow",
+  "meta": {
+    "title": "自动化统计:引擎给 d,应用给边界和标签,相减即归因",
+    "locale": "zh-CN",
+    "animation": "trace",
+    "quality_profile": "showcase",
+    "viewBox": [
+      1080,
+      500
+    ],
+    "views": [
+      {
+        "id": "collect",
+        "label": "① 采集",
+        "focus": [
+          "engine",
+          "app",
+          "log"
+        ],
+        "note": "引擎现成 prompt / cached,应用顺手记 bounds / new / 标签 / 预热,每次调用一行。"
+      },
+      {
+        "id": "attribute",
+        "label": "② 归因",
+        "focus": [
+          "log",
+          "attr",
+          "agg"
+        ],
+        "note": "d 落在哪段边界之间,其后到 new 之前就是白算;按 Q × 业务 × 方案聚合。"
+      },
+      {
+        "id": "report",
+        "label": "③ 报表与报警",
+        "focus": [
+          "agg",
+          "report",
+          "alarm"
+        ],
+        "note": "三张报表替换 P5–P8 的格子;白算 > 1 块、偏离通式直接报警。"
+      }
+    ]
+  },
+  "stages": [
+    {
+      "label": "来源"
+    },
+    {
+      "label": "明细"
+    },
+    {
+      "label": "归因"
+    },
+    {
+      "label": "聚合"
+    },
+    {
+      "label": "输出"
+    }
+  ],
+  "nodes": [
+    {
+      "id": "engine",
+      "type": "backend",
+      "label": "推理引擎",
+      "sublabel": "prompt · cached = d",
+      "stage": 0,
+      "row": 0,
+      "tag": "现成"
+    },
+    {
+      "id": "app",
+      "type": "frontend",
+      "label": "Agent 应用",
+      "sublabel": "bounds · new · 标签",
+      "stage": 0,
+      "row": 2,
+      "tag": "4 类埋点"
+    },
+    {
+      "id": "log",
+      "type": "messagebus",
+      "label": "调用明细",
+      "sublabel": "每次调用一行",
+      "stage": 1,
+      "row": 1,
+      "tag": "session · q"
+    },
+    {
+      "id": "attr",
+      "type": "backend",
+      "label": "归因",
+      "sublabel": "白算 = miss − new",
+      "stage": 2,
+      "row": 1,
+      "tag": "≤1 块视为 0"
+    },
+    {
+      "id": "agg",
+      "type": "database",
+      "label": "聚合",
+      "sublabel": "Q × 业务 × 方案",
+      "stage": 3,
+      "row": 1,
+      "tag": "日级"
+    },
+    {
+      "id": "alarm",
+      "type": "security",
+      "label": "报警",
+      "sublabel": "白算 · 验收线 · 漂移",
+      "stage": 4,
+      "row": 0,
+      "tag": "3 条"
+    },
+    {
+      "id": "report",
+      "type": "backend",
+      "label": "日报",
+      "sublabel": "三张报表",
+      "stage": 4,
+      "row": 2,
+      "tag": "替换账目页格子"
+    }
+  ],
+  "flows": [
+    {
+      "id": "f-engine-log",
+      "from": "engine",
+      "to": "log",
+      "label": "prompt · cached",
+      "classification": "引擎字段",
+      "variant": "emphasis"
+    },
+    {
+      "id": "f-app-log",
+      "from": "app",
+      "to": "log",
+      "label": "bounds · new · biz/call/q/scheme",
+      "classification": "应用埋点",
+      "variant": "default"
+    },
+    {
+      "id": "f-log-attr",
+      "from": "log",
+      "to": "attr",
+      "label": "逐行",
+      "variant": "emphasis"
+    },
+    {
+      "id": "f-attr-agg",
+      "from": "attr",
+      "to": "agg",
+      "label": "命中率 · 白算",
+      "variant": "emphasis"
+    },
+    {
+      "id": "f-agg-alarm",
+      "from": "agg",
+      "to": "alarm",
+      "label": "白算 > 1 块",
+      "classification": "异常",
+      "variant": "security",
+      "labelSegment": 1
+    },
+    {
+      "id": "f-agg-report",
+      "from": "agg",
+      "to": "report",
+      "label": "按 Q × 业务",
+      "variant": "emphasis",
+      "labelSegment": 1
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "两边各给一半",
+      "items": [
+        "引擎:prompt_tokens、cached_tokens(按块上报)",
+        "应用:bounds[]、new 分量、biz/call/q/scheme、warmup/cold"
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "三条报警",
+      "items": [
+        "loop 白算 > 1 块(逐出 / 路由 / TTL)",
+        "目标白算 > 1 块 / 调用(验收线)",
+        "每 Q 节省偏离通式(基线漂移)"
+      ]
+    }
+  ]
+}

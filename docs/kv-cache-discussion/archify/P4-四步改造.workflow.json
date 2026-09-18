@@ -1,0 +1,280 @@
+{
+  "schema_version": 2,
+  "diagram_type": "workflow",
+  "meta": {
+    "title": "四步改造:每一步让账目里哪一段红转绿",
+    "locale": "zh-CN",
+    "animation": "trace",
+    "quality_profile": "showcase",
+    "views": [
+      {
+        "id": "s1",
+        "label": "① 动态下沉",
+        "focus": [
+          "cur",
+          "s1",
+          "sess"
+        ],
+        "note": "M5 从 SP 迁到 UAT 随 U 追加,前缀不再被改写;历史 10 轮 + 本会话史转命中。"
+      },
+      {
+        "id": "s2",
+        "label": "② Tools 前移",
+        "focus": [
+          "s1",
+          "s2"
+        ],
+        "note": "全量 12 个工具预置并排到最前,不再被会话级 / 动态连带;每 Q 首调省 5.8K。"
+      },
+      {
+        "id": "s3",
+        "label": "③ skill 预置",
+        "focus": [
+          "s2",
+          "s3",
+          "prefix"
+        ],
+        "note": "15 个高频 skill desc 进产品级前缀,日级攒批;前缀多 4.5K 但全网命中,不计 miss。"
+      },
+      {
+        "id": "s4",
+        "label": "④ 只更新变化",
+        "focus": [
+          "s3",
+          "s4",
+          "tgt"
+        ],
+        "note": "动态增量只带与上轮不同的部分,3K → ≤2K;目标 Q 首调 = R2 ≈ 2.3K。"
+      }
+    ]
+  },
+  "lanes": [
+    {
+      "id": "prod",
+      "label": "产品级前缀 · 全网命中"
+    },
+    {
+      "id": "turn",
+      "label": "轮次追加区 UAT · 只算增量"
+    },
+    {
+      "id": "sess",
+      "label": "会话级 · 首调后命中"
+    },
+    {
+      "id": "aside",
+      "label": "不进账本",
+      "variant": "exception"
+    }
+  ],
+  "phases": [
+    {
+      "id": "p0",
+      "label": "当前",
+      "fromCol": 0,
+      "toCol": 0
+    },
+    {
+      "id": "p1",
+      "label": "① 已上线",
+      "fromCol": 1,
+      "toCol": 1,
+      "variant": "emphasis"
+    },
+    {
+      "id": "p2",
+      "label": "② 待做",
+      "fromCol": 2,
+      "toCol": 2
+    },
+    {
+      "id": "p3",
+      "label": "③ 已定",
+      "fromCol": 3,
+      "toCol": 3
+    },
+    {
+      "id": "p4",
+      "label": "④ 待做",
+      "fromCol": 4,
+      "toCol": 4
+    },
+    {
+      "id": "p5",
+      "label": "目标",
+      "fromCol": 5,
+      "toCol": 5,
+      "variant": "emphasis"
+    }
+  ],
+  "groups": [],
+  "mainPath": [
+    "cur",
+    "s1",
+    "s2",
+    "s3",
+    "s4",
+    "tgt"
+  ],
+  "nodes": [
+    {
+      "id": "cur",
+      "lane": "turn",
+      "col": 0,
+      "type": "external",
+      "label": "当前 Q 首调",
+      "sublabel": "miss 14–34K",
+      "tag": "九成白算",
+      "width": 132
+    },
+    {
+      "id": "s1",
+      "lane": "turn",
+      "col": 1,
+      "type": "backend",
+      "label": "① 动态下沉",
+      "sublabel": "M5 → UAT 随 U 追加",
+      "width": 132
+    },
+    {
+      "id": "sess",
+      "lane": "sess",
+      "col": 1,
+      "type": "database",
+      "label": "会话级冻结",
+      "sublabel": "M4 + 历史 10 轮",
+      "width": 132
+    },
+    {
+      "id": "s2",
+      "lane": "prod",
+      "col": 2,
+      "type": "backend",
+      "label": "② Tools 前移",
+      "sublabel": "M1 12 个工具排最前",
+      "width": 132
+    },
+    {
+      "id": "s3",
+      "lane": "prod",
+      "col": 3,
+      "type": "backend",
+      "label": "③ skill 预置",
+      "sublabel": "M3 15 个 desc",
+      "width": 132
+    },
+    {
+      "id": "prefix",
+      "lane": "prod",
+      "col": 5,
+      "type": "database",
+      "label": "前缀纯稳定",
+      "sublabel": "Tools + SP + skill",
+      "tag": "全网命中",
+      "width": 132
+    },
+    {
+      "id": "s4",
+      "lane": "turn",
+      "col": 4,
+      "type": "backend",
+      "label": "④ 只更新变化",
+      "sublabel": "Δ动态 ≤2K",
+      "width": 132
+    },
+    {
+      "id": "tgt",
+      "lane": "turn",
+      "col": 5,
+      "type": "database",
+      "label": "目标 Q 首调",
+      "sublabel": "R2 ≈ 2.3K",
+      "tag": "白算 → 0",
+      "width": 132
+    },
+    {
+      "id": "warm",
+      "lane": "aside",
+      "col": 1,
+      "type": "cloud",
+      "label": "会话级预热",
+      "sublabel": "只改首调 TTFT",
+      "width": 132
+    }
+  ],
+  "edges": [
+    {
+      "id": "e-cur-s1",
+      "from": "cur",
+      "to": "s1",
+      "label": "前缀不再改写",
+      "variant": "emphasis"
+    },
+    {
+      "id": "e-s1-sess",
+      "from": "s1",
+      "to": "sess",
+      "label": "历史转命中",
+      "variant": "dashed",
+      "role": "branch"
+    },
+    {
+      "id": "e-s1-s2",
+      "from": "s1",
+      "to": "s2",
+      "variant": "emphasis"
+    },
+    {
+      "id": "e-s2-s3",
+      "from": "s2",
+      "to": "s3",
+      "label": "Tools 5.8K 转命中",
+      "variant": "emphasis"
+    },
+    {
+      "id": "e-s3-prefix",
+      "from": "s3",
+      "to": "prefix",
+      "label": "多 4.5K 但不计 miss",
+      "variant": "default"
+    },
+    {
+      "id": "e-s3-s4",
+      "from": "s3",
+      "to": "s4",
+      "variant": "emphasis"
+    },
+    {
+      "id": "e-s4-tgt",
+      "from": "s4",
+      "to": "tgt",
+      "label": "动态 3K → ≤2K",
+      "variant": "emphasis"
+    },
+    {
+      "id": "e-sess-warm",
+      "from": "sess",
+      "to": "warm",
+      "label": "附录 B",
+      "variant": "dashed",
+      "role": "async"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "emerald",
+      "title": "读法",
+      "items": [
+        "主线 = 四步;每条边写它让账目里哪一段红转绿",
+        "分叉 = 该步顺带冻结的会话级"
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "不进账本",
+      "items": [
+        "预热只改会话首调体感,P5–P8 的 miss 与节省按无预热计"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,332 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "上下文从哪来、缓存在哪:一次模型调用的全景",
+    "locale": "zh-CN",
+    "animation": "trace",
+    "quality_profile": "showcase",
+    "viewBox": [
+      1080,
+      580
+    ],
+    "views": [
+      {
+        "id": "prefix-sources",
+        "label": "① 三级来源",
+        "focus": [
+          "release",
+          "profile",
+          "retrieval",
+          "history",
+          "app"
+        ],
+        "note": "产品级来自版本发布(全网共享);会话级来自用户资料与历史;动态来自每 Q 检索。"
+      },
+      {
+        "id": "call-path",
+        "label": "② 一次调用",
+        "focus": [
+          "user",
+          "app",
+          "engine",
+          "cache"
+        ],
+        "note": "应用组装全量上下文 → 引擎前缀匹配得 d → d 之后 prefill → 回 A。"
+      },
+      {
+        "id": "tool-loop",
+        "label": "③ 工具往返",
+        "focus": [
+          "engine",
+          "app",
+          "tool"
+        ],
+        "note": "A 触发工具,T 追加进 UAT,再发调②;前缀不变才有 95–99% 命中。"
+      }
+    ]
+  },
+  "components": [
+    {
+      "id": "user",
+      "type": "external",
+      "label": "用户",
+      "sublabel": "语音 / 文本 U",
+      "pos": [
+        40,
+        312
+      ],
+      "size": [
+        130,
+        60
+      ]
+    },
+    {
+      "id": "release",
+      "type": "cloud",
+      "label": "版本发布",
+      "sublabel": "Tools · SP 固定 · 预置 skill",
+      "tag": "产品级 · 全网共享",
+      "pos": [
+        20,
+        60
+      ],
+      "size": [
+        190,
+        66
+      ]
+    },
+    {
+      "id": "profile",
+      "type": "security",
+      "label": "用户资料",
+      "sublabel": "user.md · device · 记忆快照",
+      "tag": "会话级",
+      "pos": [
+        240,
+        60
+      ],
+      "size": [
+        190,
+        66
+      ]
+    },
+    {
+      "id": "history",
+      "type": "database",
+      "label": "会话历史",
+      "sublabel": "历史 10 轮 U/A/T",
+      "tag": "会话创建载入",
+      "pos": [
+        460,
+        60
+      ],
+      "size": [
+        190,
+        66
+      ]
+    },
+    {
+      "id": "retrieval",
+      "type": "messagebus",
+      "label": "检索",
+      "sublabel": "skills · memory · knowledge",
+      "tag": "动态 · 每 Q",
+      "pos": [
+        680,
+        60
+      ],
+      "size": [
+        190,
+        66
+      ]
+    },
+    {
+      "id": "app",
+      "type": "frontend",
+      "label": "Agent 应用",
+      "sublabel": "组装上下文 · 会话管理",
+      "tag": "bounds[] · 标签埋点",
+      "pos": [
+        360,
+        300
+      ],
+      "size": [
+        170,
+        84
+      ]
+    },
+    {
+      "id": "engine",
+      "type": "backend",
+      "label": "推理引擎",
+      "sublabel": "prefill · decode",
+      "tag": "prompt / cached",
+      "pos": [
+        640,
+        306
+      ],
+      "size": [
+        170,
+        72
+      ]
+    },
+    {
+      "id": "cache",
+      "type": "database",
+      "label": "KV 缓存",
+      "sublabel": "前缀块匹配 · d",
+      "tag": "同一实例",
+      "pos": [
+        860,
+        309
+      ],
+      "size": [
+        160,
+        66
+      ]
+    },
+    {
+      "id": "tool",
+      "type": "messagebus",
+      "label": "工具",
+      "sublabel": "webSearch · skill",
+      "pos": [
+        370,
+        480
+      ],
+      "size": [
+        150,
+        60
+      ]
+    }
+  ],
+  "boundaries": [
+    {
+      "kind": "region",
+      "label": "缓存实例 · 会话粘性",
+      "wraps": [
+        "engine",
+        "cache"
+      ],
+      "pad": 20
+    },
+    {
+      "kind": "security-group",
+      "label": "用户私域",
+      "wraps": [
+        "profile",
+        "history"
+      ],
+      "pad": 14
+    }
+  ],
+  "connections": [
+    {
+      "id": "u",
+      "from": "user",
+      "to": "app",
+      "label": "U",
+      "variant": "default",
+      "fromSide": "right",
+      "toSide": "left"
+    },
+    {
+      "id": "prefix",
+      "from": "release",
+      "to": "app",
+      "label": "产品级前缀 · 版本级重算",
+      "variant": "emphasis",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "labelSegment": 0
+    },
+    {
+      "id": "session",
+      "from": "profile",
+      "to": "app",
+      "label": "会话级 · 会话首调",
+      "variant": "security",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "labelSegment": 0
+    },
+    {
+      "id": "hist",
+      "from": "history",
+      "to": "app",
+      "label": "历史 10 轮",
+      "variant": "default",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "labelSegment": 0
+    },
+    {
+      "id": "dyn",
+      "from": "retrieval",
+      "to": "app",
+      "label": "Δ动态 · 每 Q 追加",
+      "variant": "dashed",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "labelSegment": 0
+    },
+    {
+      "id": "call",
+      "from": "app",
+      "to": "engine",
+      "label": "调① / 调② 全量上下文",
+      "variant": "emphasis",
+      "fromSide": "right",
+      "toSide": "left",
+      "labelDy": 26
+    },
+    {
+      "id": "match",
+      "from": "engine",
+      "to": "cache",
+      "label": "前缀匹配 → d",
+      "variant": "default",
+      "fromSide": "right",
+      "toSide": "left",
+      "labelDy": 60
+    },
+    {
+      "id": "answer",
+      "from": "engine",
+      "to": "app",
+      "label": "A",
+      "variant": "default",
+      "fromSide": "left",
+      "toSide": "right"
+    },
+    {
+      "id": "exec",
+      "from": "app",
+      "to": "tool",
+      "label": "执行",
+      "variant": "default",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "labelDx": -30,
+      "labelDy": 24
+    },
+    {
+      "id": "result",
+      "from": "tool",
+      "to": "app",
+      "label": "T · 追加进 UAT",
+      "variant": "dashed",
+      "fromSide": "top",
+      "toSide": "bottom",
+      "labelDx": 52
+    }
+  ],
+  "cards": [
+    {
+      "dot": "emerald",
+      "title": "三级 = 变化频率",
+      "items": [
+        "产品级:版本发布才变,全网命中",
+        "会话级:会话内冻结,首调后命中",
+        "动态 / 轮次:每 Q 追加,只算增量"
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "缓存只认前缀",
+      "items": [
+        "逐 token 一致才算 d;改一个 token 其后全部失效",
+        "当前动态在 SP 原位重写 → d 停在 SP·固定末"
+      ]
+    },
+    {
+      "dot": "cyan",
+      "title": "同一实例",
+      "items": [
+        "预热与真正推理必须落到同一缓存实例",
+        "多实例路由下预热无效,P9 打 warmup / cold 标签"
+      ]
+    }
+  ]
+}

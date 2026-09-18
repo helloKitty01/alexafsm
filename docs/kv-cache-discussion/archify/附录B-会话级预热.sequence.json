@@ -9,7 +9,28 @@
       510
     ],
     "column_fit": "spread",
-    "quality_profile": "showcase"
+    "animation": "trace",
+    "quality_profile": "showcase",
+    "views": [
+      {
+        "id": "warm-session",
+        "label": "① 会话创建即预热",
+        "focus": ["user", "app", "engine", "cache"],
+        "note": "用户还没开口,会话级 + 历史 10 轮已经写进前缀块 d₀。"
+      },
+      {
+        "id": "warm-asr",
+        "label": "② ASR 期间续写",
+        "focus": ["app", "engine", "cache"],
+        "note": "把上轮 answer 灌进缓存并保活,Q 首调只剩 U + Δ。"
+      },
+      {
+        "id": "infer",
+        "label": "③ 真正推理只算增量",
+        "focus": ["user", "app", "engine", "cache"],
+        "note": "命中 ①② 全部前缀,首 token 等待只剩 U + Δ动态的 prefill。"
+      }
+    ]
   },
   "participants": [
     {
