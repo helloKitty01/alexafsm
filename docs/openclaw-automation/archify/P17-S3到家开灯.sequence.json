@@ -1,0 +1,233 @@
+{
+  "schema_version": 1,
+  "diagram_type": "sequence",
+  "meta": {
+    "title": "S3 到家开灯:从一句话到灯亮,运行期零 token",
+    "locale": "zh-CN",
+    "viewBox": [
+      900,
+      560
+    ],
+    "column_fit": "spread",
+    "animation": "trace",
+    "quality_profile": "showcase",
+    "views": [
+      {
+        "id": "compile",
+        "label": "T0 创建期 · 模型参与一次",
+        "focus": [
+          "user",
+          "loop",
+          "cron",
+          "hub"
+        ],
+        "note": "目录命中 geofence.enter,phone.lookup 解析\"家\";cron add 后 cron service 自动订阅,回读一句。"
+      },
+      {
+        "id": "event",
+        "label": "T1 事件到达",
+        "focus": [
+          "hub",
+          "cron"
+        ],
+        "note": "事件中心评估 filter 与窗口后推送;ingress 鉴权找 job,onTick 去重 / 过期 / 回 200。"
+      },
+      {
+        "id": "run",
+        "label": "T2 执行 · payload script",
+        "focus": [
+          "cron",
+          "run",
+          "tools"
+        ],
+        "note": "无 trigger:tick 即 run;动作编译期已确定 → script 直接调 homekit / music,不起模型。"
+      }
+    ]
+  },
+  "participants": [
+    {
+      "id": "user",
+      "type": "external",
+      "label": "用户",
+      "sublabel": "一句话"
+    },
+    {
+      "id": "loop",
+      "type": "frontend",
+      "label": "主 loop",
+      "sublabel": "LLM · 编译"
+    },
+    {
+      "id": "cron",
+      "type": "backend",
+      "label": "cron service",
+      "sublabel": "onTick · runJob"
+    },
+    {
+      "id": "hub",
+      "type": "messagebus",
+      "label": "事件中心",
+      "sublabel": "filter · 推送"
+    },
+    {
+      "id": "run",
+      "type": "backend",
+      "label": "payload script",
+      "sublabel": "零 token"
+    },
+    {
+      "id": "tools",
+      "type": "cloud",
+      "label": "homekit · music",
+      "sublabel": "toolsAllow"
+    }
+  ],
+  "segments": [
+    {
+      "from": 150,
+      "to": 286,
+      "label": "T0 创建期"
+    },
+    {
+      "from": 294,
+      "to": 350,
+      "label": "T1 事件到达"
+    },
+    {
+      "from": 358,
+      "to": 470,
+      "label": "T2 执行"
+    }
+  ],
+  "messages": [
+    {
+      "id": "say",
+      "from": "user",
+      "to": "loop",
+      "y": 162,
+      "label": "到家时帮我开灯放音乐",
+      "variant": "default"
+    },
+    {
+      "id": "add",
+      "from": "loop",
+      "to": "cron",
+      "y": 190,
+      "label": "cron add(event 源 · payload script)",
+      "variant": "emphasis"
+    },
+    {
+      "id": "sub",
+      "from": "cron",
+      "to": "hub",
+      "y": 218,
+      "label": "subscribe(filter · window · tag)",
+      "variant": "dashed"
+    },
+    {
+      "id": "subid",
+      "from": "hub",
+      "to": "cron",
+      "y": 246,
+      "label": "subscription_id",
+      "variant": "return"
+    },
+    {
+      "id": "echo",
+      "from": "loop",
+      "to": "user",
+      "y": 274,
+      "label": "回读:到家就开灯",
+      "variant": "return"
+    },
+    {
+      "id": "push",
+      "from": "hub",
+      "to": "cron",
+      "y": 310,
+      "label": "POST /hooks/eventhub · 已过 filter",
+      "variant": "emphasis"
+    },
+    {
+      "id": "ack",
+      "from": "cron",
+      "to": "hub",
+      "y": 338,
+      "label": "200(去重 · 过期已查)",
+      "variant": "return"
+    },
+    {
+      "id": "runit",
+      "from": "cron",
+      "to": "run",
+      "y": 370,
+      "label": "tick 即 run · 拼信封",
+      "variant": "emphasis"
+    },
+    {
+      "id": "call",
+      "from": "run",
+      "to": "tools",
+      "y": 398,
+      "label": "homekit.set on · music.play",
+      "variant": "emphasis"
+    },
+    {
+      "id": "ok",
+      "from": "tools",
+      "to": "run",
+      "y": 426,
+      "label": "ok",
+      "variant": "return"
+    },
+    {
+      "id": "summary",
+      "from": "run",
+      "to": "cron",
+      "y": 454,
+      "label": "run ok · last_run_summary",
+      "variant": "return"
+    }
+  ],
+  "activations": [
+    {
+      "participant": "loop",
+      "from": 158,
+      "to": 280,
+      "type": "frontend"
+    },
+    {
+      "participant": "cron",
+      "from": 186,
+      "to": 252,
+      "type": "backend"
+    },
+    {
+      "participant": "cron",
+      "from": 306,
+      "to": 460,
+      "type": "backend"
+    },
+    {
+      "participant": "run",
+      "from": 366,
+      "to": 460,
+      "type": "backend"
+    },
+    {
+      "participant": "tools",
+      "from": 394,
+      "to": 432,
+      "type": "cloud"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "模型参与点",
+      "items": [
+        "只有 T0 的 1 / 2 / 5;T1 T2 零 token"
+      ]
+    }
+  ]
+}

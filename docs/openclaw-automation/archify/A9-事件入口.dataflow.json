@@ -1,0 +1,160 @@
+{
+  "schema_version": 1,
+  "diagram_type": "dataflow",
+  "meta": {
+    "title": "事件入口:传输可替换,点火走 cron service 原有路径",
+    "locale": "zh-CN",
+    "animation": "trace",
+    "quality_profile": "showcase",
+    "viewBox": [
+      1080,
+      500
+    ],
+    "views": [
+      {
+        "id": "transport",
+        "label": "① 传输 · 可替换",
+        "focus": [
+          "webhook",
+          "stream",
+          "ingress"
+        ],
+        "note": "默认 Webhook;长连接 / 本机 IPC 只换适配器,进程内入口函数不变。"
+      },
+      {
+        "id": "ignite",
+        "label": "② 点火三步",
+        "focus": [
+          "ingress",
+          "ontick",
+          "runjob"
+        ],
+        "note": "鉴权找 job → 去重 / 过期 / 立即回 200 → 有 trigger 先判定 → fire → 落 run。"
+      },
+      {
+        "id": "ack",
+        "label": "③ 回事件中心",
+        "focus": [
+          "ontick",
+          "ack"
+        ],
+        "note": "2xx 别再重试(受理 / 重复 / 过期 / job 不存在顺手退订);5xx 只留给落 run 失败。"
+      }
+    ]
+  },
+  "stages": [
+    {
+      "label": "传输"
+    },
+    {
+      "label": "入口"
+    },
+    {
+      "label": "点火"
+    },
+    {
+      "label": "执行 / 回执"
+    }
+  ],
+  "nodes": [
+    {
+      "id": "webhook",
+      "type": "cloud",
+      "label": "Webhook",
+      "sublabel": "POST /hooks/eventhub",
+      "stage": 0,
+      "row": 0,
+      "tag": "默认"
+    },
+    {
+      "id": "stream",
+      "type": "cloud",
+      "label": "长连接 / IPC",
+      "sublabel": "Stream · Local 适配器",
+      "stage": 0,
+      "row": 2,
+      "tag": "可替换"
+    },
+    {
+      "id": "ingress",
+      "type": "backend",
+      "label": "EventIngress",
+      "sublabel": "鉴权 → 找 job",
+      "stage": 1,
+      "row": 1
+    },
+    {
+      "id": "ontick",
+      "type": "backend",
+      "label": "onTick",
+      "sublabel": "去重 → 过期 → 回 200",
+      "stage": 2,
+      "row": 1,
+      "tag": "同 job 串行"
+    },
+    {
+      "id": "runjob",
+      "type": "frontend",
+      "label": "runJob",
+      "sublabel": "拼信封 → payload",
+      "stage": 3,
+      "row": 0,
+      "tag": "与定时同一段"
+    },
+    {
+      "id": "ack",
+      "type": "security",
+      "label": "回执",
+      "sublabel": "2xx 别重试 · 5xx 重试",
+      "stage": 3,
+      "row": 2
+    }
+  ],
+  "flows": [
+    {
+      "id": "f-webhook",
+      "from": "webhook",
+      "to": "ingress",
+      "label": "envelope",
+      "variant": "emphasis"
+    },
+    {
+      "id": "f-stream",
+      "from": "stream",
+      "to": "ingress",
+      "label": "envelope",
+      "variant": "dashed"
+    },
+    {
+      "id": "f-ingress",
+      "from": "ingress",
+      "to": "ontick",
+      "label": "job_id → tick",
+      "variant": "emphasis"
+    },
+    {
+      "id": "f-run",
+      "from": "ontick",
+      "to": "runjob",
+      "label": "trigger → fire",
+      "variant": "emphasis"
+    },
+    {
+      "id": "f-ack",
+      "from": "ontick",
+      "to": "ack",
+      "label": "2xx / 5xx",
+      "classification": "回执",
+      "variant": "security"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "amber",
+      "title": "零改动验证",
+      "items": [
+        "原生 stream kind + eventhub-sub 命令行先跑通 S3(D5)"
+      ]
+    }
+  ]
+}

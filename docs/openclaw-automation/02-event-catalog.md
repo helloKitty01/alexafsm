@@ -6,8 +6,8 @@
 
 1. **模型只看目录的可见部分**：`type / group / desc / fields / must_filter / pair / state_query`。`rate / debounce / stale_after / sensitivity` 是 internal，cron service 在订阅时从目录取用，模型不写、不感知。
 2. **目录静态进 system prompt**：内建 63 条 + 已登记的派生条目，一行一条约 3–4K token，作为编译期 system prompt 的静态段（KV cache 前缀命中）。**没有目录查询工具**：派生条目数量有限，登记后同样静态注入；编译期 prompt 在会话开始时取目录快照。
-3. **filter 只做单事件布尔**：字段只能来自该条目的 `fields`；没有函数、时间、跨事件引用、state。时间窗归 `limits.activeWindow`；跨事件组合归 trigger + state（主稿 P12）；绝对时间点作为 `sources[]` 里的时间源（`kind: at / every / cron`）与事件源混排，事件目录不参与。
-4. **事件中心不做 CEP**：目录 + 单事件 filter + at-least-once 推送，其余（trigger state、limits、nextCheckAt）都在 cron service。
+3. **filter 只做单事件布尔**：字段只能来自该条目的 `fields`；没有函数、时间、跨事件引用、state。时间窗归 `sources[].window`（事件源属性，订阅时下发）；跨事件组合归 trigger + state（主稿 P12）；绝对时间点作为 `sources[]` 里的时间源（`kind: at / every / cron`）与事件源混排，事件目录不参与。
+4. **事件中心不做 CEP**：目录 + 单事件 filter + at-least-once 推送，其余（trigger state、配额计数器、nextCheckAt）都在 cron service；事件源的 `window / cooldown` 由 cron service 在 subscribe 时随 filter 一并下发。
 5. **`occurred_at` 不在 payload 里**：它是推送信封字段（`event_id / job_id / event_type / occurred_at / payload`），进 tick 时放在 `tick.event.occurred_at`。
 
 ## 2. 条目 schema

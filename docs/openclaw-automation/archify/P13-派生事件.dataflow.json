@@ -1,0 +1,159 @@
+{
+  "schema_version": 1,
+  "diagram_type": "dataflow",
+  "meta": {
+    "title": "派生事件:判定结果给别人用,只差 payload 一个字段",
+    "locale": "zh-CN",
+    "animation": "trace",
+    "quality_profile": "showcase",
+    "viewBox": [
+      1080,
+      520
+    ],
+    "views": [
+      {
+        "id": "produce",
+        "label": "① 生产者 job",
+        "focus": [
+          "trig",
+          "pub"
+        ],
+        "note": "叫醒与判定不变;payload 从 agentTurn 改成 script → event_publish,并带 publishes 登记。"
+      },
+      {
+        "id": "hub",
+        "label": "② 进目录 · 匹配订阅",
+        "focus": [
+          "pub",
+          "catalog",
+          "subs"
+        ],
+        "note": "目录多一条 weather.rain_tomorrow;事件中心按各消费者的 filter 推送。"
+      },
+      {
+        "id": "consume",
+        "label": "③ 消费者各自一条普通 event job",
+        "focus": [
+          "subs",
+          "c1",
+          "catalog",
+          "c3"
+        ],
+        "note": "加一个用途不动生产者;目录可见,其他 Agent 也能订。"
+      }
+    ]
+  },
+  "stages": [
+    {
+      "label": "生产者 S2a · 判定"
+    },
+    {
+      "label": "生产者 S2a · payload"
+    },
+    {
+      "label": "事件中心"
+    },
+    {
+      "label": "消费者"
+    }
+  ],
+  "nodes": [
+    {
+      "id": "trig",
+      "type": "backend",
+      "label": "trigger.script",
+      "sublabel": "查预报 ≥ 0.6",
+      "stage": 0,
+      "row": 1,
+      "tag": "cron 20:00"
+    },
+    {
+      "id": "pub",
+      "type": "backend",
+      "label": "payload script",
+      "sublabel": "event_publish",
+      "stage": 1,
+      "row": 1,
+      "tag": "publishes 登记"
+    },
+    {
+      "id": "catalog",
+      "type": "database",
+      "label": "事件目录",
+      "sublabel": "+1 条 rain_tomorrow",
+      "stage": 2,
+      "row": 0
+    },
+    {
+      "id": "subs",
+      "type": "messagebus",
+      "label": "订阅表",
+      "sublabel": "单事件 filter",
+      "stage": 2,
+      "row": 2
+    },
+    {
+      "id": "c1",
+      "type": "frontend",
+      "label": "S2b · S2c",
+      "sublabel": "带伞 / 改路线 各一条",
+      "stage": 3,
+      "row": 2
+    },
+    {
+      "id": "c3",
+      "type": "external",
+      "label": "其他 Agent",
+      "sublabel": "也能订",
+      "stage": 3,
+      "row": 0
+    }
+  ],
+  "flows": [
+    {
+      "id": "f-trig-pub",
+      "from": "trig",
+      "to": "pub",
+      "label": "fire · state.p",
+      "variant": "emphasis"
+    },
+    {
+      "id": "f-pub-catalog",
+      "from": "pub",
+      "to": "catalog",
+      "label": "登记 fields",
+      "variant": "dashed"
+    },
+    {
+      "id": "f-pub-subs",
+      "from": "pub",
+      "to": "subs",
+      "label": "publish",
+      "classification": "派生事件",
+      "variant": "emphasis"
+    },
+    {
+      "id": "f-subs-c1",
+      "from": "subs",
+      "to": "c1",
+      "label": "各自 filter",
+      "variant": "emphasis"
+    },
+    {
+      "id": "f-catalog-c3",
+      "from": "catalog",
+      "to": "c3",
+      "label": "可发现",
+      "variant": "dashed"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "emerald",
+      "title": "编译规则",
+      "items": [
+        "公共事实或两个以上用途 → 派生事件;拿不准 → 普通 job"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,184 @@
+{
+  "schema_version": 1,
+  "diagram_type": "lifecycle",
+  "meta": {
+    "title": "S9 的 trigger.state:领先计时是一台状态机",
+    "locale": "zh-CN",
+    "animation": "trace",
+    "quality_profile": "showcase",
+    "viewBox": [
+      980,
+      660
+    ],
+    "views": [
+      {
+        "id": "lead",
+        "label": "① 21:23 曼联进球",
+        "focus": [
+          "idle",
+          "leading",
+          "alarm"
+        ],
+        "note": "lead_since = now,设 nextCheckAt +30 分钟;其余 time tick 走脚本、state 不变。"
+      },
+      {
+        "id": "reset",
+        "label": "② 21:40 巴萨扳平",
+        "focus": [
+          "leading",
+          "idle"
+        ],
+        "note": "lead_since null,nextCheckAt null → 闹钟作废,回到未领先。"
+      },
+      {
+        "id": "fire",
+        "label": "③ 22:40 self tick",
+        "focus": [
+          "alarm",
+          "check",
+          "fired",
+          "done"
+        ],
+        "note": "仍领先且满 30 分钟 → fire 一次,message 写 lead_30m;done → disable + 退订。"
+      }
+    ]
+  },
+  "lanes": [
+    {
+      "id": "main",
+      "label": "领先计时(trigger.state)"
+    },
+    {
+      "id": "alarm",
+      "label": "自设闹钟"
+    },
+    {
+      "id": "terminal",
+      "label": "终态"
+    }
+  ],
+  "states": [
+    {
+      "id": "idle",
+      "type": "start",
+      "label": "未领先",
+      "sublabel": "lead_since null",
+      "lane": "main",
+      "col": 0,
+      "step": "01"
+    },
+    {
+      "id": "leading",
+      "type": "active",
+      "label": "领先中",
+      "sublabel": "lead_since = now",
+      "lane": "main",
+      "col": 1,
+      "step": "02",
+      "tag": "nextCheckAt +30m"
+    },
+    {
+      "id": "check",
+      "type": "decision",
+      "label": "self tick",
+      "sublabel": "仍领先?满 30m?",
+      "lane": "main",
+      "col": 2,
+      "step": "03"
+    },
+    {
+      "id": "fired",
+      "type": "success",
+      "label": "fire",
+      "sublabel": "message lead_30m",
+      "lane": "main",
+      "col": 3,
+      "step": "04",
+      "tag": "done"
+    },
+    {
+      "id": "alarm",
+      "type": "waiting",
+      "label": "闹钟",
+      "sublabel": "nextCheckAt 到点",
+      "lane": "alarm",
+      "col": 0,
+      "tag": "self"
+    },
+    {
+      "id": "done",
+      "type": "neutral",
+      "label": "结束",
+      "sublabel": "disable + 退订",
+      "lane": "terminal",
+      "col": 1,
+      "tag": "done"
+    }
+  ],
+  "transitions": [
+    {
+      "id": "t-reset",
+      "from": "leading",
+      "to": "idle",
+      "label": "扳平 → 闹钟作废",
+      "variant": "security",
+      "fromSide": "top",
+      "toSide": "top",
+      "via": [
+        [
+          248,
+          80
+        ],
+        [
+          94,
+          80
+        ]
+      ]
+    },
+    {
+      "id": "t-set",
+      "from": "leading",
+      "to": "alarm",
+      "label": "设 nextCheckAt",
+      "variant": "dashed",
+      "fromSide": "bottom",
+      "toSide": "left",
+      "via": [
+        [
+          248,
+          307
+        ]
+      ]
+    },
+    {
+      "id": "t-self",
+      "from": "alarm",
+      "to": "check",
+      "label": "self tick",
+      "variant": "emphasis",
+      "fromSide": "top",
+      "toSide": "bottom",
+      "route": "straight"
+    },
+    {
+      "id": "t-done",
+      "from": "fired",
+      "to": "done",
+      "label": "done",
+      "variant": "emphasis",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "route": "straight",
+      "labelDy": 24
+    }
+  ],
+  "cards": [
+    {
+      "dot": "violet",
+      "title": "155 个 tick 零 token",
+      "items": [
+        "只有 22:40 起一次动作 payload"
+      ]
+    }
+  ]
+}

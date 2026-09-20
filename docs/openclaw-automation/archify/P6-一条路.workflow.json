@@ -1,0 +1,229 @@
+{
+  "schema_version": 2,
+  "diagram_type": "workflow",
+  "meta": {
+    "title": "一条路:tick → [trigger] → run,两道门都是可选旁路",
+    "locale": "zh-CN",
+    "animation": "trace",
+    "quality_profile": "showcase",
+    "views": [
+      {
+        "id": "wake",
+        "label": "① 叫醒",
+        "focus": [
+          "filter",
+          "tick"
+        ],
+        "note": "filter 在事件中心侧答\"值不值得叫醒我\";过了才变成 tick,与时间到点、self 闹钟同一入口。"
+      },
+      {
+        "id": "judge",
+        "label": "② 判定(可选)",
+        "focus": [
+          "tick",
+          "trigger",
+          "state"
+        ],
+        "note": "L2 起才有 trigger:script 默认零 token,agent 可选;fire:false 只写 state,不产生 run。"
+      },
+      {
+        "id": "run",
+        "label": "③ 执行",
+        "focus": [
+          "trigger",
+          "run",
+          "quota",
+          "deliver"
+        ],
+        "note": "fire 就跑一次 payload:动作确定 → script 直接调工具;要生成 / 交互 / 确认 → agentTurn。配额到顶 → 暂停 + 告警。"
+      }
+    ]
+  },
+  "lanes": [
+    {
+      "id": "hub",
+      "label": "事件中心"
+    },
+    {
+      "id": "cron",
+      "label": "cron service"
+    },
+    {
+      "id": "checker",
+      "label": "checker · 脚本沙箱 / 只读模型"
+    },
+    {
+      "id": "exec",
+      "label": "执行"
+    }
+  ],
+  "phases": [
+    {
+      "id": "p-wake",
+      "label": "叫醒",
+      "fromCol": 0,
+      "toCol": 1
+    },
+    {
+      "id": "p-judge",
+      "label": "判定 · 可选",
+      "fromCol": 2,
+      "toCol": 3,
+      "variant": "dashed"
+    },
+    {
+      "id": "p-run",
+      "label": "执行",
+      "fromCol": 4,
+      "toCol": 5,
+      "variant": "emphasis"
+    }
+  ],
+  "groups": [],
+  "mainPath": [
+    "tick",
+    "trigger",
+    "run",
+    "deliver"
+  ],
+  "nodes": [
+    {
+      "id": "filter",
+      "lane": "hub",
+      "col": 0,
+      "type": "messagebus",
+      "label": "filter",
+      "sublabel": "值不值得叫醒我",
+      "width": 132
+    },
+    {
+      "id": "tick",
+      "lane": "cron",
+      "col": 1,
+      "type": "backend",
+      "label": "tick",
+      "sublabel": "到点 / 事件 / 自设闹钟",
+      "tag": "onTick 唯一入口",
+      "width": 132
+    },
+    {
+      "id": "trigger",
+      "lane": "checker",
+      "col": 2,
+      "type": "backend",
+      "label": "trigger",
+      "sublabel": "现在要不要动?",
+      "tag": "script 默认 · agent 可选",
+      "width": 132
+    },
+    {
+      "id": "state",
+      "lane": "checker",
+      "col": 3,
+      "type": "database",
+      "label": "state",
+      "sublabel": "跨 tick 记忆 · nextCheckAt",
+      "width": 132
+    },
+    {
+      "id": "quota",
+      "lane": "cron",
+      "col": 3,
+      "type": "security",
+      "label": "配额计数器",
+      "sublabel": "runs/day · checks/day · total",
+      "tag": "系统默认",
+      "width": 132
+    },
+    {
+      "id": "run",
+      "lane": "exec",
+      "col": 4,
+      "type": "frontend",
+      "label": "run",
+      "sublabel": "payload:script 默认 / agentTurn",
+      "width": 132
+    },
+    {
+      "id": "deliver",
+      "lane": "exec",
+      "col": 5,
+      "type": "external",
+      "label": "交付",
+      "sublabel": "announce · runs · failureAlert",
+      "width": 132
+    }
+  ],
+  "edges": [
+    {
+      "id": "e-filter-tick",
+      "from": "filter",
+      "to": "tick",
+      "label": "过 filter 才推",
+      "variant": "default"
+    },
+    {
+      "id": "e-tick-trigger",
+      "from": "tick",
+      "to": "trigger",
+      "label": "有 trigger",
+      "variant": "emphasis"
+    },
+    {
+      "id": "e-tick-run",
+      "from": "tick",
+      "to": "run",
+      "label": "无 trigger:tick 即 run",
+      "variant": "dashed",
+      "role": "branch",
+      "fromSide": "bottom",
+      "toSide": "left"
+    },
+    {
+      "id": "e-trigger-state",
+      "from": "trigger",
+      "to": "state",
+      "label": "fire:false 只写 state",
+      "variant": "dashed",
+      "role": "branch"
+    },
+    {
+      "id": "e-trigger-run",
+      "from": "trigger",
+      "to": "run",
+      "label": "fire:true",
+      "variant": "emphasis"
+    },
+    {
+      "id": "e-quota-run",
+      "from": "quota",
+      "to": "run",
+      "label": "到顶 → 暂停 + 告警",
+      "variant": "security",
+      "role": "error"
+    },
+    {
+      "id": "e-run-deliver",
+      "from": "run",
+      "to": "deliver",
+      "variant": "emphasis"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "violet",
+      "title": "两道门都可选",
+      "items": [
+        "L0 / L1:tick → run",
+        "L2 / L3:多一个 trigger"
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "配额不在路上",
+      "items": [
+        "cron service 的计数器,run / check 时 +1;有系统默认值"
+      ]
+    }
+  ]
+}

@@ -82,6 +82,17 @@ python3 inline_archify.py <spec>.json <delivered>.html --suffix xx --out /tmp/xx
 - sequence 放半栏没问题(附录 B / C)。
 - 图页说明尽量进 `.chap` 章节说明和 h3 副标题,`cards` 里的话搬到右侧卡;archify 自带的图例保留(它只列出现过的类型)。
 
+### 4.4 第二个样板:openclaw-automation v3.2(滚动式 deck,九张图,配色不变)
+
+同一套 `inline_archify.py` + 分章引擎接进另一个 deck 时验证了几件事:
+
+- **配色可以完全不动**:archify 只输出语义类(`.c-frontend` 等七类 + `.a-*` / `.m-*` / `.t-*`),把七组 `--*-fill / --*-stroke` 变量映射到目标 deck 自己的色板即可(那份稿是 蓝 = 模型 · 紫 = openClaw 非 LLM · 绿 = 事件中心 · 橙 = 新增 · 红 = 配额),连线主路径 `--arrow-emphasis` 也跟着换。"只借动态、不借风格"成立。
+- **滚动式 deck 的引擎变体**:没有 `.slide.active`,`→` / `←` / `P` 作用于视口内最居中的 `.panel.diagram`(取 `getBoundingClientRect` 中心到视口中心的距离),`IntersectionObserver` 在图进入 ≥ 60% 时跑一遍 trace、离开时回全图;给当前图加 `.focus` 外框提示。
+- **图的高度是硬约束**:archify 标签 8–10px 在 980–1100 宽的 viewBox 里,放进半栏(≈550px)就掉到 5px。可读的摆法只有两种——图独占一列(≥ 60% 宽,P4 / P6 / P10 / P17 / A5)或右栏图 + 下方一张小表(P11 / A10);一列里"图 + 大段代码"必定把图压成缩略图,宁可把代码挪到附录引用。
+- **`lifecycle` 图型**:`main` 泳道是主轨(隐式前进箭头,无 `data-edge-id`,分章时不压暗),`terminal` 是底部终态带,其余泳道共用中间事件带,事件 / 终态列 N 对齐主轨列 N + 2;回退边用 `fromSide/toSide: top` + `via` 走上方通道,标签用 `labelDy` 挪出节点。适合画 trigger.state 这类"跃迁名 = 转移标签"的状态机。
+- **`dataflow` 的分叉**:同一节点两条出边到同一排会出 7px 微段,把分叉合成一个节点或把目标分到不同 `row`;三阶段 viewBox 至少 1068 宽。
+- **`sequence` 按段分章**比按 `views.focus` 有信息量得多;`inline_archify.py` 已默认按 `segments` 切。
+
 ## 五、v2 逐图落地
 
 | 页 | 图型 | 拓扑 | 章 | 主要修复 |

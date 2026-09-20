@@ -1,0 +1,196 @@
+{
+  "schema_version": 1,
+  "diagram_type": "lifecycle",
+  "meta": {
+    "title": "S7 的跃迁:entered → still_5m → left,动作表在 payload script",
+    "locale": "zh-CN",
+    "animation": "trace",
+    "quality_profile": "showcase",
+    "viewBox": [
+      980,
+      660
+    ],
+    "views": [
+      {
+        "id": "gate",
+        "label": "① 门放行才起判定",
+        "focus": [
+          "gate",
+          "model",
+          "off"
+        ],
+        "note": "每 30s 一个 tick;前置 script 有运动或 self tick 才放行,判定模型只答 on_sofa。"
+      },
+      {
+        "id": "enter",
+        "label": "② entered_sofa",
+        "focus": [
+          "off",
+          "entered"
+        ],
+        "note": "postScript 记 on_sofa_since,设 nextCheckAt +5 分钟;fire → payload script:speaker.play。"
+      },
+      {
+        "id": "still",
+        "label": "③ still_on_sofa_5m / left_sofa",
+        "focus": [
+          "entered",
+          "still",
+          "left",
+          "off"
+        ],
+        "note": "满 5 分钟仍在 → 通知我(alerted);下沙发 → speaker.stop,state 清空、闹钟作废。"
+      }
+    ]
+  },
+  "lanes": [
+    {
+      "id": "main",
+      "label": "跃迁(postScript 维护的 state)"
+    },
+    {
+      "id": "judge",
+      "label": "每个 tick"
+    },
+    {
+      "id": "terminal",
+      "label": "配额"
+    }
+  ],
+  "states": [
+    {
+      "id": "off",
+      "type": "start",
+      "label": "沙发无狗",
+      "sublabel": "state {}",
+      "lane": "main",
+      "col": 0,
+      "step": "01"
+    },
+    {
+      "id": "entered",
+      "type": "active",
+      "label": "entered_sofa",
+      "sublabel": "fire → speaker.play",
+      "lane": "main",
+      "col": 1,
+      "step": "02",
+      "tag": "nextCheckAt +5m"
+    },
+    {
+      "id": "still",
+      "type": "active",
+      "label": "still_on_sofa_5m",
+      "sublabel": "fire → 通知我",
+      "lane": "main",
+      "col": 2,
+      "step": "03",
+      "tag": "alerted"
+    },
+    {
+      "id": "left",
+      "type": "success",
+      "label": "left_sofa",
+      "sublabel": "fire → speaker.stop",
+      "lane": "main",
+      "col": 3,
+      "step": "04"
+    },
+    {
+      "id": "gate",
+      "type": "waiting",
+      "label": "前置门",
+      "sublabel": "有运动 || self",
+      "lane": "judge",
+      "col": 0,
+      "tag": "零 token"
+    },
+    {
+      "id": "model",
+      "type": "decision",
+      "label": "判定模型",
+      "sublabel": "on_sofa?",
+      "lane": "judge",
+      "col": 2,
+      "tag": "2–4K"
+    },
+    {
+      "id": "quota",
+      "type": "failure",
+      "label": "checks/day 400",
+      "sublabel": "到顶 → 暂停 + 告警",
+      "lane": "terminal",
+      "col": 2
+    }
+  ],
+  "transitions": [
+    {
+      "id": "t-gate",
+      "from": "gate",
+      "to": "model",
+      "label": "放行",
+      "variant": "emphasis",
+      "route": "straight",
+      "fromSide": "right",
+      "toSide": "left"
+    },
+    {
+      "id": "t-quota",
+      "from": "model",
+      "to": "quota",
+      "label": "计 1 次",
+      "variant": "security",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "route": "straight",
+      "labelDy": 24
+    },
+    {
+      "id": "t-skip",
+      "from": "entered",
+      "to": "left",
+      "label": "5m 内下沙发",
+      "variant": "dashed",
+      "fromSide": "top",
+      "toSide": "top",
+      "via": [
+        [
+          248,
+          80
+        ],
+        [
+          556,
+          80
+        ]
+      ]
+    },
+    {
+      "id": "t-reset",
+      "from": "left",
+      "to": "off",
+      "label": "state {} · 闹钟 null",
+      "variant": "emphasis",
+      "fromSide": "bottom",
+      "toSide": "bottom",
+      "via": [
+        [
+          556,
+          240
+        ],
+        [
+          94,
+          240
+        ]
+      ]
+    }
+  ],
+  "cards": [
+    {
+      "dot": "amber",
+      "title": "模型只答一个问题",
+      "items": [
+        "计时、计数、跃迁全在 postScript"
+      ]
+    }
+  ]
+}

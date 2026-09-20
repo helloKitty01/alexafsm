@@ -1,0 +1,333 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "整体架构:cron service 是唯一中枢,所有叫醒源汇入 onTick",
+    "locale": "zh-CN",
+    "animation": "trace",
+    "quality_profile": "showcase",
+    "viewBox": [
+      1080,
+      560
+    ],
+    "views": [
+      {
+        "id": "compile",
+        "label": "① 编译期 · 模型参与一次",
+        "focus": [
+          "user",
+          "mainloop",
+          "lookup",
+          "cronsvc"
+        ],
+        "note": "主 loop 查目录、phone.lookup 填槽,编译出一条冻结的 job → cron add,到此为止。"
+      },
+      {
+        "id": "wake",
+        "label": "② 三路叫醒汇入 onTick",
+        "focus": [
+          "scheduler",
+          "adapter",
+          "eventhub",
+          "cronsvc"
+        ],
+        "note": "时间到点 / 事件到达 / nextCheckAt 到期,全部变成 tick 进同一个入口;订阅是 job 的副作用。"
+      },
+      {
+        "id": "exec",
+        "label": "③ 判定 → run → 交付",
+        "focus": [
+          "cronsvc",
+          "checker",
+          "run",
+          "delivery"
+        ],
+        "note": "有 trigger 先判定(script 默认零 token);fire 才起 payload;配额计数器在 cron service 里。"
+      }
+    ]
+  },
+  "components": [
+    {
+      "id": "user",
+      "type": "external",
+      "label": "用户",
+      "sublabel": "一句话",
+      "pos": [
+        40,
+        54
+      ],
+      "size": [
+        130,
+        60
+      ]
+    },
+    {
+      "id": "mainloop",
+      "type": "frontend",
+      "label": "主 loop",
+      "sublabel": "目录静态在 prompt · 编译 job",
+      "tag": "LLM · 原生",
+      "pos": [
+        250,
+        48
+      ],
+      "size": [
+        210,
+        72
+      ]
+    },
+    {
+      "id": "lookup",
+      "type": "cloud",
+      "label": "phone.lookup",
+      "sublabel": "contacts / places / state",
+      "tag": "新增 · 只读",
+      "pos": [
+        560,
+        54
+      ],
+      "size": [
+        190,
+        60
+      ]
+    },
+    {
+      "id": "scheduler",
+      "type": "backend",
+      "label": "时间调度",
+      "sublabel": "at / every / cron → tick",
+      "tag": "原生",
+      "pos": [
+        40,
+        232
+      ],
+      "size": [
+        160,
+        66
+      ]
+    },
+    {
+      "id": "cronsvc",
+      "type": "backend",
+      "label": "cron service",
+      "sublabel": "job 表 · state · runs · 配额计数器",
+      "tag": "onTick 唯一入口 · nextCheckAt",
+      "pos": [
+        290,
+        220
+      ],
+      "size": [
+        240,
+        90
+      ]
+    },
+    {
+      "id": "adapter",
+      "type": "cloud",
+      "label": "事件适配器",
+      "sublabel": "订阅 · 去重 · 过期 → tick",
+      "tag": "新增",
+      "pos": [
+        600,
+        232
+      ],
+      "size": [
+        180,
+        66
+      ]
+    },
+    {
+      "id": "eventhub",
+      "type": "messagebus",
+      "label": "事件中心",
+      "sublabel": "目录 · filter · 推送 · publish",
+      "tag": "外部 · 不做 CEP",
+      "pos": [
+        870,
+        226
+      ],
+      "size": [
+        180,
+        78
+      ]
+    },
+    {
+      "id": "checker",
+      "type": "backend",
+      "label": "checker",
+      "sublabel": "trigger.script 沙箱 / 只读判定模型",
+      "tag": "默认零 token",
+      "pos": [
+        290,
+        420
+      ],
+      "size": [
+        240,
+        66
+      ]
+    },
+    {
+      "id": "run",
+      "type": "frontend",
+      "label": "run",
+      "sublabel": "payload script(默认)/ agentTurn",
+      "tag": "isolated",
+      "pos": [
+        600,
+        420
+      ],
+      "size": [
+        180,
+        66
+      ]
+    },
+    {
+      "id": "delivery",
+      "type": "external",
+      "label": "渠道 / 主 session",
+      "sublabel": "announce · failureAlert",
+      "pos": [
+        870,
+        426
+      ],
+      "size": [
+        180,
+        60
+      ]
+    }
+  ],
+  "boundaries": [
+    {
+      "kind": "region",
+      "label": "openClaw Gateway",
+      "wraps": [
+        "mainloop",
+        "lookup",
+        "scheduler",
+        "cronsvc",
+        "adapter",
+        "checker",
+        "run"
+      ],
+      "pad": 20
+    }
+  ],
+  "connections": [
+    {
+      "id": "say",
+      "from": "user",
+      "to": "mainloop",
+      "label": "委托",
+      "variant": "default",
+      "fromSide": "right",
+      "toSide": "left"
+    },
+    {
+      "id": "fill",
+      "from": "mainloop",
+      "to": "lookup",
+      "label": "填槽",
+      "variant": "dashed",
+      "fromSide": "right",
+      "toSide": "left"
+    },
+    {
+      "id": "add",
+      "from": "mainloop",
+      "to": "cronsvc",
+      "label": "cron add",
+      "variant": "emphasis",
+      "fromSide": "bottom",
+      "toSide": "top"
+    },
+    {
+      "id": "ttick",
+      "from": "scheduler",
+      "to": "cronsvc",
+      "label": "time tick",
+      "variant": "default",
+      "fromSide": "right",
+      "toSide": "left"
+    },
+    {
+      "id": "etick",
+      "from": "adapter",
+      "to": "cronsvc",
+      "label": "event tick",
+      "variant": "emphasis",
+      "fromSide": "left",
+      "toSide": "right"
+    },
+    {
+      "id": "push",
+      "from": "eventhub",
+      "to": "adapter",
+      "label": "订阅即推送",
+      "variant": "default",
+      "fromSide": "left",
+      "toSide": "right"
+    },
+    {
+      "id": "judge",
+      "from": "cronsvc",
+      "to": "checker",
+      "label": "有 trigger → 判定",
+      "variant": "emphasis",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "labelDy": 24
+    },
+    {
+      "id": "fire",
+      "from": "checker",
+      "to": "run",
+      "label": "fire → 跑一次 payload",
+      "variant": "emphasis",
+      "fromSide": "right",
+      "toSide": "left",
+      "labelDy": -27
+    },
+    {
+      "id": "direct",
+      "from": "cronsvc",
+      "to": "run",
+      "label": "无 trigger:tick 即 run",
+      "variant": "dashed",
+      "fromSide": "right",
+      "toSide": "top"
+    },
+    {
+      "id": "out",
+      "from": "run",
+      "to": "delivery",
+      "label": "结果 / 失败",
+      "variant": "default",
+      "fromSide": "right",
+      "toSide": "left",
+      "labelDy": -40
+    }
+  ],
+  "cards": [
+    {
+      "dot": "violet",
+      "title": "原生复用",
+      "items": [
+        "主 loop · cron 工具 · 时间调度 · checker · isolated run · delivery · runs"
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "新增",
+      "items": [
+        "sources[] + 事件适配器 · tick + nextCheckAt · 配额计数器 · trigger.agent · phone.lookup"
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "外部",
+      "items": [
+        "事件中心只做目录 + 单事件 filter + 推送 + publish"
+      ]
+    }
+  ]
+}

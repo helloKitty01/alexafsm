@@ -1,0 +1,204 @@
+{
+  "schema_version": 2,
+  "diagram_type": "workflow",
+  "meta": {
+    "title": "agent 判定的三段:前置 script → 判定模型 → postScript",
+    "locale": "zh-CN",
+    "animation": "trace",
+    "quality_profile": "showcase",
+    "views": [
+      {
+        "id": "gate",
+        "label": "① 门 · 零 token",
+        "focus": [
+          "tick",
+          "gate",
+          "skip"
+        ],
+        "note": "前置 script 不放行就结束,state 照存;放行时顺手预取,message 进判定信封 tick 块。"
+      },
+      {
+        "id": "model",
+        "label": "② 判定模型 · 只读",
+        "focus": [
+          "gate",
+          "model",
+          "result",
+          "quota"
+        ],
+        "note": "prompt 三段 + state + tick 块;唯一出口 trigger_result;每次计入 checks/day 配额。"
+      },
+      {
+        "id": "post",
+        "label": "③ postScript · 零 token",
+        "focus": [
+          "result",
+          "post",
+          "out"
+        ],
+        "note": "收 trigger.result,算计时 / 计数 / 去重,给出最终 fire / message(跃迁名)/ state / nextCheckAt。"
+      }
+    ]
+  },
+  "lanes": [
+    {
+      "id": "gate",
+      "label": "① 前置 script · 零 token"
+    },
+    {
+      "id": "model",
+      "label": "② 判定模型 · 只读 · 2–4K"
+    },
+    {
+      "id": "post",
+      "label": "③ postScript · 零 token"
+    }
+  ],
+  "phases": [],
+  "groups": [],
+  "mainPath": [
+    "tick",
+    "gate",
+    "model",
+    "result",
+    "post",
+    "out"
+  ],
+  "nodes": [
+    {
+      "id": "tick",
+      "lane": "gate",
+      "col": 0,
+      "type": "external",
+      "label": "tick",
+      "sublabel": "every 30s / self",
+      "width": 120
+    },
+    {
+      "id": "gate",
+      "lane": "gate",
+      "col": 1,
+      "type": "backend",
+      "label": "门 + 预取",
+      "sublabel": "camera.motion",
+      "tag": "不放行即结束",
+      "width": 132
+    },
+    {
+      "id": "skip",
+      "lane": "gate",
+      "col": 2,
+      "type": "database",
+      "label": "state 照存",
+      "sublabel": "fire:false · 不花钱",
+      "width": 132
+    },
+    {
+      "id": "model",
+      "lane": "model",
+      "col": 2,
+      "type": "frontend",
+      "label": "判定模型",
+      "sublabel": "prompt + tick 块",
+      "tag": "出口 trigger_result",
+      "width": 132
+    },
+    {
+      "id": "result",
+      "lane": "model",
+      "col": 3,
+      "type": "database",
+      "label": "trigger.result",
+      "sublabel": "on_sofa · confidence",
+      "width": 132
+    },
+    {
+      "id": "quota",
+      "lane": "model",
+      "col": 4,
+      "type": "security",
+      "label": "配额 checks",
+      "sublabel": "默认 200 · S7 400",
+      "tag": "到顶暂停",
+      "width": 132
+    },
+    {
+      "id": "post",
+      "lane": "post",
+      "col": 4,
+      "type": "backend",
+      "label": "postScript",
+      "sublabel": "计时 · 计数 · 跃迁",
+      "width": 132
+    },
+    {
+      "id": "out",
+      "lane": "post",
+      "col": 5,
+      "type": "database",
+      "label": "最终返回",
+      "sublabel": "fire · 跃迁名 · state",
+      "width": 132
+    }
+  ],
+  "edges": [
+    {
+      "id": "e-tick-gate",
+      "from": "tick",
+      "to": "gate",
+      "variant": "default"
+    },
+    {
+      "id": "e-gate-skip",
+      "from": "gate",
+      "to": "skip",
+      "label": "不放行",
+      "variant": "dashed",
+      "role": "branch"
+    },
+    {
+      "id": "e-gate-model",
+      "from": "gate",
+      "to": "model",
+      "label": "放行 · message 进信封",
+      "variant": "emphasis"
+    },
+    {
+      "id": "e-model-result",
+      "from": "model",
+      "to": "result",
+      "label": "trigger_result",
+      "variant": "emphasis"
+    },
+    {
+      "id": "e-model-quota",
+      "from": "model",
+      "to": "quota",
+      "label": "计 1 次",
+      "variant": "security",
+      "role": "async"
+    },
+    {
+      "id": "e-result-post",
+      "from": "result",
+      "to": "post",
+      "variant": "emphasis"
+    },
+    {
+      "id": "e-post-out",
+      "from": "post",
+      "to": "out",
+      "label": "nextCheckAt",
+      "variant": "emphasis"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "amber",
+      "title": "只有中间一段花 token",
+      "items": [
+        "门不放行不花钱;计时 / 计数不交给模型"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,210 @@
+{
+  "schema_version": 1,
+  "diagram_type": "sequence",
+  "meta": {
+    "title": "S2 明天下雨:派生事件两条 job 的接力",
+    "locale": "zh-CN",
+    "viewBox": [
+      900,
+      520
+    ],
+    "column_fit": "spread",
+    "animation": "trace",
+    "quality_profile": "showcase",
+    "views": [
+      {
+        "id": "produce",
+        "label": "① 生产者 S2a · 全程无模型",
+        "focus": [
+          "cron",
+          "checker",
+          "hub"
+        ],
+        "note": "20:00 tick → trigger.script 查预报 → fire → payload script event_publish。"
+      },
+      {
+        "id": "route",
+        "label": "② 事件中心匹配订阅",
+        "focus": [
+          "hub",
+          "cron"
+        ],
+        "note": "进目录、按 S2b / S2c 各自 filter 推送;加消费者不动生产者。"
+      },
+      {
+        "id": "consume",
+        "label": "③ 消费者 S2b · 一次 agentTurn",
+        "focus": [
+          "cron",
+          "s2b",
+          "chan"
+        ],
+        "note": "与 S3 时序第 7 步后完全同一条路径;要生成提醒文案所以用 agentTurn。"
+      }
+    ]
+  },
+  "participants": [
+    {
+      "id": "cron",
+      "type": "backend",
+      "label": "cron service",
+      "sublabel": "两条 job"
+    },
+    {
+      "id": "checker",
+      "type": "backend",
+      "label": "checker",
+      "sublabel": "S2a trigger.script"
+    },
+    {
+      "id": "hub",
+      "type": "messagebus",
+      "label": "事件中心",
+      "sublabel": "目录 · 订阅表"
+    },
+    {
+      "id": "s2b",
+      "type": "frontend",
+      "label": "S2b agentTurn",
+      "sublabel": "isolated"
+    },
+    {
+      "id": "chan",
+      "type": "external",
+      "label": "渠道",
+      "sublabel": "announce"
+    }
+  ],
+  "segments": [
+    {
+      "from": 150,
+      "to": 260,
+      "label": "生产者 S2a"
+    },
+    {
+      "from": 268,
+      "to": 324,
+      "label": "事件中心"
+    },
+    {
+      "from": 332,
+      "to": 444,
+      "label": "消费者 S2b"
+    }
+  ],
+  "messages": [
+    {
+      "id": "tick",
+      "from": "cron",
+      "to": "checker",
+      "y": 162,
+      "label": "20:00 tick → trigger.script",
+      "variant": "emphasis"
+    },
+    {
+      "id": "fire",
+      "from": "checker",
+      "to": "cron",
+      "y": 190,
+      "label": "fire:true · state {p: 0.72}",
+      "variant": "return"
+    },
+    {
+      "id": "pub",
+      "from": "cron",
+      "to": "hub",
+      "y": 218,
+      "label": "payload script → event_publish(rain_tomorrow)",
+      "variant": "emphasis"
+    },
+    {
+      "id": "okpub",
+      "from": "hub",
+      "to": "cron",
+      "y": 246,
+      "label": "S2a run ok",
+      "variant": "return"
+    },
+    {
+      "id": "push",
+      "from": "hub",
+      "to": "cron",
+      "y": 284,
+      "label": "POST /hooks/eventhub(job = S2b)· 也发 S2c",
+      "variant": "emphasis"
+    },
+    {
+      "id": "ack",
+      "from": "cron",
+      "to": "hub",
+      "y": 312,
+      "label": "200",
+      "variant": "return"
+    },
+    {
+      "id": "run",
+      "from": "cron",
+      "to": "s2b",
+      "y": 344,
+      "label": "onTick → run · 拼信封",
+      "variant": "emphasis"
+    },
+    {
+      "id": "say",
+      "from": "s2b",
+      "to": "chan",
+      "y": 372,
+      "label": "announce:明天降雨 72%,带伞",
+      "variant": "default"
+    },
+    {
+      "id": "done",
+      "from": "s2b",
+      "to": "cron",
+      "y": 400,
+      "label": "S2b run ok",
+      "variant": "return"
+    }
+  ],
+  "activations": [
+    {
+      "participant": "cron",
+      "from": 158,
+      "to": 252,
+      "type": "backend"
+    },
+    {
+      "participant": "checker",
+      "from": 158,
+      "to": 196,
+      "type": "backend"
+    },
+    {
+      "participant": "hub",
+      "from": 214,
+      "to": 318,
+      "type": "messagebus"
+    },
+    {
+      "participant": "cron",
+      "from": 280,
+      "to": 410,
+      "type": "backend"
+    },
+    {
+      "participant": "s2b",
+      "from": 340,
+      "to": 406,
+      "type": "frontend"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "emerald",
+      "title": "两条 job 各自独立",
+      "items": [
+        "runs 与 failureAlert 各配;加 S2c 不动 S2a"
+      ]
+    }
+  ]
+}
