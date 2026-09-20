@@ -1,0 +1,219 @@
+{
+  "schema_version": 2,
+  "diagram_type": "workflow",
+  "meta": {
+    "title": "一条路:到点 → 条件门(可省略)→ payload → run → 交付,全部是官方语义",
+    "locale": "zh-CN",
+    "animation": "trace",
+    "quality_profile": "showcase",
+    "views": [
+      {
+        "id": "due",
+        "label": "① 官方调度",
+        "focus": [
+          "due",
+          "gate"
+        ],
+        "note": "at / every / cron 到点,或 stream 一批关闭;有条件门的 job 先评估 trigger.script(30 s · 5 次调用)。"
+      },
+      {
+        "id": "gate",
+        "label": "② 判定 · 可省略的一步",
+        "focus": [
+          "gate",
+          "quiet",
+          "payload"
+        ],
+        "note": "fire:false 只存 state、不记 run;fire:true 带 message 进 payload。形态 B 没有这一步——查 + 判 + 动都在 script payload 里。"
+      },
+      {
+        "id": "run",
+        "label": "③ 执行与交付",
+        "focus": [
+          "payload",
+          "run",
+          "notify",
+          "once"
+        ],
+        "note": "state 只在 run 成功后持久化;notify 经 delivery 投递;once:true 在首次成功执行后停用 job。审批、预算、退避都在 run 内部。"
+      }
+    ]
+  },
+  "lanes": [
+    {
+      "id": "sched",
+      "label": "调度 · 官方"
+    },
+    {
+      "id": "gate",
+      "label": "条件门 trigger.script · 可省略"
+    },
+    {
+      "id": "exec",
+      "label": "payload · run"
+    },
+    {
+      "id": "deliver",
+      "label": "交付 · 结束"
+    }
+  ],
+  "phases": [
+    {
+      "id": "p1",
+      "label": "到点 / 批到达",
+      "fromCol": 0,
+      "toCol": 0
+    },
+    {
+      "id": "p2",
+      "label": "判定 · 可省略",
+      "fromCol": 1,
+      "toCol": 2,
+      "variant": "dashed"
+    },
+    {
+      "id": "p3",
+      "label": "执行",
+      "fromCol": 3,
+      "toCol": 3,
+      "variant": "emphasis"
+    },
+    {
+      "id": "p4",
+      "label": "交付 · 结束",
+      "fromCol": 4,
+      "toCol": 5
+    }
+  ],
+  "groups": [],
+  "mainPath": [
+    "due",
+    "gate",
+    "payload",
+    "run",
+    "notify"
+  ],
+  "nodes": [
+    {
+      "id": "due",
+      "lane": "sched",
+      "col": 0,
+      "type": "backend",
+      "label": "到点 / 批到达",
+      "sublabel": "at · every · cron · stream",
+      "tag": "官方",
+      "width": 132
+    },
+    {
+      "id": "gate",
+      "lane": "gate",
+      "col": 1,
+      "type": "backend",
+      "label": "trigger.script",
+      "sublabel": "fire? · state",
+      "tag": "可省略 · 30s / 5 调用",
+      "width": 132
+    },
+    {
+      "id": "quiet",
+      "lane": "gate",
+      "col": 2,
+      "type": "database",
+      "label": "fire:false",
+      "sublabel": "存 state · 不记 run",
+      "width": 132
+    },
+    {
+      "id": "payload",
+      "lane": "exec",
+      "col": 2,
+      "type": "frontend",
+      "label": "payload",
+      "sublabel": "script 默认 / agentTurn",
+      "tag": "形态 B:查 + 判 + 动在此",
+      "width": 132
+    },
+    {
+      "id": "run",
+      "lane": "exec",
+      "col": 3,
+      "type": "backend",
+      "label": "run",
+      "sublabel": "runs · 退避 · failureAlert",
+      "tag": "state 成功后才持久化",
+      "width": 132
+    },
+    {
+      "id": "notify",
+      "lane": "deliver",
+      "col": 4,
+      "type": "external",
+      "label": "notify / announce",
+      "sublabel": "本人渠道",
+      "width": 132
+    },
+    {
+      "id": "once",
+      "lane": "deliver",
+      "col": 5,
+      "type": "security",
+      "label": "once:true",
+      "sublabel": "首次成功后停用 job",
+      "width": 132
+    }
+  ],
+  "edges": [
+    {
+      "id": "e-due-gate",
+      "from": "due",
+      "to": "gate",
+      "label": "有条件门时",
+      "variant": "default"
+    },
+    {
+      "id": "e-gate-quiet",
+      "from": "gate",
+      "to": "quiet",
+      "label": "false",
+      "variant": "dashed",
+      "role": "branch"
+    },
+    {
+      "id": "e-gate-payload",
+      "from": "gate",
+      "to": "payload",
+      "label": "fire:true · message",
+      "variant": "emphasis"
+    },
+    {
+      "id": "e-payload-run",
+      "from": "payload",
+      "to": "run",
+      "variant": "emphasis"
+    },
+    {
+      "id": "e-run-notify",
+      "from": "run",
+      "to": "notify",
+      "label": "成功 → notify",
+      "variant": "emphasis"
+    },
+    {
+      "id": "e-run-once",
+      "from": "run",
+      "to": "once",
+      "label": "成功 · once",
+      "variant": "security",
+      "role": "async"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "violet",
+      "title": "没有自定义节点",
+      "items": [
+        "fire 是 trigger 返回值;限制 / 审批 / 配额收在 run 内部"
+      ]
+    }
+  ]
+}

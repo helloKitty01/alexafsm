@@ -1,0 +1,216 @@
+{
+  "schema_version": 1,
+  "diagram_type": "lifecycle",
+  "meta": {
+    "title": "一次 run 的生命周期:审批、state 持久化与 once 都以执行结果为准",
+    "locale": "zh-CN",
+    "animation": "trace",
+    "quality_profile": "showcase",
+    "viewBox": [
+      980,
+      660
+    ],
+    "views": [
+      {
+        "id": "ok",
+        "label": "① 正常",
+        "focus": [
+          "queued",
+          "running",
+          "ok"
+        ],
+        "note": "成功 → 返回的 state 才持久化、notify 才投递、once:true 才停用 job。「判定到了」和「做成了」由这一步分开。"
+      },
+      {
+        "id": "approve",
+        "label": "② 审批(agentTurn 才有)",
+        "focus": [
+          "running",
+          "waiting",
+          "grant"
+        ],
+        "note": "高危动作 → approval card 送到审批面,run 等待;Always allow 铸一枚 standing grant,以后同类不再问。script payload 没有这条路。"
+      },
+      {
+        "id": "fail",
+        "label": "③ 失败 / 跳过",
+        "focus": [
+          "running",
+          "waiting",
+          "error",
+          "skipped"
+        ],
+        "note": "抛错 / 超时 / 拒绝 → error:state 不持久化、退避、failureAlert;once 不生效,下次条件仍成立可再 fire。重复 / 过期 / 预检失败 → skipped。"
+      }
+    ]
+  },
+  "lanes": [
+    {
+      "id": "main",
+      "label": "run"
+    },
+    {
+      "id": "approval",
+      "label": "审批(官方)"
+    },
+    {
+      "id": "terminal",
+      "label": "终态"
+    }
+  ],
+  "states": [
+    {
+      "id": "queued",
+      "type": "start",
+      "label": "queued",
+      "sublabel": "到点 / fire:true",
+      "lane": "main",
+      "col": 0,
+      "step": "01"
+    },
+    {
+      "id": "running",
+      "type": "active",
+      "label": "running",
+      "sublabel": "script / agentTurn",
+      "lane": "main",
+      "col": 1,
+      "step": "02",
+      "tag": "tool budget · timeout"
+    },
+    {
+      "id": "ok",
+      "type": "success",
+      "label": "ok",
+      "sublabel": "state 持久化 · notify",
+      "lane": "main",
+      "col": 2,
+      "step": "03",
+      "tag": "once → 停用"
+    },
+    {
+      "id": "waiting",
+      "type": "waiting",
+      "label": "waiting",
+      "sublabel": "approval card",
+      "lane": "approval",
+      "col": 0,
+      "tag": "agentTurn 才有"
+    },
+    {
+      "id": "grant",
+      "type": "waiting",
+      "label": "standing grant",
+      "sublabel": "Always allow",
+      "lane": "approval",
+      "col": 2,
+      "tag": "二期免确认"
+    },
+    {
+      "id": "error",
+      "type": "failure",
+      "label": "error",
+      "sublabel": "不持久化 · 退避 · 告警",
+      "lane": "terminal",
+      "col": 0
+    },
+    {
+      "id": "skipped",
+      "type": "failure",
+      "label": "skipped",
+      "sublabel": "重复 · 过期 · 预检",
+      "lane": "terminal",
+      "col": 1
+    }
+  ],
+  "transitions": [
+    {
+      "id": "t-wait",
+      "from": "running",
+      "to": "waiting",
+      "label": "高危动作",
+      "variant": "security",
+      "fromSide": "bottom",
+      "toSide": "left",
+      "via": [
+        [
+          248,
+          307
+        ]
+      ]
+    },
+    {
+      "id": "t-allow",
+      "from": "waiting",
+      "to": "ok",
+      "label": "允许 → 继续 → 成功",
+      "variant": "emphasis",
+      "fromSide": "top",
+      "toSide": "bottom",
+      "route": "straight"
+    },
+    {
+      "id": "t-grant",
+      "from": "waiting",
+      "to": "grant",
+      "label": "Always allow",
+      "variant": "dashed",
+      "route": "straight",
+      "labelDy": 24
+    },
+    {
+      "id": "t-deny",
+      "from": "waiting",
+      "to": "error",
+      "label": "拒绝 / 超时",
+      "variant": "security",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "route": "straight",
+      "labelDy": 24
+    },
+    {
+      "id": "t-err",
+      "from": "running",
+      "to": "error",
+      "label": "抛错 / 超时",
+      "variant": "security",
+      "fromSide": "bottom",
+      "toSide": "left",
+      "via": [
+        [
+          248,
+          479
+        ]
+      ]
+    },
+    {
+      "id": "t-skip",
+      "from": "queued",
+      "to": "skipped",
+      "label": "重复 / 过期",
+      "variant": "dashed",
+      "fromSide": "bottom",
+      "toSide": "bottom",
+      "via": [
+        [
+          94,
+          600
+        ],
+        [
+          556,
+          600
+        ]
+      ]
+    }
+  ],
+  "cards": [
+    {
+      "dot": "rose",
+      "title": "不自定义",
+      "items": [
+        "waiting / grant / once / 退避全是官方行为"
+      ]
+    }
+  ]
+}

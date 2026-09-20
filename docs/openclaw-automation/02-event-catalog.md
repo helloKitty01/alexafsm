@@ -1,13 +1,13 @@
 # 02 · 事件目录（event catalog）规范与内建条目
 
-> 配套 `openClaw自动化任务方案.slides.v3.1.html` P8 / P12 与附录 A2 / A3 / A4。本文是目录的**完整文本版**：条目 schema、filter 语法、命名规则、10 组 63 条内建事件（含模型不可见的 internal 字段）。幻灯片只放分组总览，细节以本文为准。
+> 配套 `openClaw自动化任务方案.slides.v4.html` P11 与附录 A5 / A6。**v4 里本文是候选接入清单**：首版只用 `geofence.enter` / `phone.call_incoming` 两条，条目决定桥接命令 `eventhub-sub` 能订什么、模板能生成什么 filter；目录不整体注入 prompt，只列已接入模板对应的条目。本文是目录的**完整文本版**：条目 schema、filter 语法、命名规则、10 组 63 条内建事件（含模型不可见的 internal 字段）。幻灯片只放分组总览，细节以本文为准。
 
 ## 1. 设计约束
 
 1. **模型只看目录的可见部分**：`type / group / desc / fields / must_filter / pair / state_query`。`rate / debounce / stale_after / sensitivity` 是 internal，cron service 在订阅时从目录取用，模型不写、不感知。
-2. **目录静态进 system prompt**：内建 63 条 + 已登记的派生条目，一行一条约 3–4K token，作为编译期 system prompt 的静态段（KV cache 前缀命中）。**没有目录查询工具**：派生条目数量有限，登记后同样静态注入；编译期 prompt 在会话开始时取目录快照。
-3. **filter 只做单事件布尔**：字段只能来自该条目的 `fields`；没有函数、时间、跨事件引用、state。时间窗归 `sources[].window`（事件源属性，订阅时下发）；跨事件组合归 trigger + state（主稿 P12）；绝对时间点作为 `sources[]` 里的时间源（`kind: at / every / cron`）与事件源混排，事件目录不参与。
-4. **事件中心不做 CEP**：目录 + 单事件 filter + at-least-once 推送，其余（trigger state、配额计数器、nextCheckAt）都在 cron service；事件源的 `window / cooldown` 由 cron service 在 subscribe 时随 filter 一并下发。
+2. **目录进 prompt 的方式**：v4 首版只把已接入模板对应的条目（两条）放进创建期 prompt；全部 63 条静态注入是路线图上放开更多事件模式时的做法（一行一条约 3–4K token，KV cache 前缀命中）。**没有目录查询工具**。派生事件在 v4 属于暂不支持。
+3. **filter 只做单事件布尔**：字段只能来自该条目的 `fields`；没有函数、时间、跨事件引用、state。时间窗在模板脚本内判断（v4 D6：source 不丢事实）；跨事件组合是路线图（S11 / S12）；v4 一个 job 只有一个官方 schedule（cron 或 stream），不混排。
+4. **事件中心不做 CEP**：目录 + 单事件 filter + at-least-once 推送，其余（去重 / 过期 / 冷却 / 日期）都在 openClaw 侧的模板脚本 state 里；v4 由桥接命令 `eventhub-sub` 携带 filter 订阅，官方 `stream` 收行。
 5. **`occurred_at` 不在 payload 里**：它是推送信封字段（`event_id / job_id / event_type / occurred_at / payload`），进 tick 时放在 `tick.event.occurred_at`。
 
 ## 2. 条目 schema

@@ -1,0 +1,268 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "两种官方 job 形态:条件门 + agentTurn,或单个 script payload;同一 job 不能两者都要",
+    "locale": "zh-CN",
+    "animation": "trace",
+    "quality_profile": "showcase",
+    "viewBox": [
+      1080,
+      560
+    ],
+    "views": [
+      {
+        "id": "a",
+        "label": "形态 A · 条件门 + agentTurn",
+        "focus": [
+          "schedA",
+          "gateA",
+          "turnA",
+          "outA"
+        ],
+        "note": "要生成内容或需审批的动作:trigger.script 只做只读判定并持有 state 槽;fire:true 才起一次 agentTurn。首版只有 S1(无门)用它。"
+      },
+      {
+        "id": "b",
+        "label": "形态 B · 单 script payload",
+        "focus": [
+          "schedB",
+          "scriptB",
+          "toolsB",
+          "outB"
+        ],
+        "note": "查 + 判 + 动在同一段固定脚本里,state 槽归它;每次检查都是一次 run(条件不满足返回 {})。S2 / S3 / S4 / S10 全部用它。"
+      },
+      {
+        "id": "x",
+        "label": "为什么不能混",
+        "focus": [
+          "gateA",
+          "scriptB"
+        ],
+        "note": "trigger.state 只有一个持久化所有者:条件门与 script payload 同 job 会争这个槽,官方直接拒绝。程序按模式选形态,模型不组合。"
+      }
+    ]
+  },
+  "components": [
+    {
+      "id": "schedA",
+      "type": "backend",
+      "label": "every / cron / stream",
+      "sublabel": "到点 · 批",
+      "pos": [
+        60,
+        120
+      ],
+      "size": [
+        170,
+        60
+      ]
+    },
+    {
+      "id": "gateA",
+      "type": "backend",
+      "label": "trigger.script 条件门",
+      "sublabel": "只读判定 · fire / message",
+      "tag": "持有 trigger.state",
+      "pos": [
+        300,
+        114
+      ],
+      "size": [
+        200,
+        72
+      ]
+    },
+    {
+      "id": "turnA",
+      "type": "frontend",
+      "label": "agentTurn",
+      "sublabel": "生成内容 · 可审批",
+      "tag": "isolated",
+      "pos": [
+        570,
+        120
+      ],
+      "size": [
+        170,
+        60
+      ]
+    },
+    {
+      "id": "outA",
+      "type": "external",
+      "label": "announce / main",
+      "sublabel": "本人渠道",
+      "pos": [
+        820,
+        120
+      ],
+      "size": [
+        170,
+        60
+      ]
+    },
+    {
+      "id": "schedB",
+      "type": "backend",
+      "label": "cron / stream",
+      "sublabel": "到点 · 批",
+      "pos": [
+        60,
+        380
+      ],
+      "size": [
+        170,
+        60
+      ]
+    },
+    {
+      "id": "scriptB",
+      "type": "backend",
+      "label": "script payload",
+      "sublabel": "查 + 判 + 动 · 固定模板",
+      "tag": "持有 trigger.state · 每次检查一次 run",
+      "pos": [
+        300,
+        374
+      ],
+      "size": [
+        200,
+        72
+      ]
+    },
+    {
+      "id": "toolsB",
+      "type": "cloud",
+      "label": "工具",
+      "sublabel": "weather · homekit · phone.lookup",
+      "tag": "toolsAllow 白名单",
+      "pos": [
+        570,
+        380
+      ],
+      "size": [
+        170,
+        60
+      ]
+    },
+    {
+      "id": "outB",
+      "type": "external",
+      "label": "notify → delivery",
+      "sublabel": "本人渠道",
+      "pos": [
+        820,
+        380
+      ],
+      "size": [
+        170,
+        60
+      ]
+    }
+  ],
+  "boundaries": [
+    {
+      "kind": "region",
+      "label": "形态 A · 需要模型生成内容(S1 晨报)",
+      "wraps": [
+        "schedA",
+        "gateA",
+        "turnA",
+        "outA"
+      ],
+      "pad": 24
+    },
+    {
+      "kind": "region",
+      "label": "形态 B · 固定动作(S2 S3 S4 S10),零 token",
+      "wraps": [
+        "schedB",
+        "scriptB",
+        "toolsB",
+        "outB"
+      ],
+      "pad": 24
+    }
+  ],
+  "connections": [
+    {
+      "id": "a1",
+      "from": "schedA",
+      "to": "gateA",
+      "label": "due / batch",
+      "variant": "default",
+      "fromSide": "right",
+      "toSide": "left",
+      "labelDy": 30
+    },
+    {
+      "id": "a2",
+      "from": "gateA",
+      "to": "turnA",
+      "label": "fire:true + message",
+      "variant": "emphasis",
+      "fromSide": "right",
+      "toSide": "left",
+      "labelDy": -30
+    },
+    {
+      "id": "a3",
+      "from": "turnA",
+      "to": "outA",
+      "label": "最终文本",
+      "variant": "default",
+      "fromSide": "right",
+      "toSide": "left"
+    },
+    {
+      "id": "b1",
+      "from": "schedB",
+      "to": "scriptB",
+      "label": "due / batch",
+      "variant": "default",
+      "fromSide": "right",
+      "toSide": "left",
+      "labelDy": 34
+    },
+    {
+      "id": "b2",
+      "from": "scriptB",
+      "to": "toolsB",
+      "label": "tools.call",
+      "variant": "emphasis",
+      "fromSide": "right",
+      "toSide": "left",
+      "labelDy": -30
+    },
+    {
+      "id": "b3",
+      "from": "toolsB",
+      "to": "outB",
+      "label": "{notify, state}",
+      "variant": "default",
+      "fromSide": "right",
+      "toSide": "left"
+    },
+    {
+      "id": "x1",
+      "from": "gateA",
+      "to": "scriptB",
+      "label": "✗ 不能同 job:共用 trigger.state",
+      "variant": "security",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "labelDy": 70
+    }
+  ],
+  "cards": [
+    {
+      "dot": "rose",
+      "title": "官方约束",
+      "items": [
+        "condition trigger 与 script payload 共用 state 槽,不能同 job"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,189 @@
+{
+  "schema_version": 1,
+  "diagram_type": "dataflow",
+  "meta": {
+    "title": "模型只选模式、填参数;程序生成脚本、state、权限与 job 形态",
+    "locale": "zh-CN",
+    "animation": "trace",
+    "quality_profile": "showcase",
+    "viewBox": [
+      1080,
+      520
+    ],
+    "views": [
+      {
+        "id": "model",
+        "label": "① 模型只做两件事",
+        "focus": [
+          "user",
+          "mode",
+          "params"
+        ],
+        "note": "识别属于 5 个模式中的哪一个,按该模式的参数 schema 填对象 / 时间 / 阈值 / 文案;缺参数追问,不支持就说明。"
+      },
+      {
+        "id": "program",
+        "label": "② 程序生成",
+        "focus": [
+          "params",
+          "tmpl",
+          "gen"
+        ],
+        "note": "创建处理函数校验参数(对象唯一 · 工具已接入 · 有权限),把参数注入固定模板,生成脚本 / prompt / 工具白名单 / 交付。"
+      },
+      {
+        "id": "job",
+        "label": "③ 落成官方 job",
+        "focus": [
+          "gen",
+          "job",
+          "bridge"
+        ],
+        "note": "产物是一条普通 cron job;事件类模式再起一个 stream 桥接进程。模型不写脚本、不写 filter 语法、不碰 state。"
+      }
+    ]
+  },
+  "stages": [
+    {
+      "label": "用户"
+    },
+    {
+      "label": "模型(创建期一次)"
+    },
+    {
+      "label": "程序(创建处理函数)"
+    },
+    {
+      "label": "官方 job"
+    },
+    {
+      "label": "事件源进程"
+    }
+  ],
+  "nodes": [
+    {
+      "id": "user",
+      "type": "external",
+      "label": "用户",
+      "sublabel": "一句话委托",
+      "stage": 0,
+      "row": 1
+    },
+    {
+      "id": "tmpl",
+      "type": "database",
+      "label": "模板库",
+      "sublabel": "5 个固定模板",
+      "stage": 2,
+      "row": 0,
+      "tag": "工程维护"
+    },
+    {
+      "id": "mode",
+      "type": "frontend",
+      "label": "选模式",
+      "sublabel": "5 选 1 或不支持",
+      "stage": 1,
+      "row": 0,
+      "tag": "LLM"
+    },
+    {
+      "id": "params",
+      "type": "frontend",
+      "label": "填参数",
+      "sublabel": "对象 · 时间 · 阈值",
+      "stage": 1,
+      "row": 2,
+      "tag": "ID 来自查询"
+    },
+    {
+      "id": "gen",
+      "type": "backend",
+      "label": "创建处理函数",
+      "sublabel": "校验 · 注入 · 生成",
+      "stage": 2,
+      "row": 2,
+      "tag": "脚本 · 权限"
+    },
+    {
+      "id": "job",
+      "type": "backend",
+      "label": "原生 job",
+      "sublabel": "cron · every · stream",
+      "stage": 3,
+      "row": 1,
+      "tag": "官方"
+    },
+    {
+      "id": "bridge",
+      "type": "cloud",
+      "label": "stream 桥接进程",
+      "sublabel": "eventhub-sub",
+      "stage": 4,
+      "row": 1,
+      "tag": "适配"
+    }
+  ],
+  "flows": [
+    {
+      "id": "f-user-mode",
+      "from": "user",
+      "to": "mode",
+      "label": "委托",
+      "variant": "default"
+    },
+    {
+      "id": "f-mode-params",
+      "from": "mode",
+      "to": "params",
+      "label": "参数 schema",
+      "variant": "emphasis",
+      "labelDy": 24,
+      "fromSide": "bottom",
+      "toSide": "top",
+      "route": "straight"
+    },
+    {
+      "id": "f-params-gen",
+      "from": "params",
+      "to": "gen",
+      "label": "{template, args}",
+      "classification": "提案",
+      "variant": "emphasis"
+    },
+    {
+      "id": "f-tmpl-gen",
+      "from": "tmpl",
+      "to": "gen",
+      "label": "脚本骨架",
+      "variant": "dashed",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "route": "straight",
+      "labelDy": 24
+    },
+    {
+      "id": "f-gen-job",
+      "from": "gen",
+      "to": "job",
+      "label": "cron add",
+      "variant": "emphasis"
+    },
+    {
+      "id": "f-gen-bridge",
+      "from": "job",
+      "to": "bridge",
+      "label": "拉起桥接进程",
+      "variant": "dashed"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "三种创建结果",
+      "items": [
+        "可以创建 · 需要澄清 · 暂不支持(给替代)"
+      ]
+    }
+  ]
+}

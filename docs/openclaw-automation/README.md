@@ -1,62 +1,56 @@
-# openClaw 自动化任务：定时 + 事件订阅 + 脚本 / 模型判定触发统一方案
+# openClaw 自动化任务：首版收敛——模型选模式填参数 · 程序生成 · 官方能力为准
 
-从"每天早上 9 点帮我干 xxx"出发，把 openClaw 的定时任务能力扩展到事件驱动的自动化
-（明天下雨 / 到家 / 收到某人电话 / 火车放票抢票），再扩展到条件触发（股票分档抛售 / 狗上沙发驱赶 / 开售后买卧铺没买到继续盯 / 曼联持续领先 30 分钟通知张三）
-与**跨事件 / 跨状态的组合条件**（到家且电量低 / 到家后 10 分钟内来电 / 离开公司 1 小时还没到家）。
-架构以 openClaw 原生 `cron` 为基础、按需新增。前提假设：存在一个统一的**事件中心（EventHub）**，订阅即推送，单事件 filter 在事件中心侧评估，有 publish 接口；
-**事件中心不做 CEP**，判定（trigger state）、配额计数器、自设闹钟（`nextCheckAt`）全在 cron service；叫醒窗口与 cooldown 是 `sources[]` 的属性。订阅由 openClaw Gateway 内部完成，模型不调订阅工具、不感知 debounce / staleAfter。
+从"每天早上 9 点帮我干 xxx"出发，把 openClaw 的定时任务扩到事件驱动的自动化。**v4 是一次收敛而不是修正**：v3.x 把十二个场景（定时 / 事件 / 条件 / 组合）都纳入一套通用执行模型（`sources[]`、`onTick`、`trigger.agent`、`nextCheckAt`、`done`、`quota`…），v4 按三条原则把首版边界收到**定时、单事件、简单即时条件、本人提醒与少量固定动作**，并把运行时语义全部落回 openClaw 官方能力上：
 
-> 命名约定：中文统一叫"事件中心"，代码 / 字段 / 端点用 `EventHub`（如 `EventHub.subscribe`、`/hooks/eventhub`）。
-> 模型可见的新工具只有三个：`phone.lookup(kind, q)`（只读；kind ∈ contacts / apps / bluetooth / places / state）、`event_publish`（仅 payload script）、`trigger_result`（仅判定 agent）。
-> 大小写：job JSON 字段 camelCase（`staleAfter / nextCheckAt / maxRunsTotal / lastRunAt`），事件目录 yaml 与事件 payload snake_case（`stale_after / must_filter / contact_id`）；点火入口叫 `onTick`。
-> 九个核心名词（tick / filter / window · cooldown / trigger / fire / state · nextCheckAt / run / 配额 / 派生事件）的定义见主稿 P6。
+1. **模型负担轻**：模型只在创建期出场一次——从 5 个固定模式里选一个、填参数、回读一句；脚本、state、权限、job 形态由程序生成。
+2. **整体机制少**：工程新增只有两件——5 个模板 + 创建处理函数、EventHub → 官方 `stream` 的桥接命令。不新增调度体系、任务表、事件适配器、判定模型工具、结束 / 限额协议。
+3. **与官方一致**：`at / every / cron / stream`、`trigger.script` 契约、`once`、script payload 的 `notify / state / nextCheck`、approval card / standing grant、runs / delivery / failureAlert 全部照用；实施前锁定版本，三栏区分官方已有 / 我们的适配 / 暂不支持。
+
+首版五个场景：S1 晨报、S2 定时查天气满足条件提醒、S3 到家开灯、S4 指定联系人来电提醒、S10 到家查电量低则提醒。其余七个（S5 抢票、S6 分档卖出、S7 狗上沙发、S8 盯卧铺、S9 持续领先、S11 到家后来电、S12 离开没到家）进入**路线图**，用户提出时明确说明并给替代话术。
+
+> 命名约定：中文统一叫"事件中心"，代码 / 端点用 `EventHub`；桥接命令叫 `eventhub-sub`。job JSON 字段沿用官方 camelCase；事件目录 yaml 与事件 payload snake_case。
+> 官方文档核对日期 2026-09-20（`docs.openclaw.ai/automation/cron-jobs/{schedules,payloads}`）；尚未核实实际部署的 release / commit。
 
 ## 目录
 
 | 文件 | 内容 |
 | --- | --- |
-| [openClaw自动化任务方案.slides.v3.2.html](./openClaw自动化任务方案.slides.v3.2.html) | **幻灯片（当前版本 v3.2，28 页 = 主稿 18 页 + 附录 10 页，单文件 HTML 16:9，滚动式）**。相对 v3.1 做了**模型收拢**与**九张 archify 分章图**两件事。收拢：一条路只剩 `tick → [trigger] → run`，trigger 是 L2 起才有的可选旁路，**fire 降为 trigger 返回值里的一条定义**（不再是节点）；v3.1 的 `limits` 拆成三处——"什么时候叫我"归 `sources[].window / cooldown`（时间源直接写 cron 表达式或 `startAt–endAt`），依赖 run 事实的节流归 trigger（tick 带 `lastRunAt / runsToday`），`maxRunsTotal / maxRunsPerDay / maxChecksPerDay` 是 cron service 的**系统配额**（默认 runs/day 50 · checks/day 200，用户明说才覆盖，到顶暂停告警，不经判定者）；trigger 契约加 `done`（S6 stage_2 / S9 用它收尾，payload 自删只留 S8）；**payload 成本阶梯**：动作在编译期能写成固定工具调用 → `payload.script`（默认，零 token，S3 / S7 / S10 / S11 全程零 token），要生成 / 交互 / 必确认 → agentTurn；D2 脚本边界分两档（trigger 只读 / payload 可写但不能 cron / ask_user，必确认动作 fail-closed）；D6 改为"窗口是叫醒源属性，self 闹钟不受窗口约束"。图：P4 整体架构（architecture）、P6 一条路（workflow）、P10 agent 判定三段（workflow）、P11 S9 领先计时状态机（lifecycle）、P13 派生事件（dataflow）、P17 S3 时序、A5 S2 时序（sequence，替换手写 SVG）、A9 事件入口（dataflow）、A10 S7 跃迁状态机（lifecycle）；全部 `validate --quality showcase` 9/9 后 `deliver`，由 `slide-style/inline_archify.py` 保钩子内联，archify 七类语义色映射到本稿原色板（蓝 = 模型 · 紫 = openClaw · 绿 = 事件中心 · 橙 = 新增 · 红 = 配额 / 回执，**配色不变**）；滚动式 deck 的分章引擎：图进入视口跑一遍 trace，`→` / `←` 对视口内最居中的图逐章高亮（非焦点节点压暗、章内边按序流动、时序图按段压暗），`P` 自动播放 3.2 s / 章，离开视口回全图。28 页经无头浏览器 1100 / 1334 / 1700 三宽度逐页校验无溢出 |
-| [archify/](./archify/) | 九张图的 Typed JSON 源与 deliver 出的独立 HTML（答问时打开：`R` 探路、聚焦节点看 Upstream / Downstream、`P` 播放章节；`?theme=light&present=1`）。改图先改 JSON，`validate <type> <json> --quality showcase --json` 9/9 后 `deliver`，再 `python3 ../../slide-style/inline_archify.py <json> <html> --suffix xx` 抽 SVG + 章节内联（见 slide-style/01 第四、六节）|
-| [02-event-catalog.md](./02-event-catalog.md) | **事件目录规范与内建条目全文**（配套主稿 P8 / P12 与附录 A2 / A3 / A4）：设计约束（模型只看可见字段、目录含派生条目静态进 prompt、filter 单事件布尔、事件中心不做 CEP、`occurred_at` 在信封不在 payload）→ 条目 schema（`type / group / desc / fields(!key) / must_filter / pair / state_query` + internal `rate / debounce / stale_after / sensitivity`）与 cron add 校验规则 → 派生事件条目登记 → filter 语法 BNF 与示例 → 命名与字段规范 → **唯一只读查询工具 `phone.lookup`** → **10 组 63 条内建条目逐条表**（device 10 / setting 17 / connectivity 13 / geofence 2 / activity 1 / phone 6 / alarm 3 / app 5 / calendar 3 / notification 3，含 internal 默认值）→ 相对原稿的改动清单 |
-| [history/](./history/) | 历史版本留档（v0.1 → v3.1 主稿、v3.0 附录，以及合并前单独成册的 v3.1 附录）。v3.1 → v3.2 的差别见下文"v3.2 相对 v3.1" |
+| [openClaw自动化任务方案.slides.v4.html](./openClaw自动化任务方案.slides.v4.html) | **幻灯片（当前版本 v4，24 页 = 主稿 18 页 + 附录 6 页，单文件 HTML 16:9，滚动式）**。① 边界与职责：三条原则与首版五场景 / 暂缓七场景（P2）、**模型只选模式填参数回读、程序生成其余一切**的职责边界表与提案 JSON（P3）、职责边界图（P4）、**模式库 5 个**（定时生成内容 · 定时查询→条件→提醒 · 单事件→固定动作 · 单事件→通知本人 · 单事件→查现况→提醒，每个给模型填的参数、程序生成的官方 job 形态、模板里固定的逻辑，P5）；② 运行时以官方为准：一条路 `到点 → 条件门（可省略）→ payload → run → 交付` 与**官方名词表**（schedule 五 kind、trigger.script 契约与 30 s / 5 次预算、once、payload 四 kind、notify / state / nextCheck、streamBatch、approval / standing grant、tool policy，P6）、一条路图（P7）、**两种 job 形态**——条件门 + agentTurn 与单个 script payload，官方不允许同 job 混用（共用 trigger.state 槽）——及字段三栏（P8）、形态对照图（P9）、**限制四分**（source 整形 / 运行时动作冷却与窗口 / 用户业务限制 / 平台配额，三类对模型隐藏，到顶行为各异，P10）；③ 事件 · 审批 · 结束：**stream 桥接**链路、官方批处理行为、模板固定三步（解析 / 去重 / 过期）、首版不承诺项（P11）、S3 事件时序图（P12）、S2 形态 B 脚本状态机图（P13）、**审批与结束语义**——once 以首次成功执行为准、state 仅成功 run 后持久化、approval card / standing grant（P14）、run 生命周期图（P15）；④ 验证与拍板：五场景全表（P16）、**四条轨迹推演**（同批两事件 / 旧事件迟到 / 最后一次动作失败 / 等待确认时条件改变，P17）、八项拍板 D1–D8 + 版本锁定三栏 + 待核实 V1–V6（P18）。附录：路线图七场景逐条（缺的能力 / 评估什么 / 替代话术，A1）、S9 / S7 设想状态机图（A2 / A3）、三段固定模板代码（A4）、事件目录与 filter 语法（A5 / A6）。**八张图每张独占一页**，archify 渲染并保留钩子：进入视口跑一遍 trace，`→` / `←` 逐章高亮，`P` 自动播放，**悬停节点看上下游流光**（非相邻压暗、相邻亮起、相邻边跑光点，出边蓝 / 入边紫），点击钉住并在章节栏显示上游 N · 下游 M，Esc 取消；配色沿用蓝 / 紫 / 绿 / 橙 / 红五色。24 页经无头浏览器 1100 / 1334 / 1700 三宽度逐页校验无溢出 |
+| [archify/](./archify/) | v4 八张图的 Typed JSON 源与 deliver 出的独立 HTML（`v4-P4-职责边界.dataflow`、`v4-P7-一条路.workflow`、`v4-P9-两种形态.architecture`、`v4-P12-S3事件桥接.sequence`、`v4-P13-S2形态B脚本.lifecycle`、`v4-P15-run生命周期.lifecycle`、`v4-A3-设想S9.lifecycle`、`v4-A4-设想S7.lifecycle`）。改图先改 JSON，`validate <type> <json> --quality showcase --json` 9/9 后 `deliver`，再 `python3 ../../slide-style/inline_archify.py <json> <html> --suffix xx` 抽 SVG + 章节内联 |
+| [02-event-catalog.md](./02-event-catalog.md) | 事件目录规范与内建条目全文（10 组 63 条）。v4 里它是**候选接入清单**：首版只用 `geofence.enter` / `phone.call_incoming` 两条；条目决定桥接命令能订什么、模板能生成什么 filter；不整体注入 prompt，只列已接入模板对应的条目 |
+| [history/](./history/) | 历史版本留档（v0.1 → v3.2 主稿、v3.0 / v3.1 附录、`archify-v3.2/` 为 v3.2 九张图的源）。v3.2 → v4 的差别见下文"v4 相对 v3.2" |
 
 ## 核心结论
 
-1. **一个任务工具 + 三个只读小工具**：模型只面对 openClaw 原生 `cron` 工具；`schedule` 有单一时间源的简写（`kind: at / every / cron`）和通用形式 `sources[]`（每项 `kind ∈ at / every / cron / event`，1..n，时间与事件可混排）；事件目录（内建 63 条 + 已登记派生条目）静态在编译期 system prompt 里，没有目录查询工具；新工具只有 `phone.lookup`、`event_publish`、`trigger_result`。job 表就是任务表。
-2. **一条路，两道可选门**：`tick → [trigger] → run`。tick 三种来源（时间到点 / 订阅事件到达 / `nextCheckAt` self 闹钟）全部进 `onTick`，tick 带 `lastRunAt / runsToday`；filter（事件中心）答"值不值得叫醒我"，trigger（checker，L2 起才有）答"现在需要动作吗"，**无 trigger 的 job tick 即 run**。**fire（D1）是 trigger 返回值里的一条定义**：= 需要执行一次 payload 而不是条件为真；trigger 检测跃迁并在 `message` 里写**跃迁名**（`stage_1 / stage_2`、`entered_sofa / still_on_sofa_5m / left_sofa`），跃迁 → 动作表写在 payload（script 里是一段 `switch`）——判定侧不出现动作工具名。配额不在路上。
-3. **最小字段集（P7）**：`schedule`（简写或 `sources[]`，事件源可带 `window / cooldown`，时间源用 cron 表达式或 `startAt–endAt` 表达窗口）；`trigger {kind: script|agent, script, prompt, postScript, state, stateSchema, toolsAllow}`（agent 时 `script` 是零 token 前置门、其 message 进判定信封，`postScript` 收 `trigger_result` 算计时 / 计数并给出最终 fire / state）；`quota {maxRunsTotal, maxRunsPerDay, maxChecksPerDay}`（系统默认，明说才覆盖）；`payload {kind: script(默认)|agentTurn|systemEvent, script | message, toolsAllow, publishes}`；`sessionTarget`；`delivery`。契约 `trigger(tick, state) → {fire, message, state, nextCheckAt?, done?}`，script 与 agent 相同；`done` → 本次 run 后 disable + 退订。
-4. **判定默认是脚本，模型是可选项（G2 / P10）**：有结构化数据源（行情 / 比分 / 余票 / 预报 API、`phone.lookup(state)`）默认 `trigger.script`，零 token；只有图像 / 非结构化页面必须 `trigger.agent`（S7）；有 API 但条件含语义判断时 agent 是可选项（S6 / S8 / S9），默认仍是 script，用户要更强的语义判断时切换。选 agent 必配三道护栏：前置 script 门、配额 `maxChecksPerDay`（系统默认 200，S7 覆盖 400；超出暂停并告警，回读时告知"每天最多看 N 次"）、stateSchema + postScript（计时、计数、去重不交给模型）。判定和动作分开的理由：fire:false 的代价、判定期权限、跨 tick 记忆、checks 与 runs 分开计数；"判定动作一体"只用于离线验证判定 prompt。
-5. **三种"时间"的分工**：绝对时间点 → `sources[]` 里的时间源（"8 点前一直没收到快递通知" = event + cron 两源）；相对某次事件的时间点 → `nextCheckAt`（离开后 1 小时、领先后 30 分钟）；只在某时段叫我 → `sources[].window` 或 cron 表达式本身（D6：窗外该源不产生 tick，self 闹钟不受窗口约束）。
-6. **时间戳规则**：事件与事件之间的间隔用 `tick.event.occurred_at`（投递可能延迟、重试、乱序）；deadline / nextCheckAt 的到点用 `tick.now`（cron service 自己的钟）。不假设投递顺序；同一 job 的 onTick 串行处理（V7）。
-7. **脚本运行时边界（D2）两档**：同一 cron service 进程内沙箱，30s / 5 次调用 / state ≤16KB。**trigger script** 能读 `tick` / `trigger.state`，只能 `tools.call` toolsAllow 内的只读工具，**失败 = fire:false + check error，state 保留旧值**；**payload script** 可调 `payload.toolsAllow` 内的写工具与 `event_publish`，不能 cron / ask_user，遇必确认动作 fail-closed（run error + failureAlert）——这类动作编译期就该选 agentTurn。
-8. **限额不是一层，拆三处**：叫醒源的有效范围（"只在晚上 / 别一直提醒"）归 `sources[].window / cooldown`；依赖 run 事实的节流（"刚做过别再做"，S8 2m、S11 30m）归 trigger，脚本查 `tick.lastRunAt`，由判定者自己决定，跃迁不会被"跳过"丢失；**配额**（`maxRunsTotal / maxRunsPerDay / maxChecksPerDay`）是 cron service 挂在 job 上的计数器，系统默认 runs/day 50 · checks/day 200，用户明说才覆盖，到顶暂停 + 告警，不经判定者——是脚本 bug / 模型幻觉时的安全网。`nextCheckAt` **只加一个 self tick、不减任何 tick**，新值覆盖、`null` 作废。S9 用 script 时 155 个 tick 零 token，22:40 self tick fire 一次并 `done`。
-9. **组合条件一种写法（P12）**：与 / 或 / 之后 / 没有 / 到点还没全是 `sources[]` + 一段 `trigger.script`——"或"= sources 两个无 trigger；"事件且状态"= 脚本查 `phone.lookup(state)`；"A 之后 W 内 B"= state 记 `a_at`（occurred_at）；"A 之后 W 内没有 B"= state 记 `deadline` + `nextCheckAt`。不给模板编号，不加原语，事件中心不做 CEP。
-10. **事件源（P8）**：模型只写 `eventType + filter`；cron service 处理 add 时按 sources 里的 event 项逐条 `EventHub.subscribe(filter + 目录默认 debounce / staleAfter, tag=job_id)`，订阅是 job 的副作用（add / update 差集 / enabled / remove / 启动对账）；时间项由原生调度器按 index 产生 tick，不经事件中心。入口四步：鉴权找 job → event_id 去重 24h → occurred_at 过期 → 先回 200 再 `onTick`。三句承诺：事件不丢、动作不重复、过期不执行。
-11. **派生事件只差 payload 一个字段（P13）**：默认是普通 job；结果要复用时 payload 改 `script → event_publish(type, payload)` 并带 `publishes {type, desc, fields}` 登记目录，消费者是普通 event job。编译规则：单用途只关我 → 普通 job；公共事实或两个以上用途 → 派生事件；拿不准 → 普通 job。
-12. **编译（P14）**：主 loop 六步——路由 → 选叫醒源与判定者（成本阶梯）→ `phone.lookup` 填槽 → 写判定与限额 → message 三段 + 显式 sessionTarget / toolsAllow / delivery → 回读一句 → `cron add`。S5 的车次 / 席别 / 代付在这一步问清，S5 是一条 `at` job。
-13. **执行（P15）**：**payload script 默认**（不起 session，在沙箱直接拿 tick / trigger.message / state 调工具，零 token）；agentTurn 走 isolated；五种上下文的工具面（主 loop / trigger script / 判定 agent / payload script / 动作 agentTurn）；agentTurn 的五块信封 = 触发头 + 触发事实（标 external-data）+ 冻结的 message 三段 + contextMessages + `last_run_summary`，不读主对话。**跨 session ask_user（D4）**：run 进 waiting → 问题经 delivery 渠道送达 → 答复回 run；可能 ask_user 的 job 强制 announce；超时 → error + failureAlert。
-14. **预授权分期（D3 / G6）**：一期支付 / 卖出 / 对外发送一律 ask_user；二期在 toolsAllow 加参数级约束后，创建期确认过的范围免确认；支付永远 ask_user。
-15. **十二场景全表（P16）**：S1 cron + agentTurn；S2 cron + script 查预报；S3 event geofence.enter（window 18–23 · cooldown 2h）+ **payload script**；S4 event phone.call_incoming；S5 一条 at；S6 cron 交易时段 + script 跃迁 fire（可选 agent），stage_2 → `done`；S7 every 30s + agent（前置 script 有运动 || self，postScript 算三个跃迁）+ **payload script switch**，配额 checks/day 400，动作零 token（附录 A10 完整 job）；S8 every 30s startAt + script 或 agent，trigger 查 lastRunAt ≥ 2m，支付成功后自删；S9 every 1m startAt–endAt + script 或 agent + nextCheckAt，fire + `done`；S10 event + script 查电量 + systemEvent；S11 event ×2 + state a_at + lastRunAt 节流 + systemEvent；S12 event ×2 + state deadline + nextCheckAt。收尾两种：trigger 知道结束 → `done`；结果决定去留 → payload 自删（只剩 S8）。
-16. **分期**：一期把两种判定者、两种动作者都做出来——`sources[]`（含 window / cooldown）+ 事件适配器、tick（带 lastRunAt）+ nextCheckAt + done、配额计数器与默认值、payload script 档、目录进 prompt + `phone.lookup`、`event_publish`、`trigger.agent` 基础（prompt + trigger_result + 前置 script），覆盖 S1–S12；二期加护栏与放权——postScript + stateSchema 强校验、多模态直接进判定信封、参数级 toolsAllow 约束、预授权放开。
-17. **动手前到源码核实（V1–V7）**：`trigger.script` 沙箱能力与失败默认语义；`stream` kind 的 tick 语义；自动化 run 里 `cron remove` 自己对 isolated 是否放开（只剩 S8 依赖）；run waiting 的 ask_user 送达与恢复；toolsAllow 是否支持参数级约束；`at` 自删能否复用为 `done` 的实现、payload script 沙箱能否拿到写工具；`onTick` 对同一 job 是否已串行。
-18. **文档组织**：一份 28 页幻灯片——P2 一页看懂给汇报用，前 18 页主稿讲逻辑与每个场景，后 10 页附录放规格细节、模板、模型视角与一份完整 job 示例；九张 archify 图（架构 / 流程 / 状态机 / 数据流 / 时序）可逐章高亮与自动播放，源在 `archify/`；`02-event-catalog.md` 是目录全文。版面规则：单页 16:9、正文 clamp(11px, 1.12vw, 15px)，配色沿用蓝 / 紫 / 绿 / 橙 / 红五色，archify 语义类映射到这五色；无头浏览器三宽度逐页校验，既查页面溢出也查面板内溢出。
+1. **模型只做三件事**：选模式（5 选 1 或"不支持"）、填参数（时间 / 对象 ID / 阈值 / 文案，对象 ID 来自 `phone.lookup` 解析）、回读一句。模型产物是应用内部的提案 JSON `{template, args, readback}`，不是 `cron add` 参数；创建处理函数校验（模式命中 · 参数合法 · 对象唯一 · 工具已接入 · 有权限）后把参数注入固定模板生成真正的 job。模型只有三种创建结果：可以创建 / 需要澄清 / 暂不支持（说明原因 + 替代，用户接受才建）。
+2. **模式库 5 个，模板 = 固定 JS / prompt 骨架 + 参数注入**，工程维护、有版本；不建模板语言与通用编译器。实际是 2 个前缀（stream 三步 / cron）+ 3 个后缀（查判提醒 / 幂等动作 / 生成内容）的组合。对应工具或本人交付渠道未接入时该模式不出现在列表里。
+3. **两种官方 job 形态**：形态 A 条件门 + agentTurn / systemEvent（要生成内容或需审批；`trigger.script` 只读判定并持有 state 槽），形态 B 单个 script payload（查 + 判 + 动在同一段固定脚本，state 槽归它，条件不满足 `return {}`，**每次检查都记一次 run**——接受）。**官方不允许 condition trigger 与 script payload 同 job**，这是 v4 把判断并进 payload 的直接原因。首版 S1 用 A（无门），S2 / S3 / S4 / S10 用 B，全程零 token。
+4. **一条路是官方的**：到点 / 批到达 → 条件门（可省略的一步，不是旁路）→ payload → run → notify / announce；`fire` 是 `trigger.script` 返回值里的布尔，不是节点；限制、审批、预算收在 run 内部。没有自定义的 onTick / sources / done / quota / lastRunAt。
+5. **限制分四类，三类对模型隐藏**：① source 整形（事件中心 debounce、桥接按实例订阅、重连只收新事件）；② 动作冷却与执行窗口——job 级，在模板脚本内判断（`state.lastActionAt` 动作成功后写；**事件仍收，只是不动作**，不在 source 层过滤）；③ 用户业务限制（"每天一次"= state 记日期，次日恢复；一次性用官方 `once`，完成安静结束）；④ 平台配额（官方 timeout / tool budget / 30 s 最小间隔，到顶退避告警）。debounce ≠ cooldown；source 级冷却挡不住多源；三类阈值到顶行为不同，不能合并。
+6. **事件接入 = 官方 `stream` + 工程维护的 `eventhub-sub`**：模型只填事件类型与 filter 参数；桥接命令订阅、逐行 JSON 到 stdout、按实例管理租约、先落盘再 ack（D7）、重连只收新事件不补历史。照抄 stream 行为：250 ms 静默关批、payload 运行期间后到的行并入下一批、内建 30 s 间隔、**失败不重试**、五次短命退出进 error。模板固定三步：逐行解析（截断丢弃）→ `event_id` 去重（state.seen 24 h，成功后写）→ `occurred_at` 过期丢弃。**首版不承诺**逐条处理、毫秒级、恰好一次、离线补执行；因此抢票、比分等高频时效场景进路线图。
+7. **审批与结束全是官方语义**：agentTurn 的高危 exec → approval card → run waiting；"Always allow" 铸 standing grant（= 旧稿 D3 的二期免确认，不自建参数级约束）；script payload unattended、不能 ask_user，因此只做创建期已授权的固定动作（开灯、本人提醒）。`once: true` 在**首次成功执行**后停用（失败 / 拒绝不停用、state 不持久化、下次可再 fire）——"判定到了"与"做成了"由 run 结果分开，替代旧稿的 done。state 仅成功 run 后持久化是官方既有行为：去重键、日期、lastActionAt 都在动作成功后写，失败自然回滚。
+8. **四条轨迹推演（P17）**：同批两事件（幂等 set + seen 一次写回）、旧事件迟到（过期丢弃；source 不丢事实所以以后能做"旧事件取消新计时"）、最后一次动作失败（state 不持久化 → 不会"记了 seen 却没开灯"；run 与 delivery 分开可查）、等待确认时条件改变（allow 后由动作 agentTurn 重读现况）——都在"官方状态模型 + 模板三步 + 幂等目标状态"下有确定行为，不需要自定义事务 / 补偿 / 恢复协议。
+9. **八项拍板 D1–D8**：D1 fire = 返回值；D2 脚本边界按官方数字、模板显式最小 toolsAllow；D3 固定动作 = 创建期授权、需确认走 agentTurn + approval、Always allow = 二期；D4 官方 waiting；D5 stream 桥接；D6 source 不丢事实、窗口与冷却在脚本内；D7 落盘后再 ack；D8 幂等键 event_id + job_id 入 state、动作用目标状态非 toggle。
+10. **版本锁定三栏**：官方已有（schedule 五 kind · trigger.script / once · payload 四 kind · notify / state / nextCheck · pacing · approval / standing grant · runs / delivery · tool policy）/ 我们的适配（5 模板 + 创建处理函数 · eventhub-sub · phone.lookup · 模板三步 · 目录进 prompt）/ 暂不支持（sources[] · onTick · trigger.agent / postScript · nextCheckAt · done · quota · 派生事件 · 跨事件 state · 对外发送 / 支付 / 交易）。
+11. **待核实 V1–V6**：锁定版本的字段名与 notify 投递；stream `mode: match` 只接 JSON 行、子进程收尾、重启后源身份；script payload 能否调插件工具、toolsAllow 是否生效；事件中心租约与 filter 在哪侧评估（S4 contact_id 过滤取决于此）；地点 / 联系人 / 设备 / 天气 / 电量工具可用且创建轮次可见；agent 建 job 的 `--tools` 默认值。
+12. **顺序**：锁版本 + V1–V6 → 模式①②（S1 / S2，纯 cron）→ 桥接 + 模式③（S3）→ ④⑤（S4 / S10）→ 路线图逐项评估，不预先承诺。
+13. **路线图进入条件**：有明确重要需求 · 对应官方能力在锁定版本存在或适配可控 · 能补一条轨迹推演 · 有验收用例。缺一不进。旧稿对 S5–S12 的分析（判定契约、state 状态机、nextCheck、派生事件）保留为评估材料，A2 / A3 的设想状态机图即来自 v3.2。
+14. **文档组织**：一份 24 页幻灯片，八张 archify 图每张独占一页（悬停 Intent Trace、钉住、分章、trace、播放）；`02-event-catalog.md` 是候选接入清单。版面规则：单页 16:9、正文 clamp(11px, 1.12vw, 15px)，配色沿用五色，archify 语义类映射到这五色；三宽度逐页校验。
 
-## v3.2 相对 v3.1
+## v4 相对 v3.2
 
-- **一条路收成 `tick → [trigger] → run`**：trigger 是 L2 起才有的可选旁路，L0 / L1 的 job 到点 / 事件到了直接跑；**fire 从节点降为 trigger 返回值里的一条定义**；"三道门"说法去掉。
-- **limits 拆三处**：`activeWindow / cooldown` → `sources[]` 属性（时间源直接写进 cron 表达式或 `startAt–endAt`；事件源 `window` / `cooldown` 覆盖目录 debounce）；依赖 run 事实的节流 → trigger，tick 新增 `lastRunAt / runsToday`；`maxRunsTotal / maxRunsPerDay / maxChecksPerDay` → cron service 的**系统配额**（默认值 + 可覆盖，到顶暂停告警）。D6 改为"窗口是叫醒源属性，self 闹钟不受窗口约束"。
-- **trigger 契约加 `done`**：S6 stage_2、S9 用它收尾；payload 自删只留 S8（结果决定去留）；V3 的依赖面缩小。
-- **payload 成本阶梯**：`payload.kind: script` 成为默认（动作编译期已确定的固定工具调用，零 token），agentTurn 只用于要生成 / 多步交互 / 必确认；S3 / S7 / S10 / S11 全程零 token，S7 的跃迁 → 动作表从 message 策略段改为 script `switch`。D2 分两档（trigger script 只读；payload script 可写但不能 cron / ask_user，必确认动作 fail-closed）。
-- **九张 archify 图**（P4 / P6 / P10 / P11 / P13 / P17 / A5 / A9 / A10）替换 CSS 箭头与两张手写时序 SVG；分章高亮、trace、自动播放；配色映射到本稿原色板。
-- 材料中不保留版本变更叙述（本节除外）。
+- **是收敛不是修正**：v3.2 的分析仍然成立，但首版只做其中五个场景；七个复杂场景转路线图，每条写清缺的能力、评估什么、替代话术。
+- **模型职责从"写 job"改为"选模式填参数"**：脚本、filter、state、toolsAllow、once、冷却全部由模板与创建处理函数生成；这是对 Codex 评审"没有真正减少模型创建期职责"的回应。
+- **运行时语义落回官方**：`trigger.script` 与 `payload.script` 不能同 job（v3.2 大量使用该组合，改为形态 A / B 二选一）；`once` 替代 `done`；`nextCheck` + `pacing` 替代 `nextCheckAt`；state 仅成功后持久化替代自造的"状态与结果分离"；approval card / standing grant 替代自建的 D3 / D4。
+- **撤回 v3.2 的 limits 三拆**：debounce ≠ cooldown、source 级冷却挡不住多源、source 层过滤窗口会破坏状态正确性——改为四分（整形 / 运行时冷却窗口 / 业务限制 / 平台配额），三类对模型隐藏；删掉 `sources[].window / cooldown`、`lastRunAt / runsToday`、`quota` 字段。
+- **事件接入改为 stream 桥接**：不做 webhook 入口、onTick、事件适配器、`sources[]` 多源；接受批处理与合并，新增 D7 落盘后再 ack、D8 动作幂等。
+- **图**：从九张半栏图改为八张整页图；补 Intent Trace 悬停层与钉住；`fire` 降为返回值、固定动作优先 script 两点保留。
 
 ## 开放问题
 
-- **openClaw 源码事实 V1–V7**（见主稿 P18）：都是"核实后照写"的事实，不是设计分歧；V1 若原生脚本失败语义不可配，D2 需要在 checker 外包一层。
-- **判定模型选型与配额默认值**（哪个小模型、checks/day 默认 200 与 runs/day 默认 50 是否合适、S7 多模态成本）。
-- **模型 I/O 细节三项**（附录 A6–A8）：`last_run_summary` 由谁产出（倾向动作模型最终文本首行，NO_REPLY 时 cron service 用工具调用列表拼一行）；多模态输入如何进判定信封（一期由前置 script 预取塞进 tick 块，二期直接进信封）；`NO_REPLY` 与 `announce` 并存（倾向抑制渠道发送、主 session 摘要仍发）。
-- 事件中心与 Gateway 的部署关系与推送能力——决定 D5 默认 webhook 还是本机直调。
-- 派生事件条目的生命周期：生产者 job remove 后条目标 `orphaned` 保留还是级联通知消费者（倾向保留 + 对账时提示）。
-- 同 job 有 run 在 waiting 时新 fire 合并而非排队——实现期在 cron service 内做。
-- payload script 的 `announce(text)` 是否作为沙箱内建（S7 still_on_sofa_5m、S10 / S11 提醒）还是一律走 systemEvent——实现期定。
-- S5 抢票统一走模型后的时效（搁置）。
+- **S4 的"指定联系人"过滤放哪**：事件中心侧按 `contact_id` 评估（首选，需其支持），还是桥接侧过滤（所有来电都推到 Gateway）——待事件中心确认，决定桥接命令的最小功能面。
+- **锁定哪个 release / commit**：文档核对日期 2026-09-20；实施前必须核实实际部署版本的 `cron add` 字段名、script payload 的 `notify` 投递与插件工具可调性（V1–V3）。
+- **stream 只接 stdout JSON 行**：`mode: match` + `^\{` 是否足够，还是桥接命令要把日志完全静默（V2）。
+- **`nextCheck` 的精度**：路线图 S9 / S12 依赖它做"到点"，官方语义是从成功完成起算并受 pacing 夹，能否接受 ±pacing 的误差。
+- **模板版本升级时已建 job 怎么办**：官方保护"运行中修改脚本不被旧返回覆盖"，但批量升级模板脚本的流程需要定义。
+- **本人提醒的重复**：重连 / 合批可能让 S4 重复提醒，首版接受；若用户不接受，需要在模板里加 `lastActionAt` 冷却（机制已有，是否默认开）。

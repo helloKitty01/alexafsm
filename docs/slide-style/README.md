@@ -1,6 +1,6 @@
 # 幻灯片风格:archify 画图 / 动态接入与浅色 token
 
-沉淀仓库内 HTML 幻灯片的**画图、动态、交付**规范。起点是对 [tt-a1i/archify](https://github.com/tt-a1i/archify) skill 的分析,落地样板两份:`docs/kv-cache-discussion/kv cache方案(汇报版·升级版).v2.slides.html`(翻页式,5 张图)与 `docs/openclaw-automation/openClaw自动化任务方案.slides.v3.2.html`(滚动式,9 张图,配色沿用原稿——只借动态不借风格的样板)。
+沉淀仓库内 HTML 幻灯片的**画图、动态、交付**规范。起点是对 [tt-a1i/archify](https://github.com/tt-a1i/archify) skill 的分析,落地样板:`docs/kv-cache-discussion/kv cache方案(汇报版·升级版).v2.slides.html`(翻页式,5 张图)与 `docs/openclaw-automation/openClaw自动化任务方案.slides.v4.html`(滚动式,8 张**整页图**,含悬停 Intent Trace 与钉住,配色沿用原稿——只借动态不借风格的样板)。
 
 ## 目录
 
@@ -24,8 +24,9 @@
 
 6. 图页的 `meta` 写 `animation: "trace"` + `views`;进页跑一遍 trace,`→` / `←` 先走章节再翻页,`P` 自动播放,`↑` `↓` 直接翻页;深链 `#p=N&c=K`。
 7. 分章只动讲述焦点(压暗 / 流动),不动几何;`prefers-reduced-motion` 下全部关闭。
-8. 版式:图至少独占一列(≥ 60% 宽)或右栏"图 + 一张小表";dataflow 必须整页横贯;一列里不放"图 + 大段代码"。
+8. 版式:**图默认独占一页**(`.slide.figure`:页头 lede + 图占满 + 章节栏),说明文字放相邻页;退而求其次才是独占一列(≥ 60% 宽);一列里不放"图 + 大段代码"。
 8a. 配色:archify 的七组颜色变量映射到 deck 自己的色板,不引入它的配色;滚动式 deck 用视口居中判定当前图(见 01 第 4.4 节)。
+8b. 悬停:图页必须带 Intent Trace 层——悬停节点压暗非相邻、相邻边跑光点(出边 / 入边 / 自环三色),悬停边亮两端,点击钉住并显示上游 / 下游数(见 01 第 4.5 节)。
 
 ### 风格与交付(v1 起)
 

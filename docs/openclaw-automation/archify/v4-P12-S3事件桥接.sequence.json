@@ -1,0 +1,247 @@
+{
+  "schema_version": 1,
+  "diagram_type": "sequence",
+  "meta": {
+    "title": "S3 到家开灯:事件中心 → 桥接 → stream 批 → 固定脚本三步 → 幂等开灯",
+    "locale": "zh-CN",
+    "viewBox": [
+      960,
+      610
+    ],
+    "column_fit": "spread",
+    "animation": "trace",
+    "quality_profile": "showcase",
+    "views": [
+      {
+        "id": "batch",
+        "label": "① 事件到批",
+        "focus": [
+          "hub",
+          "bridge",
+          "sched"
+        ],
+        "note": "桥接命令逐行输出 JSON;stream 在 250 ms 静默后关批,payload 运行期间后到的行并入下一批;30 s 内建间隔。"
+      },
+      {
+        "id": "steps",
+        "label": "② 模板固定三步",
+        "focus": [
+          "sched",
+          "script",
+          "state"
+        ],
+        "note": "逐行解析 → event_id 去重(state 里记 24 h)→ occurred_at 过期丢弃;这三步是模板实现,模型不写。"
+      },
+      {
+        "id": "act",
+        "label": "③ 幂等动作与交付",
+        "focus": [
+          "script",
+          "home",
+          "user"
+        ],
+        "note": "homekit.set(on) 是目标状态、不是 toggle,重复批也不会反向;S3 delivery = none,不发通知。失败不重试(官方),state 不持久化。"
+      }
+    ]
+  },
+  "participants": [
+    {
+      "id": "hub",
+      "type": "messagebus",
+      "label": "事件中心",
+      "sublabel": "订阅即推送"
+    },
+    {
+      "id": "bridge",
+      "type": "cloud",
+      "label": "eventhub-sub",
+      "sublabel": "桥接 · 工程维护"
+    },
+    {
+      "id": "sched",
+      "type": "backend",
+      "label": "stream 调度",
+      "sublabel": "官方 · 批"
+    },
+    {
+      "id": "script",
+      "type": "backend",
+      "label": "script payload",
+      "sublabel": "固定模板"
+    },
+    {
+      "id": "state",
+      "type": "database",
+      "label": "trigger.state",
+      "sublabel": "成功后持久化"
+    },
+    {
+      "id": "home",
+      "type": "cloud",
+      "label": "homekit",
+      "sublabel": "toolsAllow"
+    },
+    {
+      "id": "user",
+      "type": "external",
+      "label": "本人渠道",
+      "sublabel": "delivery"
+    }
+  ],
+  "segments": [
+    {
+      "from": 150,
+      "to": 246,
+      "label": "① 事件到批"
+    },
+    {
+      "from": 254,
+      "to": 364,
+      "label": "② 三步"
+    },
+    {
+      "from": 372,
+      "to": 512,
+      "label": "③ 动作"
+    }
+  ],
+  "messages": [
+    {
+      "id": "push",
+      "from": "hub",
+      "to": "bridge",
+      "y": 176,
+      "label": "geofence.enter zone=home",
+      "variant": "default"
+    },
+    {
+      "id": "line",
+      "from": "bridge",
+      "to": "sched",
+      "y": 204,
+      "label": "stdout 一行 JSON",
+      "variant": "emphasis"
+    },
+    {
+      "id": "close",
+      "from": "sched",
+      "to": "script",
+      "y": 232,
+      "label": "批关闭 → trigger.streamBatch",
+      "variant": "emphasis"
+    },
+    {
+      "id": "seen",
+      "from": "script",
+      "to": "state",
+      "y": 266,
+      "label": "event_id 见过?",
+      "variant": "default"
+    },
+    {
+      "id": "fresh",
+      "from": "state",
+      "to": "script",
+      "y": 294,
+      "label": "未见过 · occurred_at 未过期",
+      "variant": "return"
+    },
+    {
+      "id": "where",
+      "from": "script",
+      "to": "home",
+      "y": 322,
+      "label": "phone.lookup(state) 仍在家?",
+      "variant": "dashed"
+    },
+    {
+      "id": "yes",
+      "from": "home",
+      "to": "script",
+      "y": 350,
+      "label": "在家",
+      "variant": "return"
+    },
+    {
+      "id": "set",
+      "from": "script",
+      "to": "home",
+      "y": 384,
+      "label": "homekit.set(living_main, on)",
+      "variant": "emphasis"
+    },
+    {
+      "id": "ok",
+      "from": "home",
+      "to": "script",
+      "y": 412,
+      "label": "ok(幂等)",
+      "variant": "return"
+    },
+    {
+      "id": "ret",
+      "from": "script",
+      "to": "sched",
+      "y": 440,
+      "label": "return { state: seen+id }",
+      "variant": "return"
+    },
+    {
+      "id": "persist",
+      "from": "sched",
+      "to": "state",
+      "y": 468,
+      "label": "run ok → 持久化 state",
+      "variant": "dashed"
+    },
+    {
+      "id": "none",
+      "from": "sched",
+      "to": "user",
+      "y": 496,
+      "label": "delivery none(不发)",
+      "variant": "dashed"
+    }
+  ],
+  "activations": [
+    {
+      "participant": "bridge",
+      "from": 172,
+      "to": 210,
+      "type": "cloud"
+    },
+    {
+      "participant": "sched",
+      "from": 200,
+      "to": 474,
+      "type": "backend"
+    },
+    {
+      "participant": "script",
+      "from": 228,
+      "to": 446,
+      "type": "backend"
+    },
+    {
+      "participant": "state",
+      "from": 262,
+      "to": 300,
+      "type": "database"
+    },
+    {
+      "participant": "home",
+      "from": 380,
+      "to": 418,
+      "type": "cloud"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "amber",
+      "title": "接受的限制",
+      "items": [
+        "批合并 · 失败不重试 · 不承诺恰好一次"
+      ]
+    }
+  ]
+}

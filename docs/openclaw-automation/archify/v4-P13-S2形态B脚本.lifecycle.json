@@ -1,0 +1,182 @@
+{
+  "schema_version": 1,
+  "diagram_type": "lifecycle",
+  "meta": {
+    "title": "S2 形态 B 脚本:一次 run 内查 → 判 → 提醒,每天最多一次靠 state 日期",
+    "locale": "zh-CN",
+    "animation": "trace",
+    "quality_profile": "showcase",
+    "viewBox": [
+      980,
+      660
+    ],
+    "views": [
+      {
+        "id": "ok",
+        "label": "① 正常路径",
+        "focus": [
+          "due",
+          "query",
+          "judge",
+          "today",
+          "remind"
+        ],
+        "note": "20:00 到点 → weather.forecast → 概率 ≥ 阈值 → 今天没提醒过 → 返回 {notify, state:{last: today}}。"
+      },
+      {
+        "id": "quiet",
+        "label": "② 不满足 / 已提醒",
+        "focus": [
+          "judge",
+          "skip",
+          "today",
+          "dup"
+        ],
+        "note": "低于阈值或今天已提醒 → 返回 {},这次检查仍记一次 run(官方形态 B 的代价,接受)。"
+      },
+      {
+        "id": "fail",
+        "label": "③ 失败",
+        "focus": [
+          "query",
+          "err"
+        ],
+        "note": "数据不可用直接抛错 → run error、退避、failureAlert;返回的 state 不持久化。「读不到」不写成「不下雨」。"
+      }
+    ]
+  },
+  "lanes": [
+    {
+      "id": "main",
+      "label": "一次 run 内的固定脚本"
+    },
+    {
+      "id": "quiet",
+      "label": "安静返回 {}"
+    },
+    {
+      "id": "terminal",
+      "label": "错误"
+    }
+  ],
+  "states": [
+    {
+      "id": "due",
+      "type": "start",
+      "label": "20:00 到点",
+      "sublabel": "cron 0 20 * * *",
+      "lane": "main",
+      "col": 0,
+      "step": "01"
+    },
+    {
+      "id": "query",
+      "type": "active",
+      "label": "查预报",
+      "sublabel": "weather.forecast",
+      "lane": "main",
+      "col": 1,
+      "step": "02",
+      "tag": "tools.call"
+    },
+    {
+      "id": "judge",
+      "type": "decision",
+      "label": "≥ 阈值?",
+      "sublabel": "rain_prob ≥ 0.6",
+      "lane": "main",
+      "col": 2,
+      "step": "03"
+    },
+    {
+      "id": "today",
+      "type": "decision",
+      "label": "今天提醒过?",
+      "sublabel": "state.last == today",
+      "lane": "main",
+      "col": 3,
+      "step": "04"
+    },
+    {
+      "id": "remind",
+      "type": "success",
+      "label": "notify",
+      "sublabel": "带伞 · state.last = today",
+      "lane": "main",
+      "col": 4,
+      "step": "05"
+    },
+    {
+      "id": "skip",
+      "type": "waiting",
+      "label": "低于阈值",
+      "sublabel": "返回 {} · 记一次 run",
+      "lane": "quiet",
+      "col": 0
+    },
+    {
+      "id": "dup",
+      "type": "waiting",
+      "label": "已提醒",
+      "sublabel": "返回 {} · 不重发",
+      "lane": "quiet",
+      "col": 1
+    },
+    {
+      "id": "err",
+      "type": "failure",
+      "label": "run error",
+      "sublabel": "state 不持久化 · 退避",
+      "lane": "terminal",
+      "col": 0
+    }
+  ],
+  "transitions": [
+    {
+      "id": "t-skip",
+      "from": "judge",
+      "to": "skip",
+      "label": "否",
+      "variant": "dashed",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "route": "straight",
+      "labelDy": 24
+    },
+    {
+      "id": "t-dup",
+      "from": "today",
+      "to": "dup",
+      "label": "是",
+      "variant": "dashed",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "route": "straight",
+      "labelDy": 24
+    },
+    {
+      "id": "t-err",
+      "from": "query",
+      "to": "err",
+      "label": "数据不可用 → 抛错",
+      "variant": "security",
+      "fromSide": "bottom",
+      "toSide": "left",
+      "via": [
+        [
+          248,
+          479
+        ]
+      ]
+    }
+  ],
+  "cards": [
+    {
+      "dot": "emerald",
+      "title": "模型填的只有",
+      "items": [
+        "城市 · 时间 · 阈值 · 文案;其余是模板"
+      ]
+    }
+  ]
+}

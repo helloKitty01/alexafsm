@@ -93,6 +93,14 @@ python3 inline_archify.py <spec>.json <delivered>.html --suffix xx --out /tmp/xx
 - **`dataflow` 的分叉**:同一节点两条出边到同一排会出 7px 微段,把分叉合成一个节点或把目标分到不同 `row`;三阶段 viewBox 至少 1068 宽。
 - **`sequence` 按段分章**比按 `views.focus` 有信息量得多;`inline_archify.py` 已默认按 `segments` 切。
 
+### 4.5 第三个样板:openclaw-automation v4(整页图 + Intent Trace 悬停层)
+
+- **图独占一页**是唯一让 archify 8–10 px 标签可读的摆法:`.slide.figure` = 页头一句 lede + `.panel.diagram` 占满剩余高度 + 底部章节栏;svg `height: 100%`,宽度由高度和 viewBox 比例决定(16:9 页里约 1000 px 宽)。说明文字全部挪到相邻文字页,图页只留 badge 和 lede。
+- **Intent Trace 悬停层**(archify `template.html` 4525–4570、9157 行起的 pointerover 层)是它最直观的动态,v2 / v3.2 漏掉了。搬法:`pointerover` 到 `g[data-node-id]` → svg 打 `data-hover`,该节点与相邻边 / 相邻节点打 `data-hi`,其余 CSS 压到 0.18 / 0.1;相邻边**克隆一条 `<path>`** 进 `.hover-overlay`,`pathLength="1"` + `stroke-dasharray: 0.1 0.9` + `dashoffset 0 → -1` 的 1.15 s 动画就是那道"光点",按 `data-edge-from/to` 判出边 / 入边 / 自环三色(映射到 deck 的蓝 / 紫 / 红);悬停边则亮该边与两端。`pointerout` 恢复;`click` 钉住(`data-pinned`,保持高亮,章节栏显示上游 N · 下游 M),再点或 Esc 取消。全部只依赖 `inline_archify.py` 保留的钩子,约 80 行 JS。
+- 分章高亮与悬停叠加时以悬停为先(`data-hover` 的规则写在 `data-chapter` 之后)。
+- **`sequence` 第一段的标签会被最左侧参与者的第一条消息标签压住**:把第一条消息 y 从 162 推到 176、各段相应下移即可。
+- Playwright 测悬停要用 `locator(...).hover(force=True)`:节点组里的 `<text>` 会"拦截"指针,但事件照样冒泡到 `g[data-node-id]`。
+
 ## 五、v2 逐图落地
 
 | 页 | 图型 | 拓扑 | 章 | 主要修复 |
