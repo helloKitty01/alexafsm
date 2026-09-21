@@ -1,0 +1,682 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>KV Cache 方案(汇报版)· v3 · 3 页 · 同内容只换排布</title>
+<style>
+  :root {
+    --bg: #e9edf4;
+    --slide-bg: linear-gradient(135deg, #ffffff 0%, #f7f9fd 60%, #eef3fb 100%);
+    --card: #f7f9fc;
+    --card-border: #dfe5ee;
+    --text: #1f2a3d;
+    --muted: #5c6b84;
+    --accent: #2563eb;
+    --good: #059669;
+    --warn: #d97706;
+    --bad: #dc2626;
+    --lvl-prod: #3b5bdb;
+    --lvl-sess: #7c3aed;
+    --lvl-q:    #d97706;
+    --lvl-loop: #0891b2;
+    --mono: "SF Mono", "JetBrains Mono", Consolas, "Courier New", monospace;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { background: var(--bg); height: 100%; }
+  body {
+    font-family: "PingFang SC", "Microsoft YaHei", "Noto Sans SC", -apple-system, sans-serif;
+    color: var(--text);
+    display: flex; justify-content: center; align-items: center;
+    padding: 16px 12px; min-height: 100vh;
+  }
+  .deck { position: relative; width: min(96vw, calc((100vh - 32px) * 1.7778)); }
+  .slide {
+    width: 100%;
+    aspect-ratio: 16 / 9;
+    background: var(--slide-bg);
+    border: 1px solid var(--card-border);
+    border-radius: 18px;
+    box-shadow: 0 18px 50px rgba(31,42,61,.16);
+    padding: 1.8% 2.6%;
+    display: none; flex-direction: column;
+    overflow: hidden; position: relative;
+    font-size: clamp(9.5px, min(1.08vw, 1.92vh), 22px);
+  }
+  .slide.active { display: flex; }
+  .slide::before {
+    content: ""; position: absolute; inset: 0 0 auto 0; height: 5px;
+    background: linear-gradient(90deg, var(--accent), var(--good));
+    border-radius: 18px 18px 0 0;
+  }
+  h2 { font-size: 1.18em; font-weight: 700; margin-bottom: .35em; line-height: 1.3; }
+  h2 .hl { color: var(--accent); }
+  h2 .num { color: var(--muted); font-weight: 600; margin-right: .4em; font-size: .78em; }
+  h2 small { font-size: .66em; font-weight: 500; color: var(--muted); margin-left: .55em; }
+  .card {
+    background: var(--card); border: 1px solid var(--card-border);
+    border-radius: 12px; padding: .5em .75em; overflow: hidden;
+  }
+  .card h3 { font-size: .86em; margin-bottom: .25em; color: var(--text); display: flex; align-items: center; gap: .8em; flex-wrap: wrap; }
+  .card h3 .sub { font-size: .78em; font-weight: 500; color: var(--muted); }
+  .card p, .card li { color: var(--muted); font-size: .7em; line-height: 1.42; }
+  .card li { margin-left: 1.15em; margin-bottom: .18em; }
+  .card b { color: var(--text); font-weight: 700; }
+  .mono { font-family: var(--mono); }
+  .goodc { color: var(--good) !important; }
+  .badc { color: var(--bad) !important; }
+  .warnc { color: var(--warn) !important; }
+  .accc { color: var(--accent) !important; }
+  .row { display: flex; gap: .6em; min-height: 0; }
+  .col { display: flex; flex-direction: column; gap: .45em; min-width: 0; min-height: 0; }
+  .grow { flex: 1; min-height: 0; min-width: 0; }
+  .tag { display: inline-block; border-radius: 999px; padding: .02em .45em; font-size: .8em; font-weight: 700; white-space: nowrap; }
+  .tag.real { background: rgba(5,150,105,.12); color: var(--good); }
+  .tag.mid  { background: rgba(37,99,235,.12); color: var(--accent); }
+  .tag.est  { background: rgba(217,119,6,.12); color: var(--warn); }
+  .tag.bad  { background: rgba(220,38,38,.12); color: var(--bad); }
+
+  table { border-collapse: collapse; width: 100%; font-size: .68em; }
+  th, td { text-align: left; padding: .22em .4em; border-bottom: 1px solid var(--card-border); vertical-align: top; }
+  th { color: var(--accent); font-weight: 700; white-space: nowrap; }
+  td { color: var(--muted); line-height: 1.32; }
+  td b { color: var(--text); }
+  td.n, th.n { text-align: right; font-family: var(--mono); white-space: nowrap; }
+  td.nm { font-weight: 700; color: var(--text); white-space: nowrap; }
+  tr.sum td { background: rgba(37,99,235,.06); font-weight: 700; color: var(--text); }
+
+  .kpi { display: flex; gap: .6em; margin-bottom: .45em; }
+  .kpi .card { flex: 1; text-align: center; padding: .38em .32em; }
+  .kpi .big { font-size: 1.16em; font-weight: 800; color: var(--accent); font-family: var(--mono); white-space: nowrap; }
+  .kpi .big.g { color: var(--good); }
+  .kpi .big.w { color: var(--warn); }
+  .kpi .big.r { color: var(--bad); }
+  .kpi .big .arr { color: var(--muted); font-weight: 500; font-size: .75em; margin: 0 .18em; }
+  .kpi .big .pct { font-size: .68em; color: var(--good); background: rgba(5,150,105,.1); border-radius: 4px; padding: 0 .3em; margin-left: .3em; vertical-align: .12em; }
+  .kpi .lbl { color: var(--muted); font-size: .62em; margin-top: .1em; line-height: 1.3; }
+  .kpi .lbl b { color: var(--text); }
+
+  .banner {
+    border-radius: 10px; padding: .38em .85em; font-size: .72em;
+    background: linear-gradient(90deg, rgba(37,99,235,.08), rgba(5,150,105,.07));
+    border: 1px solid rgba(37,99,235,.28); color: var(--text); line-height: 1.42; margin-top: .4em;
+  }
+  .banner b { color: var(--accent); }
+  .footer {
+    margin-top: auto; padding-top: .28em; display: flex;
+    justify-content: space-between; color: var(--muted); font-size: .56em; gap: 1em; line-height: 1.35;
+  }
+  .footer b { color: var(--text); }
+  .footer > div:last-child { margin-right: 10em; white-space: nowrap; }
+
+  /* ===== 结构条 ===== */
+  .legend { display: flex; gap: .9em; font-size: .62em; color: var(--muted); align-items: center; flex-wrap: wrap; margin-left: auto; }
+  .legend i { display: inline-block; width: 1.15em; height: .78em; border-radius: 3px; margin-right: .28em; vertical-align: -.08em; border: 1px solid rgba(0,0,0,.08); }
+  .legend i.hit  { background: rgba(5,150,105,.72); }
+  .legend i.wr   { background: rgba(220,38,38,.85); }
+  .legend i.nw   { background: rgba(37,99,235,.85); }
+  .legend i.first{ background: repeating-linear-gradient(135deg, rgba(37,99,235,.55) 0 3px, rgba(37,99,235,.18) 3px 6px); }
+  .bars { display: flex; flex-direction: column; gap: .32em; }
+  .barrow { display: flex; align-items: stretch; gap: .5em; }
+  .barrow .who { width: 4.6em; flex: none; display: flex; flex-direction: column; justify-content: center; font-size: .76em; font-weight: 800; line-height: 1.2; }
+  .barrow .who small { font-size: .7em; font-weight: 500; color: var(--muted); }
+  .bar { flex: 1; display: flex; gap: 2px; min-width: 0; }
+  .bars .seg { display: flex; flex-direction: column; min-width: 0; }
+  .bars .seg .top {
+    height: 1.5em; border-radius: 5px; display: flex; align-items: center; justify-content: center; gap: .22em;
+    color: #fff; font-size: .6em; font-weight: 700; white-space: nowrap; overflow: hidden; padding: 0 .35em;
+    text-shadow: 0 1px 2px rgba(0,0,0,.25);
+  }
+  .bars .seg .sub { font-size: .52em; color: var(--muted); line-height: 1.22; margin-top: .12em; text-align: center; overflow: hidden; white-space: nowrap; }
+  table.fill { height: 100%; font-size: .9em; }
+  table.fill td, table.fill th { vertical-align: middle; padding: .26em .5em; }
+  .bars .seg .sub b { color: var(--text); }
+  .bars .seg.hit .top { background: rgba(5,150,105,.72); }
+  .bars .seg.wr  .top { background: rgba(220,38,38,.85); }
+  .bars .seg.nw  .top { background: rgba(37,99,235,.85); }
+  .bars .seg.first .top { background: repeating-linear-gradient(135deg, rgba(37,99,235,.55) 0 4px, rgba(37,99,235,.18) 4px 8px); color: #0f2a6b; text-shadow: none; }
+  .bars .seg.brk { position: relative; }
+  .bars .seg.brk::after { content: "断点 ↓"; position: absolute; right: .2em; top: -1.05em; font-size: .5em; color: var(--bad); font-weight: 800; }
+
+  /* ===== 零件 chip ===== */
+  .parts { display: grid; grid-template-columns: repeat(4, 1fr); gap: .35em; }
+  .part { background: #fff; border: 1px solid var(--card-border); border-radius: 8px; padding: .3em .4em; text-align: center; min-width: 0; }
+  .part .v { font-family: var(--mono); font-weight: 800; font-size: .9em; color: var(--accent); white-space: nowrap; }
+  .part .k { font-size: .56em; color: var(--muted); line-height: 1.25; margin-top: .04em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .part.t .v { color: var(--lvl-loop); }
+  .dist { display: flex; height: 1.15em; border-radius: 6px; overflow: hidden; border: 1px solid var(--card-border); margin-top: .25em; }
+  .dist span { display: flex; align-items: center; justify-content: center; font-size: .52em; color: #fff; font-weight: 700; white-space: nowrap; overflow: hidden; }
+  .eqs { display: flex; flex-direction: column; gap: .22em; }
+  .eq { font-family: var(--mono); font-weight: 800; font-size: .78em; background: #fff; border: 1px solid var(--card-border); border-radius: 8px; padding: .28em .55em; display: flex; justify-content: space-between; align-items: baseline; gap: .6em; }
+  .eq small { font-family: inherit; font-weight: 500; color: var(--muted); font-size: .8em; white-space: nowrap; }
+  .eq .g { color: var(--good); } .eq .r { color: var(--bad); } .eq .b { color: var(--accent); } .eq .w { color: var(--warn); }
+
+  /* ===== P2 横向堆叠柱 ===== */
+  .mchart { flex: 1; display: flex; flex-direction: column; justify-content: space-evenly; gap: .3em; min-height: 0; margin-top: .25em; }
+  .mgrp { display: flex; align-items: center; gap: .55em; }
+  .mgrp .glb { flex: none; width: 7.6em; text-align: right; line-height: 1.25; }
+  .mgrp .glb .t1 { font-size: .74em; font-weight: 700; color: var(--text); display: block; }
+  .mgrp .glb .t2 { font-size: .56em; color: var(--muted); display: block; }
+  .mgrp .bars2 { flex: 1; display: flex; flex-direction: column; gap: .18em; min-width: 0; }
+  .hb { display: flex; align-items: center; gap: .4em; }
+  .hb .who { flex: none; width: 2.6em; font-size: .6em; color: var(--muted); text-align: right; white-space: nowrap; font-weight: 700; }
+  .hb .who.cur { color: var(--bad); } .hb .who.tgt { color: var(--good); }
+  .hb .htrack { flex: 1; height: 1.32em; border-radius: 5px; background: #eceff5; display: flex; overflow: hidden; }
+  .hb .hv { flex: none; width: 10.4em; font-family: var(--mono); font-size: .62em; white-space: nowrap; color: var(--muted); }
+  .hb .hv b { color: var(--text); }
+  .hseg { height: 100%; display: flex; align-items: center; justify-content: center; overflow: hidden; flex: none; }
+  .hseg + .hseg { border-left: 1px solid rgba(255,255,255,.85); }
+  .hseg span { font-size: .58em; white-space: nowrap; color: #fff; font-weight: 700; text-shadow: 0 1px 2px rgba(0,0,0,.3); }
+  .hseg.gh { background: rgba(5,150,105,.68); }
+  .hseg.wr { background: rgba(220,38,38,.85); }
+  .hseg.nw { background: rgba(37,99,235,.8); }
+  .hseg.first { background: repeating-linear-gradient(135deg, rgba(37,99,235,.55) 0 4px, rgba(37,99,235,.18) 4px 8px); }
+  .hseg.first span { color: #0f2a6b; text-shadow: 0 0 2px #fff, 0 0 2px #fff; }
+  .mgrp .mbadge { flex: none; width: 6.6em; text-align: center; }
+  .mgrp .mbadge .pv { font-family: var(--mono); font-weight: 800; font-size: .84em; color: var(--good); display: block; white-space: nowrap; }
+  .mgrp .mbadge .pl { font-size: .54em; color: var(--muted); line-height: 1.25; display: block; margin-top: .06em; }
+  .mgrp.total { border-top: 1px dashed var(--card-border); padding-top: .35em; }
+  .mgrp.total .htrack { height: 1.5em; }
+  .mlegend { display: flex; gap: .8em; font-size: .62em; color: var(--muted); flex-wrap: wrap; margin-left: auto; }
+  .mlegend i { display: inline-block; width: .82em; height: .55em; border-radius: 3px; margin-right: .24em; }
+  .mlegend .l-gh i { background: rgba(5,150,105,.68); }
+  .mlegend .l-wr i { background: rgba(220,38,38,.85); }
+  .mlegend .l-nw i { background: rgba(37,99,235,.8); }
+  .mlegend .l-first i { background: repeating-linear-gradient(135deg, rgba(37,99,235,.55) 0 3px, rgba(37,99,235,.18) 3px 6px); }
+
+  /* ===== P2 三步 ===== */
+  .steps { display: flex; flex-direction: column; gap: .35em; flex: 1; justify-content: space-evenly; }
+  .step { border-radius: 10px; padding: .38em .55em; background: #fff; border: 1px solid var(--card-border); display: flex; flex-direction: column; gap: .12em; }
+  .step .no { font-size: .6em; font-weight: 800; color: var(--accent); }
+  .step .no .tag { margin-left: .4em; }
+  .step h4 { font-size: .74em; font-weight: 800; color: var(--text); line-height: 1.3; }
+  .step p { font-size: .6em; color: var(--muted); line-height: 1.38; }
+  .step .acc { font-size: .6em; color: var(--good); font-weight: 700; line-height: 1.35; }
+  .step .acc b { color: var(--text); }
+
+  /* ===== P3 公式 + 曲线 ===== */
+  .formula { background: #fff; border: 1px solid var(--card-border); border-radius: 8px; padding: .38em .6em; font-size: .68em; line-height: 1.55; color: var(--muted); }
+  .formula .big2 { font-family: var(--mono); font-size: 1.18em; font-weight: 800; color: var(--accent); }
+  .formula .r { color: var(--bad); font-weight: 700; } .formula .o { color: var(--warn); font-weight: 700; } .formula .g { color: var(--good); font-weight: 700; }
+  .formula b { color: var(--text); }
+  .chartbox { flex: 1; min-height: 0; display: flex; }
+  .chartbox svg { width: 100%; height: 100%; display: block; }
+  .three { display: flex; flex-direction: column; gap: .3em; flex: 1; justify-content: space-evenly; }
+  .three .it { flex: 1; display: flex; gap: .6em; align-items: center; background: #fff; border: 1px solid var(--card-border); border-radius: 8px; padding: .42em .7em; }
+  .three .it .k { font-family: var(--mono); font-weight: 800; color: var(--accent); font-size: .92em; white-space: nowrap; min-width: 5.2em; }
+  .three .it p { font-size: .7em; line-height: 1.45; }
+
+  .nav { position: absolute; bottom: 3.2%; right: 3%; display: flex; gap: .5em; align-items: center; z-index: 10; font-size: clamp(9.5px, min(1.08vw, 1.92vh), 22px); }
+  .nav button { background: #fff; border: 1px solid var(--card-border); color: var(--text); border-radius: 8px; width: 2.1em; height: 2.1em; cursor: pointer; font-size: 1em; }
+  .nav button:hover { border-color: var(--accent); color: var(--accent); }
+  .nav .pg { color: var(--muted); font-family: var(--mono); font-size: .88em; padding: 0 .35em; }
+  .dots { position: absolute; bottom: 3.9%; left: 3%; display: flex; gap: .42em; z-index: 10; }
+  .dots i { width: .52em; height: .52em; border-radius: 50%; background: #c9d2e0; cursor: pointer; }
+  .dots i.on { background: var(--accent); }
+</style>
+</head>
+<body>
+<div class="deck">
+
+<!-- ============ P1 数据基线 ============ -->
+<section class="slide active">
+  <h2><span class="num">01</span>数据基线:<span class="hl">同一份内容,只换排布</span>——全稿所有数字只从这一页取<small>K token · DS-V4 tokenizer · 两边模块长度一致,差别只在位置与缓存命运</small></h2>
+
+  <div class="row grow">
+    <div class="card" style="flex:1.55; display:flex; flex-direction:column; min-height:0;">
+      <h3>物理序与缓存命运 <span class="sub">从左到右 = 送给模型的顺序;段宽示意、不按比例;以 Q≥2 的首调为例</span>
+        <span class="legend"><span><i class="hit"></i>已缓存</span><span><i class="wr"></i>白算(本该命中却重算)</span><span><i class="nw"></i>必算(本次新增)</span><span><i class="first"></i>会话首调载入一次</span></span>
+      </h3>
+      <div class="bars" style="margin-top:.4em;">
+        <div class="barrow">
+          <div class="who">当前<small>SP → Tools → UAT</small></div>
+          <div class="bar">
+            <div class="seg hit brk" style="flex:28.9 1 7.6em;"><div class="top">SP·固定 <span data-b="sp"></span></div><div class="sub">产品级 · 命中 · <b>断点在此末尾</b></div></div>
+            <div class="seg nw" style="flex:3 0 6.2em;"><div class="top">SP·动态 <span data-b="dyn"></span></div><div class="sub">每 Q 原位重写 → 其后全断</div></div>
+            <div class="seg wr" style="flex:1.5 0 4.6em;"><div class="top">会话级 <span data-b="sess"></span></div><div class="sub">被连带</div></div>
+            <div class="seg wr" style="flex:5.9 0 5.4em;"><div class="top">Tools <span data-b="tools"></span></div><div class="sub">产品级却每 Q 重算</div></div>
+            <div class="seg wr" style="flex:7 0 5.6em;"><div class="top">历史 1–10 轮 <span data-b="hist"></span></div><div class="sub">被连带</div></div>
+            <div class="seg wr" style="flex:9 1 6.6em;"><div class="top">本会话 U/A/T</div><div class="sub">随轮增长 · 被连带</div></div>
+            <div class="seg nw" style="flex:1.2 0 3.4em;"><div class="top">U</div><div class="sub">query</div></div>
+          </div>
+        </div>
+        <div class="barrow">
+          <div class="who">目标<small>Tools → SP → UAT</small></div>
+          <div class="bar">
+            <div class="seg hit" style="flex:5.9 0 5.4em;"><div class="top">Tools <span data-b="tools"></span></div><div class="sub">最前 · 全网命中</div></div>
+            <div class="seg hit" style="flex:28.9 1 7.6em;"><div class="top">SP·固定 <span data-b="sp"></span></div><div class="sub">不塞 skill · 命中</div></div>
+            <div class="seg first" style="flex:1.5 0 4.6em;"><div class="top">会话级 <span data-b="sess"></span></div><div class="sub">会话首调一次</div></div>
+            <div class="seg first" style="flex:7 0 5.6em;"><div class="top">历史 1–10 轮 <span data-b="hist"></span></div><div class="sub">会话首调一次</div></div>
+            <div class="seg hit" style="flex:9 1 6.6em;"><div class="top">本会话 U/A/T</div><div class="sub">只追加 · 全命中</div></div>
+            <div class="seg nw" style="flex:3 0 6.2em;"><div class="top">U·动态 <span data-b="dyn"></span></div><div class="sub">随 U 追加 · 不回写 SP</div></div>
+            <div class="seg nw" style="flex:1.2 0 3.4em;"><div class="top">U</div><div class="sub">query</div></div>
+          </div>
+        </div>
+      </div>
+
+      <h3 style="margin-top:.55em;">模块表 <span class="sub">长度两边相同;"命运"= Q≥2 首调时该段是被缓存、白算还是必算</span></h3>
+      <div style="flex:1; min-height:0; overflow:hidden; margin-top:.2em;">
+      <table class="fill">
+        <tr><th>模块</th><th class="n">长度</th><th>当前位置</th><th>目标位置</th><th>当前命运</th><th>目标命运</th></tr>
+        <tr><td class="nm">Tools(12 个)</td><td class="n" data-b="tools"></td><td>SP 之后</td><td><b>最前</b></td><td class="badc">每 Q 白算</td><td class="goodc">全网命中</td></tr>
+        <tr><td class="nm">SP·固定(14 段)</td><td class="n" data-b="sp"></td><td>最前</td><td>Tools 之后</td><td class="goodc">命中(断点在此末尾)</td><td class="goodc">命中</td></tr>
+        <tr><td class="nm">会话级(user.md / 私域 / device / 记忆)</td><td class="n" data-b="sess"></td><td>SP 尾</td><td>SP 尾</td><td class="badc">每 Q 白算</td><td class="accc">会话首调算一次</td></tr>
+        <tr><td class="nm">对话历史 1–10 轮</td><td class="n" data-b="hist"></td><td>UAT 头</td><td>UAT 头</td><td class="badc">每 Q 白算</td><td class="accc">会话首调算一次</td></tr>
+        <tr><td class="nm">动态(skills 引用 / memory / knowledge)</td><td class="n" data-b="dyn"></td><td><b>SP 内,原位重写</b></td><td><b>U 前半,只追加</b></td><td class="accc">每 Q 必算</td><td class="accc">每 Q 必算</td></tr>
+        <tr><td class="nm">U · query</td><td class="n" data-b="u"></td><td>U</td><td>U 后半</td><td class="accc">必算</td><td class="accc">必算</td></tr>
+        <tr><td class="nm">A · tool call</td><td class="n" data-b="call"></td><td>UAT</td><td>UAT</td><td class="accc">必算</td><td class="accc">必算</td></tr>
+        <tr><td class="nm">T · webSearch / SkillLoad / 正常工具</td><td class="n"><span data-b="web"></span> / <span data-b="skill"></span> / <span data-b="tool"></span></td><td>UAT</td><td>UAT</td><td class="accc">必算(loop 那一调)</td><td class="accc">必算(两边同)</td></tr>
+        <tr><td class="nm">A · 最终 answer</td><td class="n" data-b="ans"></td><td>UAT</td><td>UAT</td><td class="accc">必算(下一 Q 首调)</td><td class="accc">必算(两边同)</td></tr>
+      </table>
+      </div>
+    </div>
+
+    <div class="col" style="flex:1; font-size:1.14em;">
+      <div class="card">
+        <h3>运行时零件 <span class="sub">每出现一次算一次,两边同长</span></h3>
+        <div class="parts">
+          <div class="part"><div class="v" data-b="dyn"></div><div class="k">动态 / 每 Q</div></div>
+          <div class="part"><div class="v" data-b="u"></div><div class="k">query</div></div>
+          <div class="part"><div class="v" data-b="call"></div><div class="k">tool call</div></div>
+          <div class="part"><div class="v" data-b="ans"></div><div class="k">answer</div></div>
+          <div class="part t"><div class="v" data-b="web"></div><div class="k">webSearch</div></div>
+          <div class="part t"><div class="v" data-b="skill"></div><div class="k">SkillLoad</div></div>
+          <div class="part t"><div class="v" data-b="tool"></div><div class="k">正常工具</div></div>
+          <div class="part t"><div class="v" data-b="sess+hist"></div><div class="k">会话级 + 历史</div></div>
+        </div>
+      </div>
+      <div class="card">
+        <h3>业务与轮数 <span class="sub">一轮 = 一个 Q;每类 Q 的调用链</span></h3>
+        <table>
+          <tr><th>类型</th><th class="n">占比</th><th>调用链</th><th class="n">每 Q 必算</th></tr>
+          <tr><td class="nm">问答</td><td class="n" data-b="pct(mix.qa)"></td><td>调① tool call → 调② webSearch <span data-b="web"></span> + answer</td><td class="n" data-b="K1(qNew.qa)"></td></tr>
+          <tr><td class="nm">任务</td><td class="n" data-b="pct(mix.task)"></td><td>调① tool call → 调② SkillLoad <span data-b="skill"></span> + 工具 <span data-b="tool"></span> + answer</td><td class="n" data-b="K1(qNew.task)"></td></tr>
+          <tr><td class="nm">闲聊</td><td class="n" data-b="pct(mix.chat)"></td><td>调① answer</td><td class="n" data-b="K1(qNew.chat)"></td></tr>
+        </table>
+        <div class="dist" id="dist"></div>
+        <p style="margin-top:.2em; font-size:.56em;">会话轮数分布(1Q → 6Q+),6Q+ 按 8 轮计;加权每 Q 必算 <b data-b="K1(Tn)"></b>,加权沉淀 <b data-b="K1(alpha)"></b>/轮。</p>
+      </div>
+      <div class="card grow" style="display:flex; flex-direction:column;">
+        <h3>账目恒等式 <span class="sub">P2 / P3 只用这四条</span></h3>
+        <div class="eqs" style="flex:1; justify-content:space-evenly;">
+          <div class="eq"><span>输入 = <span class="g">已缓存</span> + <span class="r">白算</span> + <span class="b">必算</span></span><small>每次调用</small></div>
+          <div class="eq"><span><span class="w">实算</span> = <span class="r">白算</span> + <span class="b">必算</span></span><small>真实 prefill,账单与 TTFT</small></div>
+          <div class="eq"><span>命中率 = <span class="g">已缓存</span> / 输入</span><small>健康度,不是钱</small></div>
+          <div class="eq"><span>验收:<span class="r">白算</span> → 0</span><small>实算 = 必算</small></div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="footer">
+    <div><b>口径</b>:Tools / SP / 会话级 / 动态取现网实测(token_breakdown.csv、prompt段内容变化对照),T 三类与 tool call 为拍板工作值;两边同内容、同长度,差别只在排布 → 对比只反映排布收益。假设会话内缓存不被逐出、无裁剪;命中按块上报的粒度误差(DS 4K)不计。<b>本页落档 16 / 17 / 18。</b></div>
+    <div>KV Cache 方案(汇报版)· v3 · P1 数据基线</div>
+  </div>
+</section>
+
+<!-- ============ P2 当前 vs 目标 ============ -->
+<section class="slide">
+  <h2><span class="num">02</span>当前 vs 目标:<span class="hl">省的全是白算,必算两边一样</span>——一条 3 Q 演示会话,实算 <span data-b="K0(demo.curTot)"></span> → <span data-b="K0(demo.tgtTot)"></span><small>Q1 问答(会话首调)· Q2 任务(skill + 工具一次 loop)· Q3 闲聊;产品级 SP 已常驻</small></h2>
+
+  <div class="kpi">
+    <div class="card"><div class="big w"><span data-b="K0(demo.curTot)"></span><span class="arr">→</span><span class="goodc" data-b="K0(demo.tgtTot)"></span><span class="pct">−<span data-b="pct0(demo.saveRate)"></span></span></div><div class="lbl"><b>实算</b> · 5 次调用合计 · 账单与 TTFT 跟它走</div></div>
+    <div class="card"><div class="big r"><span data-b="K0(demo.curWaste)"></span><span class="arr">→</span><span class="goodc">0</span></div><div class="lbl"><b>白算</b> · 本该命中却重算 · 全部来自 Q 首调</div></div>
+    <div class="card"><div class="big"><span data-b="K0(demo.curNew)"></span><span class="arr">=</span><span data-b="K0(demo.tgtNew)"></span></div><div class="lbl"><b>必算</b> · 两边相同 · 不记成绩</div></div>
+    <div class="card"><div class="big g"><span class="badc" data-b="pct0(demo.curHit)"></span><span class="arr">→</span><span data-b="pct0(demo.tgtHit)"></span></div><div class="lbl"><b>命中率</b> · 已缓存 / 输入 · 到不了 95%:会话首调与 webSearch 是必算</div></div>
+  </div>
+
+  <div class="row grow">
+    <div class="col" style="flex:.92; font-size:1.06em;">
+      <div class="card">
+        <h3>问题只有一个:动态在 SP 里每 Q 重写,后面全断</h3>
+        <p>缓存要求前缀逐 token 一致。当前 <b>SP·动态</b>排在 Tools、会话级、历史和本会话之前,每 Q 改一次 → 断点钉在 SP·固定末尾,其后 <b><span data-b="K1(tools+sess+hist)"></span> + 本会话已写内容</b>全部重算;会话越深,白算越多。实测 Q 首调 miss 里 <b>白算占 90–99%</b>。</p>
+      </div>
+      <div class="card grow" style="display:flex; flex-direction:column;">
+        <h3>三步改造 <span class="sub">每步写清它让哪一段红转绿</span></h3>
+        <div class="steps">
+          <div class="step">
+            <div class="no">① 动态下沉 <span class="tag real">已上线</span></div>
+            <h4>动态从 SP 迁到 U 前半,随 U 追加</h4>
+            <div class="acc">账目:前缀不再被改写,<b>历史 1–10 轮 + 本会话已写</b>转命中 → Q2 起每 Q 省 <span data-b="K1(hist)"></span> + 沉淀</div>
+          </div>
+          <div class="step">
+            <div class="no">② Tools 前移 <span class="tag est">需 chat template</span></div>
+            <h4>全量 12 个工具预置,排到 SP 之前</h4>
+            <div class="acc">账目:<b>Tools <span data-b="K1(tools)"></span></b> 转命中,每个 Q 首调都省;Q1 首调 −<span data-b="pct0(demo.q1FirstRate)"></span></div>
+          </div>
+          <div class="step">
+            <div class="no">③ 动态只追加、不回写 <span class="tag est">规范</span></div>
+            <h4>skill 引用 / memory / knowledge 跟着 U 走,不进 SP</h4>
+            <div class="acc">账目:会话级 <span data-b="K1(sess)"></span> 从每 Q 白算变成会话首调算一次;<b>前缀永不断</b></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card" style="flex:1.6; display:flex; flex-direction:column; min-height:0;">
+      <div class="row" style="align-items:center;">
+        <h3 style="margin-bottom:0;">逐调用账目 <span class="sub">同一尺度 0–<span data-b="K0(demo.scale)"></span>;每次调用当前 / 目标同位对照</span></h3>
+        <div class="mlegend"><span class="l-gh"><i></i>已缓存</span><span class="l-wr"><i></i>白算</span><span class="l-first"><i></i>会话首调载入</span><span class="l-nw"><i></i>必算</span></div>
+      </div>
+      <div class="mchart" id="demo"></div>
+    </div>
+  </div>
+
+  <div class="banner">读法:<b>红是本该免费却重算的,目标态归零</b>;蓝是本轮真新增(动态、query、工具结果、回复),两边一样、不算成绩;斜纹蓝是会话级与历史,每会话只在首调付一次。Q1 首调只省 Tools(−<span data-b="pct0(demo.q1FirstRate)"></span>,TTFT 视角);<b>差别全在 Q2、Q3 的首调</b>——当前把前两轮沉淀连带重算,目标只付当轮 <span data-b="K1(qFirstNew)"></span>。</div>
+  <div class="footer">
+    <div><b>数据</b>:P1 基线逐调用推演;当前侧的白算构成与三条实测会话一致(断点恒在 SP·固定末,Q 首调 miss 14–34K)。loop 那一调两边同为必算;目标侧输入比当前略长(动态留在历史里),是只追加的代价,已计入命中率分母。</div>
+    <div>KV Cache 方案(汇报版)· v3 · P2 当前 vs 目标</div>
+  </div>
+</section>
+
+<!-- ============ P3 轮数收益 ============ -->
+<section class="slide">
+  <h2><span class="num">03</span>轮数 × 业务:<span class="hl">当前每深一轮多烧 <span data-b="K1(alpha)"></span>,目标 Q2 起钉在 <span data-b="K1(Tn)"></span></span>——全业务加权实算 −<span data-b="pct0(agg.saveRate)"></span><small>三类业务 47 / 28 / 25、轮数分布 51 / 20 / 9 / 5.5 / 3.5 / 11 加权;每会话计入全部调用</small></h2>
+
+  <div class="row grow">
+    <div class="card" style="flex:1.2; display:flex; flex-direction:column; min-height:0;">
+      <div class="formula">
+        每轮节省 <span class="big2">ΔS(1) = <span data-b="K1(tools)"></span></span>(Tools)&nbsp;&nbsp;
+        <span class="big2">ΔS(n≥2) = <span data-b="K1(fixed2)"></span> + <span data-b="K1(alpha)"></span>×(n−1)</span><br>
+        <b><span data-b="K1(fixed2)"></span> 固定项</b> = Tools <span data-b="K1(tools)"></span> + 会话级 <span data-b="K1(sess)"></span> + 历史 <span data-b="K1(hist)"></span>(Q1 两边都必算,Q2 起当前白算、目标命中);
+        <span class="r"><span data-b="K1(alpha)"></span> 沉淀速率</span> = 47%×<span data-b="K1(sed.qa)"></span>(问答:webSearch + 回复)+ 28%×<span data-b="K1(sed.chat)"></span>(闲聊)+ 25%×<span data-b="K1(sed.task)"></span>(任务:skill + 工具 + 回复);
+        当前第 n 轮实算 <b>C(n) = <span data-b="K1(C2base)"></span> + <span data-b="K1(alpha)"></span>(n−1)</b>,目标 <b>T(n≥2) = <span data-b="K1(Tn)"></span></b> 恒定;节省率 η(n) = ΔS / C。
+      </div>
+      <div class="chartbox" id="curve"></div>
+    </div>
+
+    <div class="col" style="flex:1; font-size:1.18em;">
+      <div class="card">
+        <h3>按会话长度分桶 <span class="sub">每会话实算 = 各轮 C / T 之和</span></h3>
+        <table id="bucket"></table>
+      </div>
+      <div class="card grow" style="display:flex; flex-direction:column;">
+        <h3>三句话</h3>
+        <div class="three">
+          <div class="it"><div class="k" data-b="pct0(agg.longShareSave)"></div><p><b>钱在长对话。</b>6Q+ 会话只占 <span data-b="pct0(rounds[5][1])"></span> 的会话数,却占当前算力 <span data-b="pct0(agg.longShareCost)"></span>、贡献 <span data-b="pct0(agg.longShareSave)"></span> 的节省;节省率随轮数单调上升,8 轮 −<span data-b="pct0(eta(8))"></span>。</p></div>
+          <div class="it"><div class="k">−<span data-b="pct0(eta(1))"></span></div><p><b>1Q 会话也有固定项。</b>单轮只省 Tools <span data-b="K1(tools)"></span>;若只看首调 prefill,是 −<span data-b="pct0(demo.q1FirstRate)"></span>,对应 TTFT 体感。</p></div>
+          <div class="it"><div class="k">白算 = 0</div><p><b>验收看白算不看命中率。</b>命中率受必算拖累(会话首调、webSearch),上限约 <span data-b="pct0(agg.tgtHitCap)"></span>;白算归零是排布改造唯一可控的指标,loop 白算 &gt; 1 块即报警。</p></div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="footer">
+    <div><b>加权总公式</b>:整体实算降幅 = Σ(会话数 × 每会话节省)/ Σ(会话数 × 当前每会话实算),先汇总量再除,不平均各组降幅。<b>假设</b>:会话内缓存不被逐出;任务每 Q 一次 skill load 为偏保守;上线后由日报(引擎 cached_tokens + 应用边界埋点)替换推演。</div>
+    <div>KV Cache 方案(汇报版)· v3 · P3 轮数收益</div>
+  </div>
+</section>
+
+</div>
+
+<div class="dots" id="dots"></div>
+<div class="nav">
+  <button id="prev">‹</button>
+  <span class="pg" id="pg">1 / 3</span>
+  <button id="next">›</button>
+</div>
+
+<script>
+/* =====================================================================
+   数据基线(单一事实来源)—— 全稿数字只能从这里取。单位 K token。
+   两边模块长度一致;差别只在排布。落档:16 / 17 / 18。
+   ===================================================================== */
+var BASELINE = {
+  tools: 5.9, sp: 28.9, sess: 1.5, hist: 7,
+  dyn: 3, u: 0.03, call: 0.2, web: 10, skill: 5, tool: 2.5, ans: 0.25,
+  mix: { qa: 0.47, chat: 0.28, task: 0.25 },
+  rounds: [[1, .51], [2, .20], [3, .09], [4, .055], [5, .035], [8, .11]]
+};
+
+(function (B) {
+  function r(x, d) { var p = Math.pow(10, d); return Math.round(x * p) / p; }
+  B.K1 = function (x) { return r(x, 1) + 'K'; };
+  B.K0 = function (x) { return Math.round(x) + 'K'; };
+  B.pct = function (x) { return Math.round(x * 100) + '%'; };
+  B.pct0 = function (x) { return Math.round(x * 100) + '%'; };
+
+  /* 每 Q 的必算构成 */
+  B.qFirstNew = B.dyn + B.u + B.ans;                 // Q≥2 首调新增:动态 + query + 上轮回复
+  B.loopNew = { qa: B.call + B.web, task: B.call + B.skill + B.tool, chat: 0 };
+  B.qNew = { qa: B.qFirstNew + B.loopNew.qa, task: B.qFirstNew + B.loopNew.task, chat: B.qFirstNew };
+  /* 当前方案下每 Q 沉淀进 UAT 的量(下一 Q 会被整段白算);动态在 SP 内不沉淀 */
+  B.sed = { qa: B.u + B.loopNew.qa + B.ans, task: B.u + B.loopNew.task + B.ans, chat: B.u + B.ans };
+  var m = B.mix;
+  B.alpha = m.qa * B.sed.qa + m.chat * B.sed.chat + m.task * B.sed.task;
+  B.Tn = m.qa * B.qNew.qa + m.chat * B.qNew.chat + m.task * B.qNew.task;   // 目标 n≥2 每轮实算
+  B.loopW = m.qa * B.loopNew.qa + m.task * B.loopNew.task;                  // 加权 loop 新增
+  B.T1 = B.sess + B.hist + B.dyn + B.u + B.loopW;                          // 目标 Q1(会话首调 + loop)
+  B.fixed2 = B.tools + B.sess + B.hist;
+  B.C2base = B.fixed2 + B.Tn;
+  B.C = function (n) { return n === 1 ? B.tools + B.T1 : B.C2base + B.alpha * (n - 1); };
+  B.T = function (n) { return n === 1 ? B.T1 : B.Tn; };
+  B.dS = function (n) { return B.C(n) - B.T(n); };
+  B.eta = function (n) { return B.dS(n) / B.C(n); };
+
+  /* 会话长度分桶 */
+  var agg = { rows: [], curTot: 0, tgtTot: 0 };
+  B.rounds.forEach(function (rw) {
+    var n = rw[0], share = rw[1], c = 0, t = 0;
+    for (var k = 1; k <= n; k++) { c += B.C(k); t += B.T(k); }
+    agg.rows.push({ n: n, share: share, cur: c, tgt: t, save: (c - t) / c });
+    agg.curTot += share * c; agg.tgtTot += share * t;
+  });
+  agg.saveRate = (agg.curTot - agg.tgtTot) / agg.curTot;
+  var last = agg.rows[agg.rows.length - 1];
+  agg.longShareCost = last.share * last.cur / agg.curTot;
+  agg.longShareSave = last.share * (last.cur - last.tgt) / (agg.curTot - agg.tgtTot);
+  agg.rows.forEach(function (x) { x.shareCost = x.share * x.cur / agg.curTot; x.shareSave = x.share * (x.cur - x.tgt) / (agg.curTot - agg.tgtTot); });
+  /* 目标命中率上限:8 轮会话,输入 ≈ 产品级 + 会话级 + 历史 + 累积 UAT */
+  (function () {
+    var inSum = 0, missSum = 0, uat = 0;
+    for (var k = 1; k <= 8; k++) {
+      var first = B.tools + B.sp + B.sess + B.hist + uat + B.dyn + B.u;
+      inSum += first; missSum += (k === 1 ? B.sess + B.hist : B.ans) + B.dyn + B.u;
+      uat += B.dyn + B.u + B.ans;
+      var lp = B.loopW; if (lp > 0) { inSum += first + lp; missSum += lp; uat += lp; }
+    }
+    agg.tgtHitCap = 1 - missSum / inSum;
+  })();
+  B.agg = agg;
+
+  /* P2 演示会话:Q1 问答(会话首调)→ Q2 任务 → Q3 闲聊 */
+  var demo = { calls: [] }, curIn, tgtIn, own = 0;
+  function push(o) { demo.calls.push(o); }
+  // Q1 调① 会话首调
+  curIn = B.sp + B.dyn + B.sess + B.tools + B.hist + B.u;
+  tgtIn = B.tools + B.sp + B.sess + B.hist + B.dyn + B.u;
+  push({ t1: 'Q1 问答 · 调①', t2: '会话首调', cur: { input: curIn, hit: B.sp, waste: B.tools, first: B.sess + B.hist, nw: B.dyn + B.u },
+         tgt: { input: tgtIn, hit: B.tools + B.sp, waste: 0, first: B.sess + B.hist, nw: B.dyn + B.u }, note: '只省 Tools' });
+  // Q1 调② loop:webSearch
+  var n1 = B.call + B.web;
+  push({ t1: 'Q1 问答 · 调②', t2: 'loop · webSearch', cur: { input: curIn + n1, hit: curIn, waste: 0, first: 0, nw: n1 },
+         tgt: { input: tgtIn + n1, hit: tgtIn, waste: 0, first: 0, nw: n1 }, note: '两边相同' });
+  curIn += n1; tgtIn += n1;
+  own = B.u + n1 + B.ans;                     // 当前侧沉淀(动态不在 UAT)
+  var ownT = B.dyn + B.u + n1 + B.ans;        // 目标侧沉淀(动态留在 U 里)
+  // Q2 调① 任务首调
+  var f2 = B.ans + B.dyn + B.u;
+  curIn = B.sp + B.dyn + B.sess + B.tools + B.hist + own + B.u;
+  tgtIn = B.tools + B.sp + B.sess + B.hist + ownT + B.dyn + B.u;
+  push({ t1: 'Q2 任务 · 调①', t2: 'Q 首调', cur: { input: curIn, hit: B.sp, waste: B.tools + B.sess + B.hist + own, first: 0, nw: f2 },
+         tgt: { input: tgtIn, hit: tgtIn - f2, waste: 0, first: 0, nw: f2 }, note: 'Tools + 会话级 + 历史 + Q1 沉淀' });
+  // Q2 调② loop:skill + 工具
+  var n2 = B.call + B.skill + B.tool;
+  push({ t1: 'Q2 任务 · 调②', t2: 'loop · skill ' + B.skill + ' + 工具 ' + B.tool, cur: { input: curIn + n2, hit: curIn, waste: 0, first: 0, nw: n2 },
+         tgt: { input: tgtIn + n2, hit: tgtIn, waste: 0, first: 0, nw: n2 }, note: '两边相同' });
+  curIn += n2; tgtIn += n2;
+  own += B.u + n2 + B.ans; ownT += B.dyn + B.u + n2 + B.ans;
+  // Q3 调① 闲聊首调
+  curIn = B.sp + B.dyn + B.sess + B.tools + B.hist + own + B.u;
+  tgtIn = B.tools + B.sp + B.sess + B.hist + ownT + B.dyn + B.u;
+  push({ t1: 'Q3 闲聊 · 调①', t2: 'Q 首调 · 无工具', cur: { input: curIn, hit: B.sp, waste: B.tools + B.sess + B.hist + own, first: 0, nw: f2 },
+         tgt: { input: tgtIn, hit: tgtIn - f2, waste: 0, first: 0, nw: f2 }, note: '沉淀最多,省最多' });
+
+  demo.curTot = 0; demo.tgtTot = 0; demo.curWaste = 0; demo.curNew = 0; demo.tgtNew = 0; demo.curIn = 0; demo.tgtIn = 0; demo.curHitSum = 0; demo.tgtHitSum = 0;
+  demo.calls.forEach(function (c) {
+    c.cur.real = c.cur.waste + c.cur.first + c.cur.nw; c.tgt.real = c.tgt.waste + c.tgt.first + c.tgt.nw;
+    demo.curTot += c.cur.real; demo.tgtTot += c.tgt.real; demo.curWaste += c.cur.waste;
+    demo.curNew += c.cur.first + c.cur.nw; demo.tgtNew += c.tgt.first + c.tgt.nw;
+    demo.curIn += c.cur.input; demo.tgtIn += c.tgt.input; demo.curHitSum += c.cur.hit; demo.tgtHitSum += c.tgt.hit;
+  });
+  demo.saveRate = (demo.curTot - demo.tgtTot) / demo.curTot;
+  demo.curHit = demo.curHitSum / demo.curIn; demo.tgtHit = demo.tgtHitSum / demo.tgtIn;
+  demo.q1FirstRate = B.tools / demo.calls[0].cur.real;
+  demo.scale = Math.ceil(Math.max(demo.calls[demo.calls.length - 1].tgt.input, demo.calls[demo.calls.length - 1].cur.input) / 5) * 5;
+  B.demo = demo;
+})(BASELINE);
+
+/* ===================== 渲染 ===================== */
+(function () {
+  var B = BASELINE;
+  function fmt1(x) { return (Math.round(x * 10) / 10).toString(); }
+  function pct(x) { return Math.round(x * 100) + '%'; }
+
+  /* data-b 绑定 */
+  document.querySelectorAll('[data-b]').forEach(function (el) {
+    var expr = el.getAttribute('data-b');
+    try {
+      var v = new Function('B', 'with (B) { return (' + expr + '); }')(B);
+      if (typeof v === 'number') v = fmt1(v) + 'K';
+      el.textContent = v;
+    } catch (e) { el.textContent = '?'; console.error(expr, e); }
+  });
+
+  /* P1 轮数分布条 */
+  (function () {
+    var el = document.getElementById('dist'), h = '';
+    var cols = ['#3b5bdb', '#4f6fe0', '#6483e5', '#7a98ea', '#90acef', '#7c3aed'];
+    B.rounds.forEach(function (rw, i) {
+      var lbl = (i === B.rounds.length - 1 ? '6Q+' : rw[0] + 'Q') + ' ' + Math.round(rw[1] * 100) + '%';
+      h += '<span style="flex:' + rw[1] + '; background:' + cols[i] + ';">' + (rw[1] >= .08 ? lbl : '') + '</span>';
+    });
+    el.innerHTML = h;
+  })();
+
+  /* P2 逐调用柱 */
+  (function () {
+    var el = document.getElementById('demo'), d = B.demo, scale = d.scale, h = '';
+    function segs(s) {
+      var out = '';
+      function seg(cls, v, label) {
+        if (v <= 0) return;
+        var w = v / scale * 100;
+        out += '<div class="hseg ' + cls + '" style="width:' + w + '%;">' + (w >= 7 ? '<span>' + label + '</span>' : '') + '</div>';
+      }
+      seg('gh', s.hit, '已缓存 ' + fmt1(s.hit));
+      seg('wr', s.waste, '白算 ' + fmt1(s.waste));
+      seg('first', s.first, '首调 ' + fmt1(s.first));
+      seg('nw', s.nw, '必算 ' + fmt1(s.nw));
+      return out;
+    }
+    function hv(s, isCur) {
+      return '<div class="hv">实算 <b class="' + (isCur ? 'badc' : 'goodc') + '">' + fmt1(s.real) + 'K</b> · ' + pct(s.hit / s.input) + '</div>';
+    }
+    d.calls.forEach(function (c) {
+      var save = c.cur.real - c.tgt.real;
+      h += '<div class="mgrp"><div class="glb"><span class="t1">' + c.t1 + '</span><span class="t2">' + c.t2 + '</span></div><div class="bars2">';
+      h += '<div class="hb"><div class="who cur">当前</div><div class="htrack">' + segs(c.cur) + '</div>' + hv(c.cur, true) + '</div>';
+      h += '<div class="hb"><div class="who tgt">目标</div><div class="htrack">' + segs(c.tgt) + '</div>' + hv(c.tgt, false) + '</div>';
+      h += '</div><div class="mbadge"><span class="pv">' + (save > 0.05 ? '−' + fmt1(save) + 'K' : '±0') + '</span><span class="pl">' + c.note + '</span></div></div>';
+    });
+    /* 合计:实算构成 */
+    var tScale = Math.ceil(d.curTot / 10) * 10;
+    function tot(waste, first, nw, real, isCur) {
+      var s = '';
+      function seg(cls, v, label) { if (v <= 0) return; var w = v / tScale * 100; s += '<div class="hseg ' + cls + '" style="width:' + w + '%;">' + (w >= 6 ? '<span>' + label + '</span>' : '') + '</div>'; }
+      seg('wr', waste, '白算 ' + fmt1(waste)); seg('first', first, '首调 ' + fmt1(first)); seg('nw', nw, '必算 ' + fmt1(nw));
+      return '<div class="htrack">' + s + '</div><div class="hv">实算 <b class="' + (isCur ? 'badc' : 'goodc') + '">' + fmt1(real) + 'K</b></div>';
+    }
+    var first = d.calls[0].cur.first;
+    h += '<div class="mgrp total"><div class="glb"><span class="t1">会话合计</span><span class="t2">只看实算 · 尺度 0–' + tScale + 'K</span></div><div class="bars2">';
+    h += '<div class="hb"><div class="who cur">当前</div>' + tot(d.curWaste, first, d.curNew - first, d.curTot, true) + '</div>';
+    h += '<div class="hb"><div class="who tgt">目标</div>' + tot(0, first, d.tgtNew - first, d.tgtTot, false) + '</div>';
+    h += '</div><div class="mbadge"><span class="pv">−' + fmt1(d.curTot - d.tgtTot) + 'K</span><span class="pl">−' + pct(d.saveRate) + ' · 省额 = 白算</span></div></div>';
+    el.innerHTML = h;
+  })();
+
+  /* P3 分桶表 */
+  (function () {
+    var el = document.getElementById('bucket'), a = B.agg, h = '';
+    h += '<tr><th>会话长度</th><th class="n">占比</th><th class="n">当前 / 会话</th><th class="n">目标 / 会话</th><th class="n">降幅</th><th class="n">占当前算力</th><th class="n">占总节省</th></tr>';
+    a.rows.forEach(function (x, i) {
+      var name = (i === a.rows.length - 1 ? '6Q+' : x.n + 'Q');
+      h += '<tr><td class="nm">' + name + '</td><td class="n">' + pct(x.share) + '</td><td class="n">' + fmt1(x.cur) + 'K</td><td class="n">' + fmt1(x.tgt) + 'K</td><td class="n goodc">−' + pct(x.save) + '</td><td class="n">' + pct(x.shareCost) + '</td><td class="n">' + pct(x.shareSave) + '</td></tr>';
+    });
+    h += '<tr class="sum"><td>加权合计</td><td class="n">100%</td><td class="n">均 ' + fmt1(a.curTot) + 'K</td><td class="n">均 ' + fmt1(a.tgtTot) + 'K</td><td class="n goodc">−' + pct(a.saveRate) + '</td><td class="n">100%</td><td class="n">100%</td></tr>';
+    el.innerHTML = h;
+  })();
+
+  /* P3 曲线(SVG) */
+  (function () {
+    var el = document.getElementById('curve');
+    var W = 720, H = 470, L = 52, R = 18, T = 30, Bm = 40;
+    var N = 8, maxY = Math.ceil(B.C(N) / 10) * 10;
+    function x(n) { return L + (n - 1) / (N - 1) * (W - L - R); }
+    function y(v) { return T + (1 - v / maxY) * (H - T - Bm); }
+    var s = '<svg viewBox="0 0 ' + W + ' ' + H + '" preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg">';
+    // grid
+    for (var g = 0; g <= maxY; g += 10) {
+      s += '<line x1="' + L + '" y1="' + y(g) + '" x2="' + (W - R) + '" y2="' + y(g) + '" stroke="#e3e8f0" stroke-width="1"/>';
+      s += '<text x="' + (L - 6) + '" y="' + (y(g) + 4) + '" font-size="11" text-anchor="end" fill="#5c6b84" font-family="monospace">' + g + 'K</text>';
+    }
+    // area
+    var area = 'M' + x(1) + ',' + y(B.C(1));
+    for (var n = 2; n <= N; n++) area += ' L' + x(n) + ',' + y(B.C(n));
+    for (n = N; n >= 1; n--) area += ' L' + x(n) + ',' + y(B.T(n));
+    area += ' Z';
+    s += '<path d="' + area + '" fill="rgba(5,150,105,.12)"/>';
+    // lines
+    var pc = '', pt = '';
+    for (n = 1; n <= N; n++) { pc += (n === 1 ? 'M' : ' L') + x(n) + ',' + y(B.C(n)); pt += (n === 1 ? 'M' : ' L') + x(n) + ',' + y(B.T(n)); }
+    s += '<path d="' + pc + '" fill="none" stroke="#dc2626" stroke-width="3"/>';
+    s += '<path d="' + pt + '" fill="none" stroke="#059669" stroke-width="3"/>';
+    // points + labels
+    for (n = 1; n <= N; n++) {
+      s += '<circle cx="' + x(n) + '" cy="' + y(B.C(n)) + '" r="4" fill="#dc2626"/>';
+      s += '<circle cx="' + x(n) + '" cy="' + y(B.T(n)) + '" r="4" fill="#059669"/>';
+      s += '<text x="' + x(n) + '" y="' + (y(B.C(n)) - 9) + '" font-size="11" text-anchor="middle" fill="#dc2626" font-family="monospace" font-weight="700">' + fmt1(B.C(n)) + '</text>';
+      s += '<text x="' + x(n) + '" y="' + (y(B.T(n)) + 18) + '" font-size="11" text-anchor="middle" fill="#059669" font-family="monospace" font-weight="700">' + fmt1(B.T(n)) + '</text>';
+      var mid = (y(B.C(n)) + y(B.T(n))) / 2;
+      if (n >= 2) s += '<text x="' + x(n) + '" y="' + (mid + 4) + '" font-size="12" text-anchor="middle" fill="#047857" font-weight="800">−' + pct(B.eta(n)) + '</text>';
+      s += '<text x="' + x(n) + '" y="' + (H - Bm + 18) + '" font-size="12" text-anchor="middle" fill="#1f2a3d" font-weight="700">Q' + n + '</text>';
+    }
+    // Q1 note
+    s += '<text x="' + (x(1) - 6) + '" y="' + (y(B.T(2)) + 34) + '" font-size="11" fill="#047857" font-weight="700">Q1 −' + pct(B.eta(1)) + '(只看首调 −' + pct(B.demo.q1FirstRate) + ')</text>';
+    // legend
+    s += '<rect x="' + (L + 8) + '" y="' + (T - 18) + '" width="14" height="4" fill="#dc2626"/><text x="' + (L + 26) + '" y="' + (T - 13) + '" font-size="11" fill="#1f2a3d">当前每轮实算 C(n)</text>';
+    s += '<rect x="' + (L + 168) + '" y="' + (T - 18) + '" width="14" height="4" fill="#059669"/><text x="' + (L + 186) + '" y="' + (T - 13) + '" font-size="11" fill="#1f2a3d">目标每轮实算 T(n)</text>';
+    s += '<rect x="' + (L + 328) + '" y="' + (T - 21) + '" width="14" height="10" fill="rgba(5,150,105,.25)"/><text x="' + (L + 346) + '" y="' + (T - 13) + '" font-size="11" fill="#1f2a3d">阴影 = 每轮节省 ΔS(n),累计即会话节省</text>';
+    s += '<text x="' + (W - R) + '" y="' + (H - 6) + '" font-size="10" text-anchor="end" fill="#5c6b84">横轴:第 n 轮(Q 序号)· 纵轴:该轮全部调用的实算,业务加权</text>';
+    s += '</svg>';
+    el.innerHTML = s;
+  })();
+
+  /* 翻页 */
+  var slides = [].slice.call(document.querySelectorAll('.slide'));
+  var dotsBox = document.getElementById('dots');
+  var curIdx = 0;
+  slides.forEach(function (_, i) {
+    var d = document.createElement('i');
+    if (i === 0) d.classList.add('on');
+    d.onclick = function () { go(i); };
+    dotsBox.appendChild(d);
+  });
+  var dots = [].slice.call(dotsBox.children);
+  function go(i) {
+    curIdx = (i + slides.length) % slides.length;
+    slides.forEach(function (s, j) { s.classList.toggle('active', j === curIdx); });
+    dots.forEach(function (d, j) { d.classList.toggle('on', j === curIdx); });
+    document.getElementById('pg').textContent = (curIdx + 1) + ' / ' + slides.length;
+    if (location.hash !== '#p=' + (curIdx + 1)) history.replaceState(null, '', '#p=' + (curIdx + 1));
+  }
+  document.getElementById('prev').onclick = function () { go(curIdx - 1); };
+  document.getElementById('next').onclick = function () { go(curIdx + 1); };
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'ArrowRight' || e.key === ' ' || e.key === 'PageDown') go(curIdx + 1);
+    if (e.key === 'ArrowLeft' || e.key === 'PageUp') go(curIdx - 1);
+  });
+  var mh = /p=(\d+)/.exec(location.hash); if (mh) go(parseInt(mh[1], 10) - 1);
+  window.__go = go;
+})();
+</script>
+</body>
+</html>
