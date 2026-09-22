@@ -1,0 +1,825 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>KV Cache 方案(汇报版)· v3.5 · 3 页 · 同内容只换排布</title>
+<style>
+  :root {
+    --bg: #e9edf4;
+    --slide-bg: linear-gradient(135deg, #ffffff 0%, #f7f9fd 60%, #eef3fb 100%);
+    --card: #f7f9fc;
+    --card-border: #dfe5ee;
+    --text: #1f2a3d;
+    --muted: #5c6b84;
+    --accent: #2563eb;
+    --good: #059669;
+    --warn: #d97706;
+    --bad: #dc2626;
+    --lvl-prod: #3b5bdb;
+    --lvl-sess: #7c3aed;
+    --lvl-q:    #d97706;
+    --lvl-loop: #0891b2;
+    --mono: "SF Mono", "JetBrains Mono", Consolas, "Courier New", monospace;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { background: var(--bg); height: 100%; }
+  body {
+    font-family: "PingFang SC", "Microsoft YaHei", "Noto Sans SC", -apple-system, sans-serif;
+    color: var(--text);
+    display: flex; justify-content: center; align-items: center;
+    padding: 16px 12px; min-height: 100vh;
+  }
+  .deck { position: relative; width: min(96vw, calc((100vh - 32px) * 1.7778)); }
+  .slide {
+    width: 100%;
+    aspect-ratio: 16 / 9;
+    background: var(--slide-bg);
+    border: 1px solid var(--card-border);
+    border-radius: 18px;
+    box-shadow: 0 18px 50px rgba(31,42,61,.16);
+    padding: 1.8% 2.6%;
+    display: none; flex-direction: column;
+    overflow: hidden; position: relative;
+    font-size: clamp(9.5px, min(1.08vw, 1.92vh), 22px);
+  }
+  .slide.active { display: flex; }
+  .slide::before {
+    content: ""; position: absolute; inset: 0 0 auto 0; height: 5px;
+    background: linear-gradient(90deg, var(--accent), var(--good));
+    border-radius: 18px 18px 0 0;
+  }
+  h2 { font-size: 1.18em; font-weight: 700; margin-bottom: .35em; line-height: 1.3; }
+  h2 .hl { color: var(--accent); }
+  h2 .num { color: var(--muted); font-weight: 600; margin-right: .4em; font-size: .78em; }
+  h2 small { font-size: .66em; font-weight: 500; color: var(--muted); margin-left: .55em; }
+  .card {
+    background: var(--card); border: 1px solid var(--card-border);
+    border-radius: 12px; padding: .5em .75em; overflow: hidden;
+  }
+  .card h3 { font-size: .86em; margin-bottom: .25em; color: var(--text); display: flex; align-items: center; gap: .8em; flex-wrap: wrap; }
+  .card h3 .sub { font-size: .78em; font-weight: 500; color: var(--muted); }
+  .card p, .card li { color: var(--muted); font-size: .7em; line-height: 1.42; }
+  .card li { margin-left: 1.15em; margin-bottom: .18em; }
+  .card b { color: var(--text); font-weight: 700; }
+  .mono { font-family: var(--mono); }
+  .goodc { color: var(--good) !important; }
+  .badc { color: var(--bad) !important; }
+  .warnc { color: var(--warn) !important; }
+  .accc { color: var(--accent) !important; }
+  .row { display: flex; gap: .6em; min-height: 0; }
+  .col { display: flex; flex-direction: column; gap: .45em; min-width: 0; min-height: 0; }
+  .grow { flex: 1; min-height: 0; min-width: 0; }
+  .tag { display: inline-block; border-radius: 999px; padding: .02em .45em; font-size: .8em; font-weight: 700; white-space: nowrap; }
+  .tag.real { background: rgba(5,150,105,.12); color: var(--good); }
+  .tag.mid  { background: rgba(37,99,235,.12); color: var(--accent); }
+  .tag.est  { background: rgba(217,119,6,.12); color: var(--warn); }
+  .tag.bad  { background: rgba(220,38,38,.12); color: var(--bad); }
+
+  table { border-collapse: collapse; width: 100%; font-size: .68em; }
+  th, td { text-align: left; padding: .22em .4em; border-bottom: 1px solid var(--card-border); vertical-align: top; }
+  th { color: var(--accent); font-weight: 700; white-space: nowrap; }
+  td { color: var(--muted); line-height: 1.32; }
+  td b { color: var(--text); }
+  td.n, th.n { text-align: right; font-family: var(--mono); white-space: nowrap; }
+  td.nm { font-weight: 700; color: var(--text); white-space: nowrap; }
+  tr.sum td { background: rgba(37,99,235,.06); font-weight: 700; color: var(--text); }
+
+  .banner {
+    border-radius: 10px; padding: .38em .85em; font-size: .72em;
+    background: linear-gradient(90deg, rgba(37,99,235,.08), rgba(5,150,105,.07));
+    border: 1px solid rgba(37,99,235,.28); color: var(--text); line-height: 1.42; margin-top: .4em;
+  }
+  .banner b { color: var(--accent); }
+  .footer {
+    margin-top: auto; padding-top: .28em; display: flex;
+    justify-content: space-between; color: var(--muted); font-size: .56em; gap: 1em; line-height: 1.35;
+  }
+  .footer b { color: var(--text); }
+  .footer > div:last-child { margin-right: 10em; white-space: nowrap; }
+
+  /* ===== P1:三列基线表 ===== */
+  table.bl3 { height: 100%; font-size: .92em; }
+  table.bl3 th, table.bl3 td { vertical-align: middle; padding: .3em .55em; }
+  table.bl3 td.id { font-family: var(--mono); font-weight: 800; color: var(--accent); width: 2.6em; text-align: center; }
+  table.bl3 td.nm { white-space: normal; }
+  table.bl3 td.nm small { display: block; color: var(--muted); font-weight: 500; font-size: .84em; margin-top: .06em; line-height: 1.3; }
+  table.bl3 tr.mv td { background: rgba(37,99,235,.07); }
+  table.bl3 tr.mv td.nm { color: var(--accent); }
+  table.bl3 tr.gone td { background: rgba(220,38,38,.05); }
+  table.bl3 tr.gone td.nm { color: var(--bad); }
+  .lv { display: inline-block; border-radius: 4px; padding: 0 .38em; font-weight: 700; color: #fff; font-size: .72em; white-space: nowrap; vertical-align: .08em; margin-left: .35em; }
+  .lv.prod { background: var(--lvl-prod); } .lv.sess { background: var(--lvl-sess); } .lv.dyn { background: var(--bad); }
+  .lv.q { background: var(--lvl-q); } .lv.loop { background: var(--lvl-loop); }
+  .hbars { display: flex; flex-direction: column; justify-content: space-evenly; min-height: 0; margin-top: .15em; }
+  .hbars .hb { display: flex; align-items: center; gap: .45em; font-size: .62em; line-height: 1.4; }
+  .hbars .lb { width: 4.2em; flex: none; font-weight: 700; color: var(--text); text-align: right; white-space: nowrap; }
+  .hbars .tr { flex: 1; height: .95em; background: rgba(37,99,235,.06); border-radius: 3px; overflow: hidden; min-width: 0; }
+  .hbars .tr i { display: block; height: 100%; border-radius: 3px; min-width: 2px; }
+  .hbars .v { width: 4.4em; flex: none; font-family: var(--mono); color: var(--muted); text-align: right; white-space: nowrap; }
+  .dist { display: flex; height: 1.15em; border-radius: 6px; overflow: hidden; border: 1px solid var(--card-border); margin-top: .25em; }
+  .dist span { display: flex; align-items: center; justify-content: center; font-size: .52em; color: #fff; font-weight: 700; white-space: nowrap; overflow: hidden; }
+
+  /* ===== P2:结构条(继承 v1.4 P2)===== */
+  .legend { display: flex; gap: .9em; font-size: .62em; color: var(--muted); align-items: center; flex-wrap: wrap; margin-left: auto; }
+  .legend i { display: inline-block; width: 1.15em; height: .78em; border-radius: 3px; margin-right: .28em; vertical-align: -.08em; border: 1px solid rgba(0,0,0,.08); }
+  .legend i.prod { background: var(--lvl-prod); }
+  .legend i.sess { background: var(--lvl-sess); }
+  .legend i.q    { background: var(--lvl-q); }
+  .legend i.loop { background: var(--lvl-loop); }
+  .legend i.dyn  { background: var(--bad); }
+  .legend i.dynt { background: #fff; border: 2px solid var(--bad); }
+  .legend i.hit  { background: rgba(5,150,105,.72); }
+  .legend i.rw   { background: rgba(220,38,38,.9); }
+  .legend i.drag { background: rgba(245,158,11,.85); }
+  .legend i.new  { background: rgba(37,99,235,.85); }
+  .legend i.first{ background: repeating-linear-gradient(135deg, rgba(37,99,235,.85) 0 3px, rgba(37,99,235,.35) 3px 6px); }
+  .bars { display: flex; flex-direction: column; gap: .3em; }
+  .barrow { display: flex; align-items: stretch; gap: .5em; }
+  .barrow .who { width: 4.4em; flex: none; display: flex; flex-direction: column; justify-content: center; font-size: .78em; font-weight: 800; line-height: 1.2; }
+  .barrow .who small { font-size: .7em; font-weight: 500; color: var(--muted); }
+  .bar { flex: 1; display: flex; gap: 2px; min-width: 0; }
+  .bars .seg { display: flex; flex-direction: column; min-width: 0; }
+  .bars .seg .top {
+    height: 1.5em; border-radius: 5px; display: flex; align-items: center; justify-content: center; gap: .22em;
+    color: #fff; font-size: .6em; font-weight: 700; white-space: nowrap; overflow: hidden; padding: 0 .35em;
+    text-shadow: 0 1px 2px rgba(0,0,0,.25);
+  }
+  .bars .seg .sub { font-size: .52em; color: var(--muted); line-height: 1.22; margin-top: .12em; text-align: center; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+  .bars .seg .sub b { color: var(--text); }
+  .bars .seg .sub .r { color: var(--bad); font-weight: 700; }
+  .bars .seg .sub .o { color: var(--warn); font-weight: 700; }
+  .bars .seg .sub .g { color: var(--good); font-weight: 700; }
+  .bars .seg.prod .top { background: var(--lvl-prod); }
+  .bars .seg.sess .top { background: var(--lvl-sess); }
+  .bars .seg.dyn  .top { background: var(--bad); }
+  .bars .seg.dynt .top { background: #fff; box-shadow: inset 0 0 0 2px var(--bad); color: var(--bad); text-shadow: none; }
+  .bars .seg.uat .top {
+    background: linear-gradient(90deg, var(--lvl-q) 0%, var(--lvl-loop) 100%);
+    clip-path: polygon(0 0, 95% 0, 100% 50%, 95% 100%, 0 100%);
+    border-radius: 5px 0 0 5px; justify-content: flex-start; padding-left: .6em;
+  }
+
+  /* ===== P2:逐次调用矩阵(继承 v1.4 P2)===== */
+  .mats { display: flex; flex-direction: column; gap: .2em; min-height: 0; flex: 1; justify-content: space-evenly; overflow: hidden; }
+  .mat .h { padding-bottom: .05em; }
+  .mat { display: grid; gap: 2px 2px; align-items: stretch; }
+  .mat .g { font-size: .56em; color: var(--muted); text-align: center; font-weight: 700; padding: .05em 0; border-bottom: 1px solid var(--card-border); letter-spacing: .02em; }
+  .mat .g.sp, .mat .g.tl { color: var(--lvl-prod); }
+  .mat .g.ua { color: var(--lvl-q); }
+  .mat .g.ms { text-align: left; padding-left: .5em; color: var(--text); }
+  .mat .g.blank { border-bottom: none; }
+  .mat .h { font-size: .54em; color: var(--muted); text-align: center; line-height: 1.15; padding: .03em 0 .06em; white-space: nowrap; overflow: hidden; }
+  .mat .h b { color: var(--text); }
+  .mat .h .q { color: var(--bad); }
+  .mat .rl { font-size: .58em; font-weight: 700; color: var(--text); display: flex; flex-direction: column; justify-content: center; white-space: nowrap; line-height: 1.15; overflow: hidden; }
+  .mat .rl small { color: var(--muted); font-weight: 500; font-size: .9em; }
+  .mat .c { height: 1.0em; border-radius: 3px; min-width: 0; }
+  .mat .c.hit  { background: rgba(5,150,105,.72); }
+  .mat .c.rw   { background: rgba(220,38,38,.9); }
+  .mat .c.drag { background: rgba(245,158,11,.85); }
+  .mat .c.new  { background: rgba(37,99,235,.85); }
+  .mat .c.first{ background: repeating-linear-gradient(135deg, rgba(37,99,235,.85) 0 3px, rgba(37,99,235,.35) 3px 6px); }
+  .mat .c.na   { background: transparent; }
+  .mat .uatstart { position: relative; }
+  .mat .uatstart::before { content: ""; position: absolute; left: -2px; top: -1px; bottom: -1px; width: 2px; background: var(--lvl-q); opacity: .55; }
+  .mat .miss { font-size: .54em; color: var(--muted); display: flex; align-items: center; padding-left: .5em; line-height: 1.2; overflow: hidden; white-space: nowrap; }
+  .mat .miss small { font-size: .9em; }
+  .mat .miss b { color: var(--text); }
+  .mat .miss .r { color: var(--bad); font-weight: 700; }
+  .mat .miss .o { color: var(--warn); font-weight: 700; }
+  .mat .miss .bl { color: var(--accent); font-weight: 700; }
+  .mat .miss .ok { color: var(--good); font-weight: 700; }
+  .mat .miss .re { background: rgba(5,150,105,.10); border: 1px solid rgba(5,150,105,.4); color: var(--good); padding: 0 .3em; border-radius: 3px; font-weight: 800; white-space: nowrap; margin-left: .35em; font-family: var(--mono); }
+  .mat .miss .re.bad { background: rgba(220,38,38,.08); border-color: rgba(220,38,38,.4); color: var(--bad); }
+
+  /* ===== P2:四把尺子(继承 v1.4 P2)===== */
+  .rulers { display: grid; grid-template-columns: repeat(4, 1fr); gap: .45em; margin-top: .35em; }
+  .steps { font-size: .58em; color: var(--muted); line-height: 1.35; margin-top: .25em; padding-top: .2em; border-top: 1px dashed var(--card-border); }
+  .steps b { color: var(--text); }
+  .ruler { background: var(--card); border: 1px solid var(--card-border); border-radius: 10px; padding: .3em .55em; min-width: 0; }
+  .ruler .t { font-size: .6em; font-weight: 700; color: var(--text); white-space: nowrap; overflow: hidden; }
+  .ruler .t small { font-weight: 500; color: var(--muted); margin-left: .3em; }
+  .ruler .v { display: flex; align-items: baseline; gap: .3em; font-family: var(--mono); font-size: .78em; font-weight: 800; white-space: nowrap; margin: .05em 0; }
+  .ruler .v .cur { color: var(--bad); }
+  .ruler .v .arr { color: var(--muted); font-weight: 500; font-size: .8em; }
+  .ruler .v .tgt { color: var(--good); }
+  .ruler .v .pct { font-size: .7em; color: var(--good); background: rgba(5,150,105,.1); border-radius: 4px; padding: 0 .3em; }
+  .ruler .n { font-size: .48em; color: var(--muted); line-height: 1.28; }
+  .ruler .n b { color: var(--text); }
+  .ruler.how { background: linear-gradient(90deg, rgba(37,99,235,.08), rgba(5,150,105,.07)); border-color: rgba(37,99,235,.28); }
+  .ruler.how .t { color: var(--accent); }
+  .ruler.how .n { font-size: .54em; color: var(--text); }
+  .eqbar { display: flex; gap: .5em; margin-top: .35em; }
+  .eqbar .eq { flex: 1; font-family: var(--mono); font-weight: 800; font-size: .7em; background: #fff; border: 1px solid var(--card-border); border-radius: 8px; padding: .28em .55em; display: flex; flex-direction: column; gap: .08em; min-width: 0; }
+  .eqbar .eq small { font-family: "PingFang SC", "Microsoft YaHei", sans-serif; font-weight: 500; color: var(--muted); font-size: .78em; line-height: 1.35; }
+  .eqbar .g { color: var(--good); } .eqbar .r { color: var(--bad); } .eqbar .b { color: var(--accent); } .eqbar .w { color: var(--warn); } .eqbar .o { color: var(--warn); }
+
+  /* ===== P3 公式 + 曲线 ===== */
+  .formula { background: #fff; border: 1px solid var(--card-border); border-radius: 8px; padding: .38em .6em; font-size: .68em; line-height: 1.55; color: var(--muted); }
+  .formula .big2 { font-family: var(--mono); font-size: 1.18em; font-weight: 800; color: var(--accent); }
+  .formula .r { color: var(--bad); font-weight: 700; } .formula .o { color: var(--warn); font-weight: 700; } .formula .g { color: var(--good); font-weight: 700; }
+  .formula b { color: var(--text); }
+  .chartbox { flex: 1; min-height: 0; display: flex; }
+  .chartbox svg { width: 100%; height: 100%; display: block; }
+  .three { display: flex; flex-direction: column; gap: .25em; flex: 1; justify-content: space-evenly; }
+  .three .it { flex: 1; display: flex; gap: .6em; align-items: center; background: #fff; border: 1px solid var(--card-border); border-radius: 8px; padding: .3em .65em; }
+  .three .it .k { font-family: var(--mono); font-weight: 800; color: var(--accent); font-size: .92em; white-space: nowrap; min-width: 5.6em; line-height: 1.25; }
+  .three .it .k.mini { min-width: 13em; display: flex; flex-direction: column; gap: .3em; font-family: "PingFang SC", "Microsoft YaHei", sans-serif; }
+  .three .it .mb { display: flex; align-items: center; gap: .35em; font-size: .78em; font-weight: 700; color: var(--text); }
+  .three .it .mb span { width: 3.3em; flex: none; text-align: right; }
+  .three .it .mb i { display: block; height: 1.05em; border-radius: 3px; flex: none; }
+  .three .it .mb b { font-family: var(--mono); color: var(--accent); font-size: 1.2em; }
+  .three .it .k small { display: block; font-size: .62em; color: var(--muted); font-weight: 600; white-space: normal; }
+  .three .it p { font-size: .68em; line-height: 1.42; }
+
+  .nav { position: absolute; bottom: 3.2%; right: 3%; display: flex; gap: .5em; align-items: center; z-index: 10; font-size: clamp(9.5px, min(1.08vw, 1.92vh), 22px); }
+  .nav button { background: #fff; border: 1px solid var(--card-border); color: var(--text); border-radius: 8px; width: 2.1em; height: 2.1em; cursor: pointer; font-size: 1em; }
+  .nav button:hover { border-color: var(--accent); color: var(--accent); }
+  .nav .pg { color: var(--muted); font-family: var(--mono); font-size: .88em; padding: 0 .35em; }
+  .dots { position: absolute; bottom: 3.9%; left: 3%; display: flex; gap: .42em; z-index: 10; }
+  .dots i { width: .52em; height: .52em; border-radius: 50%; background: #c9d2e0; cursor: pointer; }
+  .dots i.on { background: var(--accent); }
+</style>
+</head>
+<body>
+<div class="deck">
+
+<!-- ============ P1 数据基线 ============ -->
+<section class="slide active">
+  <h2><span class="num">01</span>数据基线:<span class="hl">优化前 / 优化后各模块长度</span>——全稿所有数字只从这一页取<small>K token · DS-V4 tokenizer · 两边同一份内容、只换排布,同名模块长度相同;序号 = 送给模型的物理顺序</small></h2>
+
+  <div class="row grow">
+    <div class="card" style="flex:1.1; display:flex; flex-direction:column; min-height:0;">
+      <h3>优化前(当前方案)<span class="sub">物理序 System Prompt → Tools → UAT;动态写在 System Prompt 内</span></h3>
+      <div style="flex:1; min-height:0;">
+      <table class="bl3">
+        <tr><th>序号</th><th>模块</th><th class="n">长度</th></tr>
+        <tr><td class="id">1</td><td class="nm">System Prompt·固定<span class="lv prod">产品级</span><small>14 个 `##` 段:角色 / 原则 / 规范 / 安全 / TOOLS.md</small></td><td class="n" data-b="sp"></td></tr>
+        <tr class="mv"><td class="id">2</td><td class="nm">System Prompt·动态<span class="lv dyn">每 Q 重写</span><small>available skills 3 + 动态记忆 / 知识经验 0.3 + 前台应用 / 小艺状态 / 位置 0.05,写在 System Prompt 中部</small></td><td class="n" data-b="dyn"></td></tr>
+        <tr><td class="id">3</td><td class="nm">会话级上下文<span class="lv sess">会话级</span><small>user.md 0.5 + device_info 0.5 + memory.md(长期记忆)0.5,System Prompt 尾</small></td><td class="n" data-b="sess"></td></tr>
+        <tr class="mv"><td class="id">4</td><td class="nm">Tools<span class="lv prod">产品级</span><small>12 个工具 schema,chat template 拼在 System Prompt 之后</small></td><td class="n" data-b="tools"></td></tr>
+        <tr><td class="id">5</td><td class="nm">对话历史 1–10 轮<span class="lv sess">会话级</span><small>上一会话的对话历史,会话创建时载入、大概率不在缓存,UAT 头</small></td><td class="n" data-b="hist"></td></tr>
+        <tr><td class="id">6</td><td class="nm">UAT-U · query<span class="lv q">query 级</span><small>用户原话,不含注入</small></td><td class="n" data-b="u"></td></tr>
+        <tr><td class="id">7</td><td class="nm">UAT-A · tool call<span class="lv loop">loop 级</span><small>函数名 + 参数</small></td><td class="n" data-b="call"></td></tr>
+        <tr><td class="id">8</td><td class="nm">UAT-T · 工具结果<span class="lv loop">loop 级</span><small>webSearch / SkillLoad / 正常工具</small></td><td class="n"><span data-b="web"></span> / <span data-b="skill"></span> / <span data-b="tool"></span></td></tr>
+        <tr><td class="id">9</td><td class="nm">UAT-A · 最终 answer<span class="lv q">query 级</span><small>该 Q 最后一次回复,不再调工具</small></td><td class="n" data-b="ans"></td></tr>
+      </table>
+      </div>
+    </div>
+
+    <div class="card" style="flex:1.1; display:flex; flex-direction:column; min-height:0;">
+      <h3>优化后(目标方案)<span class="sub">物理序 Tools → System Prompt → UAT;动态随 U 追加</span></h3>
+      <div style="flex:1; min-height:0;">
+      <table class="bl3">
+        <tr><th>序号</th><th>模块</th><th class="n">长度</th></tr>
+        <tr class="mv"><td class="id">1</td><td class="nm">Tools<span class="lv prod">产品级</span><small>全量 12 个预置,排到最前</small></td><td class="n" data-b="tools"></td></tr>
+        <tr><td class="id">2</td><td class="nm">System Prompt·固定<span class="lv prod">产品级</span><small>同 14 段;不塞高频 skill</small></td><td class="n" data-b="sp"></td></tr>
+        <tr><td class="id">3</td><td class="nm">会话级上下文<span class="lv sess">会话级</span><small>user.md 0.5 + device_info 0.5 + memory.md(长期记忆)0.5,System Prompt 尾;会话内不变</small></td><td class="n" data-b="sess"></td></tr>
+        <tr><td class="id">4</td><td class="nm">对话历史 1–10 轮<span class="lv sess">会话级</span><small>上一会话的对话历史,会话创建时载入、大概率不在缓存 → 会话首调必算一次、预热可覆盖;UAT 头</small></td><td class="n" data-b="hist"></td></tr>
+        <tr class="mv"><td class="id">5</td><td class="nm">UAT-U · 动态<span class="lv dynt" style="background:#fff; border:1.5px solid var(--bad); color:var(--bad);">随 U 追加</span><small>available skills 3 + 动态记忆 / 知识经验 0.3 + 前台应用 / 小艺状态 / 位置 0.05,当轮 user 消息前半,不回写 System Prompt</small></td><td class="n" data-b="dyn"></td></tr>
+        <tr><td class="id">6</td><td class="nm">UAT-U · query<span class="lv q">query 级</span><small>当轮 user 消息后半,永远在动态之后</small></td><td class="n" data-b="u"></td></tr>
+        <tr><td class="id">7</td><td class="nm">UAT-A · tool call<span class="lv loop">loop 级</span><small>函数名 + 参数</small></td><td class="n" data-b="call"></td></tr>
+        <tr><td class="id">8</td><td class="nm">UAT-T · 工具结果<span class="lv loop">loop 级</span><small>webSearch / SkillLoad / 正常工具</small></td><td class="n"><span data-b="web"></span> / <span data-b="skill"></span> / <span data-b="tool"></span></td></tr>
+        <tr><td class="id">9</td><td class="nm">UAT-A · 最终 answer<span class="lv q">query 级</span><small>该 Q 最后一次回复,不再调工具</small></td><td class="n" data-b="ans"></td></tr>
+      </table>
+      </div>
+    </div>
+
+    <div class="col" style="flex:.8; font-size:1.08em;">
+      <div class="card">
+        <h3>业务占比 <span class="sub">按 Q 统计 · 决定每轮必算与沉淀</span></h3>
+        <table>
+          <tr><th>类型</th><th class="n">占比</th><th>调用链</th></tr>
+          <tr><td class="nm">问答</td><td class="n" data-b="pct(mix.qa)"></td><td>调① tool call → 调② webSearch <span data-b="web"></span> + answer</td></tr>
+          <tr><td class="nm">任务</td><td class="n" data-b="pct(mix.task)"></td><td>调① tool call → 调② SkillLoad <span data-b="skill"></span> + 工具 <span data-b="tool"></span> + answer</td></tr>
+          <tr><td class="nm">闲聊</td><td class="n" data-b="pct(mix.chat)"></td><td>调① answer</td></tr>
+        </table>
+      </div>
+      <div class="card grow" style="display:flex; flex-direction:column;">
+        <h3>会话轮数分布 <span class="sub">一轮 = 一个 Q · 分母 = 会话数</span></h3>
+        <div class="hbars grow" id="roundsBars"></div>
+        <p style="margin-top:.25em; font-size:.58em;">P3 计算时 ≥11 轮统一按 12 轮计(128K 窗口填满的下限口径)。色系与 P3 分桶一致:蓝 1–5Q · 紫 6–10Q · 深紫 11Q+。</p>
+      </div>
+    </div>
+  </div>
+  <div class="footer">
+    <div><b>口径</b>:Tools / System Prompt·固定 / 会话级 / 动态 / query / answer 取现网实测(token_breakdown.csv、prompt段内容变化对照);T 三类与 tool call 为工作值,两边同长。会话内缓存不被逐出、无裁剪;命中按块上报的粒度误差(DS 4K)不计。<b>本页落档 16(优化后)/ 17(优化前)。</b></div>
+    <div>KV Cache 方案(汇报版)· v3.5 · P1 数据基线</div>
+  </div>
+</section>
+
+<!-- ============ P2 上下文组成对比(v1.4 P2 骨架) ============ -->
+<section class="slide">
+  <h2><span class="num">02</span>上下文组成对比:<span class="hl">当前 vs 目标</span>——Tools 移到最前成为产品级,动态下沉 U 随轮追加<small>数字全部来自 P1;会话级只在会话首调算一次,其后只算当轮新增</small></h2>
+
+  <div class="card" style="margin-bottom:.35em; padding-bottom:.35em;">
+    <h3>结构对照:按"变化频率"分四级 <span class="sub">物理序:当前 System Prompt → Tools → UAT,目标 <b>Tools → System Prompt → UAT</b>;两行同名块一一对应;<b>段宽为示意、不按比例</b></span>
+      <span class="legend">
+        <span><i class="prod"></i>产品级 · 版本发布才变</span>
+        <span><i class="sess"></i>会话级 · 会话创建时定、会话内不变</span>
+        <span><i class="q"></i>query 级 · 每 Q 追加</span>
+        <span><i class="loop"></i>loop 级 · 每次迭代追加</span>
+        <span><i class="dyn"></i>动态 · 当前每 Q 原位重写(病灶)</span>
+        <span><i class="dynt"></i>动态 · 目标下沉 UAT 随 U 追加</span>
+      </span>
+    </h3>
+    <div class="bars">
+      <div class="barrow">
+        <div class="who">当前<small>P1 左表 · 1–9</small></div>
+        <div class="bar">
+          <div class="seg prod" style="flex:28.9 1 7em;"><div class="top">① System Prompt·固定 <span data-b="sp"></span></div><div class="sub">14 段 · 产品级 · <span class="g">命中</span>(断点实测停在这里)</div></div>
+          <div class="seg dyn" style="flex:3 0 7.3em;"><div class="top">② System Prompt·动态⚡ <span data-b="dyn"></span></div><div class="sub">skills / memory · <span class="r">每 Q 原位重写</span></div></div>
+          <div class="seg sess" style="flex:1.5 0 5.2em;"><div class="top">③ 会话级 <span data-b="sess"></span></div><div class="sub">user.md + device · <span class="o">被连带</span></div></div>
+          <div class="seg prod" style="flex:5.9 0 5.4em;"><div class="top">④ Tools <span data-b="tools"></span></div><div class="sub">12 个工具 · 产品级 · <span class="o">被连带</span></div></div>
+          <div class="seg sess" style="flex:7 0 6em;"><div class="top">⑤ 历史 10 轮 <span data-b="hist"></span></div><div class="sub">完整 U/A/T · <span class="o">被连带</span></div></div>
+          <div class="seg uat" style="flex:12 1 0;"><div class="top">⑥–⑨ 本会话 U/A/T(随轮增长)</div><div class="sub">U 仅 query · <span class="o">每 Q 首调被连带重算</span></div></div>
+        </div>
+      </div>
+      <div class="barrow">
+        <div class="who">目标<small>P1 右表 · 1–9</small></div>
+        <div class="bar">
+          <div class="seg prod" style="flex:5.9 0 5.4em;"><div class="top">① Tools <span data-b="tools"></span></div><div class="sub">全量 12 个预置 · 产品级 · <span class="g">全网命中</span></div></div>
+          <div class="seg prod" style="flex:28.9 1 7em;"><div class="top">② System Prompt·固定 <span data-b="sp"></span></div><div class="sub">14 段不变、不塞 skill · <span class="g">命中</span></div></div>
+          <div class="seg sess" style="flex:1.5 0 5.2em;"><div class="top">③ 会话级 <span data-b="sess"></span></div><div class="sub">会话内冻结 · <span class="g">首调后命中</span></div></div>
+          <div class="seg sess" style="flex:7 0 6em;"><div class="top">④ 历史 10 轮 <span data-b="hist"></span></div><div class="sub">完整 U/A/T · <span class="g">首调后命中</span></div></div>
+          <div class="seg dynt" style="flex:3 0 6.4em;"><div class="top">⑤ U·动态 <span data-b="dyn"></span></div><div class="sub">↑动态⚡ 下沉 · <span class="g">随 U 追加、不回写</span></div></div>
+          <div class="seg uat" style="flex:12 1 0;"><div class="top">⑥–⑨ 本会话 U/A/T(随轮增长)</div><div class="sub"><span class="g">纯追加,前缀永不改写</span></div></div>
+        </div>
+      </div>
+    </div>
+    <div class="steps"><b>目标行怎么来的 · 三步改造</b>:前缀区只放会话创建时已确定的内容——<b>①</b> 动态从 System Prompt 下沉到当轮 U 前半、随 U 追加(<b>已上线</b>);<b>②</b> 全量 12 个工具预置并移到最前(需 chat template);<b>③</b> 动态只追加、不回写 System Prompt。不新增预置段。</div>
+  </div>
+
+  <div class="card" style="flex:1; min-height:0; display:flex; flex-direction:column;">
+    <h3>同一会话逐次调用展开:行 = 一次模型调用,列 = 上下文位置,格色 = 该段在该次调用的缓存命运
+      <span class="sub">示例:Q1 问答 · Q2 任务 · Q3 / Q4 闲聊,共 6 次调用;右列 = 该次调用的账目(白算 + 必算 = 实算)</span>
+      <span class="legend">
+        <span><i class="hit"></i>已缓存</span>
+        <span><i class="rw"></i>原位重写</span>
+        <span><i class="drag"></i>被连带 · 白算</span>
+        <span><i class="new"></i>新增 · 必算</span>
+        <span><i class="first"></i>会话首调载入(每会话一次 · 必算)</span>
+      </span>
+    </h3>
+    <div class="mats">
+      <div class="mat" id="mat-cur"></div>
+      <div class="mat" id="mat-tgt"></div>
+    </div>
+  </div>
+
+  <div class="eqbar">
+    <div class="eq"><span>① 输入 = <span class="g">已缓存</span> + <span class="r">白算</span> + <span class="b">必算</span></span><small>已缓存 = 前缀逐 token 一致的深度;<span class="r">白算</span> = 本该命中却因前缀改写而重算;<span class="b">必算</span> = 本次必要新增</small></div>
+    <div class="eq"><span>② <span class="w">实算</span> = <span class="r">白算</span> + <span class="b">必算</span> = 输入 − 已缓存</span><small>prefill 真正计算的量;账单与 TTFT 都跟它走,成本收益看它降多少</small></div>
+    <div class="eq"><span>③ cache 命中率 = <span class="g">已缓存</span> ÷ 输入</span><small>业界通用健康度;分母含必算,必算越多命中率越低,不如实算直观,按业界口径一并报</small></div>
+  </div>
+
+  <div class="rulers">
+    <div class="ruler">
+      <div class="t">目标 ① <span class="badc">白算 → 0</span><small>验收线 · 排布改造唯一可控项</small></div>
+      <div class="v"><span class="cur" data-b="K1(demo.curWaste)"></span><span class="arr">→</span><span class="tgt">0</span><span class="pct">上表 6 次调用合计</span></div>
+      <div class="n">Tools / 会话级 / 历史 / 本会话已写被前缀改写连带;实测 Q≥2 首调 miss 21–34K、白算占 90–99%。目标态 loop 白算 &gt; 1 块即报警</div>
+    </div>
+    <div class="ruler">
+      <div class="t">目标 ② <span class="accc">必算尽可能小</span><small>整轮必要新增 · 本次不记成绩 · 下一步</small></div>
+      <div class="v"><span class="cur" style="color:var(--accent);" data-b="K1(demo.tgtNew)"></span><span class="arr">=</span><span class="tgt" style="color:var(--accent);" data-b="K1(demo.tgtNew)"></span><span class="pct" style="color:var(--accent); background:rgba(37,99,235,.1);">两边相同</span></div>
+      <div class="n">两个口径:<b>首调必算 <span data-b="K1(qFirstNew)"></span></b>(动态 + query + 上轮 answer,决定 TTFT);<b>整轮实算 <span data-b="K1(Tn)"></span></b>(再加 loop 的 tool call + 工具结果,决定成本)。下一步靠 available skills 升会话级、工具结果精简去压</div>
+    </div>
+    <div class="ruler">
+      <div class="t">成本看 <span class="warnc">实算</span> 降幅<small>白算归零后实算 = 必算</small></div>
+      <div class="v"><span class="cur" data-b="K0(demo.curTot)"></span><span class="arr">→</span><span class="tgt" data-b="K0(demo.tgtTot)"></span><span class="pct">−<span data-b="pct0(demo.saveRate)"></span></span></div>
+      <div class="n">省额 <span data-b="K1(demo.curTot-demo.tgtTot)"></span> = 白算;Q≥2 首调 <span data-b="K1(demo.qFirstCurLo)"></span>–<span data-b="K1(demo.qFirstCurHi)"></span> → <span data-b="K1(qFirstNew)"></span>,与轮数脱钩;loop 两次两边相同</div>
+    </div>
+    <div class="ruler">
+      <div class="t">cache 命中率<small>已缓存 ÷ 输入 · 全业务加权</small></div>
+      <div class="v"><span class="cur" data-b="pct0(agg.curHitAll)"></span><span class="arr">→</span><span class="tgt" data-b="pct0(agg.tgtHitAll)"></span><span class="pct">业务 × 轮数分布加权</span></div>
+      <div class="n">当前断点恒在 System Prompt·固定末(实测 21 次调用加权 65.5%)。目标受必算拖累——会话首调 <span data-b="K1(sess+hist)"></span>、webSearch <span data-b="K1(web)"></span> 都在分母:长会话单轮到 <b>95% 左右</b>,1Q 只 <span data-b="pct0(hit(1,'tgt'))"></span>,而一半会话只有 1 轮</div>
+    </div>
+  </div>
+  <div class="footer">
+    <div><b>数字全部来自 P1 基线</b>,逐调用推演;当前侧与三条实测会话一致(断点恒在 System Prompt·固定末、Q 首调 miss 14–34K、loop 白算 ≤1 块)。目标侧输入比当前略长(动态留在历史里),是只追加的代价,已计入命中率分母。目标序 Tools → System Prompt 需 chat template 支持(见 06)。</div>
+    <div>KV Cache 方案(汇报版)· v3.5 · P2</div>
+  </div>
+</section>
+
+<!-- ============ P3 轮数收益 ============ -->
+<section class="slide">
+  <h2><span class="num">03</span>轮数 × 业务:<span class="hl">当前每深一轮多烧 <span data-b="K1(alpha)"></span>,目标 Q2 起钉在 <span data-b="K1(Tn)"></span></span>——全业务加权实算 −<span data-b="pct0(agg.saveRate)"></span>,cache 命中率 <span data-b="pct0(agg.curHitAll)"></span> → <span data-b="pct0(agg.tgtHitAll)"></span><small>业务 47 / 28 / 25 × 完整轮数分布加权,每会话计全部调用;≥11 轮按 12 轮计</small></h2>
+
+  <div class="row grow">
+    <div class="card" style="flex:1.2; display:flex; flex-direction:column; min-height:0;">
+      <div class="formula">
+        每轮节省 <span class="big2">ΔS(1) = <span data-b="K1(tools)"></span></span>(Tools)&nbsp;&nbsp;
+        <span class="big2">ΔS(n≥2) = <span data-b="K1(fixed2)"></span> + <span data-b="K1(alpha)"></span>×(n−1)</span><br>
+        <b><span data-b="K1(fixed2)"></span> 固定项</b> = Tools <span data-b="K1(tools)"></span> + 会话级 <span data-b="K1(sess)"></span> + 历史 <span data-b="K1(hist)"></span>(Q1 两边都必算,Q2 起当前白算、目标命中);
+        <span class="r"><span data-b="K1(alpha)"></span> 沉淀速率</span> = 47%×<span data-b="K1(sed.qa)"></span>(问答:webSearch + 回复)+ 28%×<span data-b="K1(sed.chat)"></span>(闲聊)+ 25%×<span data-b="K1(sed.task)"></span>(任务:skill + 工具 + 回复);
+        当前第 n 轮实算 <b>C(n) = <span data-b="K1(C2base)"></span> + <span data-b="K1(alpha)"></span>(n−1)</b>,目标 <b>T(n≥2) = <span data-b="K1(Tn)"></span></b> 恒定;节省率 η(n) = ΔS / C。<br>
+        <b>两个口径</b>:<span class="g">首调必算 <span data-b="K1(qFirstNew)"></span></span>(动态 + query + 上轮 answer,决定 TTFT)+ 加权 loop <span data-b="K1(loopW)"></span>(tool call + 工具结果)= <span class="g">整轮实算 T(n≥2) <span data-b="K1(Tn)"></span></span>(决定成本)。
+      </div>
+      <div class="chartbox" id="curve"></div>
+    </div>
+
+    <div class="col" style="flex:1; font-size:1.04em;">
+      <div class="card">
+        <h3>按会话长度分桶 <span class="sub">每会话实算 = 各轮 C / T 之和;6–10Q / 11Q+ 为组内加权均值,≥11 轮按 12 轮计</span></h3>
+        <table id="bucket"></table>
+      </div>
+      <div class="card">
+        <h3>首调 TTFT 预估 <span class="sub">首调实算 × ≈<span data-b="Math.round(msPerK)"></span> ms/K(参考实测 14K prefill ≈ 640 ms);loop 两边相同、不变</span></h3>
+        <table id="ttftTbl"></table>
+        <p style="margin-top:.2em; font-size:.58em;"><b>预热</b> = 会话创建时 prefill 会话级 + 历史,每轮开口前(ASR 阶段)再灌上轮 answer,实时只剩动态 + query ≈<span data-b="K1(dyn+u)"></span>,含预热自身损耗统一按 <span data-b="preheatMs"></span> ms 计。<b>收益 / 代价</b>(参考实测 14K 640 ms → 6K 预热 320 + 8K 实时 380 ms):感知 TTFT −40%;总算力 +10%,且需 TTL 保住预热到开口之间的缓存。只改 TTFT,不改账。</p>
+      </div>
+      <div class="card grow" style="display:flex; flex-direction:column;">
+        <h3>三句话</h3>
+        <div class="three">
+          <div class="it"><div class="k mini"><div class="mb"><span>会话数</span><i class="b1" style="background:var(--accent);"></i><b data-b="pct0(agg.longShare)"></b></div><div class="mb"><span>算力</span><i class="b2" style="background:var(--bad);"></i><b class="badc" data-b="pct0(agg.longShareCost)"></b></div></div><p><b>6Q+ 的长会话只占 <span data-b="pct0(agg.longShare)"></span> 的会话数,却吃掉 <span data-b="pct0(agg.longShareCost)"></span> 的算力</b>,贡献 <span data-b="pct0(agg.longShareSave)"></span> 的节省;越长省得越多,Q2 −<span data-b="pct0(eta(2))"></span> → Q12 −<span data-b="pct0(eta(12))"></span>。</p></div>
+          <div class="it"><div class="k" data-b="K1(qFirstNew)"><small>Q≥2 首调必算</small></div><p><b>会话级可提前算,首调时延与轮数脱钩。</b>Q≥2 首调钉在 <span data-b="K1(qFirstNew)"></span>(当前 <span data-b="K1(firstCur(2))"></span>–<span data-b="K1(firstCur(12))"></span> 随轮涨);加预热后所有轮次 TTFT ≈ <span data-b="preheatMs"></span> ms。</p></div>
+          <div class="it"><div class="k">白算 → 0<small>命中率 <span data-b="pct0(agg.curHitAll)"></span> → <span data-b="pct0(agg.tgtHitAll)"></span></small></div><p><b>白算归零是验收线,必算是下一步。</b>整轮必算 <span data-b="K1(Tn)"></span> 是剩下的全部成本;available skills <span data-b="K1(3)"></span> 若升为会话级,首调必算 → <span data-b="K1(qFirstNew-3)"></span>。命中率受必算拖累,长会话单轮到 95% 左右,加权 <span data-b="pct0(agg.tgtHitAll)"></span>。</p></div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="footer">
+    <div><b>加权总公式</b>:整体实算降幅 = Σ(会话数 × 每会话节省)/ Σ(会话数 × 当前每会话实算),先汇总量再除;命中率同法(已缓存与输入分别汇总再相除)。<b>≥11 轮按 12 轮计</b>:当前侧首调输入到第 12 轮已 ~124K、128K 窗口填满,再往后必然裁剪,取下限不外推。<b>前提</b>:会话内缓存不被逐出(实测 21 次调用里 2 次 loop 全 miss 属引擎侧逐出 / 路由,需会话粘性 + TTL 配合,单独报警)。<b>TTFT</b> 按参考实测线性折算,待 prefill 吞吐实测(E6)替换。上线后由日报(引擎 cached_tokens + 应用边界埋点)替换推演。</div>
+    <div>KV Cache 方案(汇报版)· v3.5 · P3 轮数收益</div>
+  </div>
+</section>
+
+</div>
+
+<div class="dots" id="dots"></div>
+<div class="nav">
+  <button id="prev">‹</button>
+  <span class="pg" id="pg">1 / 3</span>
+  <button id="next">›</button>
+</div>
+
+<script>
+/* =====================================================================
+   数据基线(单一事实来源)—— 全稿数字只能从这里取。单位 K token。
+   两边模块长度一致;差别只在排布。落档:16 / 17 / 18。
+   ===================================================================== */
+var BASELINE = {
+  tools: 5.9, sp: 28.9, sess: 1.5, hist: 4,
+  dyn: 3.5, u: 0.1, call: 0.2, web: 10, skill: 5, tool: 2.5, ans: 0.25,
+  mix: { qa: 0.47, chat: 0.28, task: 0.25 },
+  /* 会话轮数分布(原始值,合计 99.17%;差额按比例并入 1–5Q):[桶名, 占比 %, 计算轮数]。≥11 轮统一按 12 轮计:
+     当前侧首调输入到第 12 轮 ≈124K、128K 窗口填满,再往后必然裁剪,取下限不外推。 */
+  roundsRaw: [['1Q', 51, 1], ['2Q', 20, 2], ['3Q', 9, 3], ['4Q', 5.5, 4], ['5Q', 3.5, 5],
+              ['6Q', 2.17, 6], ['7Q', 1.52, 7], ['8Q', 1.11, 8], ['9Q', 0.84, 9], ['10Q', 0.64, 10],
+              ['11–20', 2.49, 12], ['21–30', 0.62, 12], ['31–40', 0.25, 12], ['41–50', 0.14, 12], ['51–100', 0.24, 12], ['100+', 0.15, 12]],
+  bucketGroups: [['1Q', ['1Q']], ['2Q', ['2Q']], ['3Q', ['3Q']], ['4Q', ['4Q']], ['5Q', ['5Q']],
+                 ['6–10Q', ['6Q', '7Q', '8Q', '9Q', '10Q']], ['11Q+', ['11–20', '21–30', '31–40', '41–50', '51–100', '100+']]],
+  msPerK: 640 / 14,   // 参考实测:14K prefill ≈ 640 ms → ≈46 ms/K;TTFT 折算用
+  preheatMs: 170,     // 预热后首调 TTFT:动态 + query ≈3.6K ≈165 ms,加预热自身损耗统一按 170 ms 计
+  demoSpec: [{ q: 'Q1', type: 'qa', name: '问答' }, { q: 'Q2', type: 'task', name: '任务' }, { q: 'Q3', type: 'chat', name: '闲聊' }, { q: 'Q4', type: 'chat', name: '闲聊' }]
+};
+
+(function (B) {
+  function r(x, d) { var p = Math.pow(10, d); return Math.round(x * p) / p; }
+  B.K1 = function (x) { return r(x, 1) + 'K'; };
+  B.K0 = function (x) { return Math.round(x) + 'K'; };
+  B.pct = function (x) { return Math.round(x * 100) + '%'; };
+  B.pct0 = function (x) { return Math.round(x * 100) + '%'; };
+  B.pct1 = function (x) { return r(x * 100, 1).toFixed(1) + '%'; };
+  B.sec = function (k) { var ms = k * B.msPerK; return ms < 1000 ? Math.round(ms / 10) * 10 + ' ms' : r(ms / 1000, 1).toFixed(1) + ' s'; };
+
+  /* 轮数分布归一:原始合计 99.17%,差额按比例并入 1–5Q */
+  var rawTot = 0, headTot = 0;
+  B.roundsRaw.forEach(function (x) { rawTot += x[1]; if (x[2] <= 5) headTot += x[1]; });
+  B.roundsDeficit = 100 - rawTot;
+  B.rounds = B.roundsRaw.map(function (x) {
+    var s = x[2] <= 5 ? x[1] * (1 + B.roundsDeficit / headTot) : x[1];
+    return { name: x[0], raw: x[1], share: s / 100, n: x[2] };
+  });
+
+  /* 每 Q 的必算构成 */
+  B.qFirstNew = B.dyn + B.u + B.ans;                 // Q≥2 首调新增:动态 + query + 上轮回复
+  B.loopNew = { qa: B.call + B.web, task: B.call + B.skill + B.tool, chat: 0 };
+  B.loopLabel = { qa: 'webSearch', task: 'skill + 工具', chat: '' };
+  B.qNew = { qa: B.qFirstNew + B.loopNew.qa, task: B.qFirstNew + B.loopNew.task, chat: B.qFirstNew };
+  /* 当前方案下每 Q 沉淀进 UAT 的量(下一 Q 会被整段白算);动态在 System Prompt 内不沉淀 */
+  B.sed = { qa: B.u + B.loopNew.qa + B.ans, task: B.u + B.loopNew.task + B.ans, chat: B.u + B.ans };
+  var m = B.mix;
+  B.alpha = m.qa * B.sed.qa + m.chat * B.sed.chat + m.task * B.sed.task;
+  B.Tn = m.qa * B.qNew.qa + m.chat * B.qNew.chat + m.task * B.qNew.task;   // 目标 n≥2 每轮实算
+  B.loopW = m.qa * B.loopNew.qa + m.task * B.loopNew.task;                  // 加权 loop 新增
+  B.T1 = B.sess + B.hist + B.dyn + B.u + B.loopW;                          // 目标 Q1(会话首调 + loop)
+  B.fixed2 = B.tools + B.sess + B.hist;
+  B.C2base = B.fixed2 + B.Tn;
+  B.C = function (n) { return n === 1 ? B.tools + B.T1 : B.C2base + B.alpha * (n - 1); };
+  B.T = function (n) { return n === 1 ? B.T1 : B.Tn; };
+  B.dS = function (n) { return B.C(n) - B.T(n); };
+  B.eta = function (n) { return B.dS(n) / B.C(n); };
+  /* 首调实算(不含 loop):TTFT 折算用 */
+  B.firstCur = function (n) { return n === 1 ? B.tools + B.sess + B.hist + B.dyn + B.u : B.fixed2 + B.alpha * (n - 1) + B.qFirstNew; };
+  B.firstTgt = function (n) { return n === 1 ? B.sess + B.hist + B.dyn + B.u : B.qFirstNew; };
+
+  /* 会话长度分桶(16 桶逐桶算,再按 bucketGroups 合并展示) */
+  var agg = { rows: [], curTot: 0, tgtTot: 0 };
+  B.rounds.forEach(function (rw) {
+    var n = rw.n, share = rw.share, c = 0, t = 0;
+    for (var k = 1; k <= n; k++) { c += B.C(k); t += B.T(k); }
+    agg.rows.push({ name: rw.name, n: n, share: share, cur: c, tgt: t, save: (c - t) / c });
+    agg.curTot += share * c; agg.tgtTot += share * t;
+  });
+  agg.saveRate = (agg.curTot - agg.tgtTot) / agg.curTot;
+  agg.rows.forEach(function (x) { x.shareCost = x.share * x.cur / agg.curTot; x.shareSave = x.share * (x.cur - x.tgt) / (agg.curTot - agg.tgtTot); });
+  function groupOf(names) {
+    var S = 0, c = 0, t = 0;
+    agg.rows.forEach(function (x) { if (names.indexOf(x.name) >= 0) { S += x.share; c += x.share * x.cur; t += x.share * x.tgt; } });
+    return { share: S, cur: c / S, tgt: t / S, save: (c - t) / c, shareCost: c / agg.curTot, shareSave: (c - t) / (agg.curTot - agg.tgtTot) };
+  }
+  agg.groups = B.bucketGroups.map(function (g) { var o = groupOf(g[1]); o.name = g[0]; o.multi = g[1].length > 1; return o; });
+  var longG = groupOf(agg.rows.filter(function (x) { return x.n >= 6; }).map(function (x) { return x.name; }));
+  agg.longShare = longG.share; agg.longShareCost = longG.shareCost; agg.longShareSave = longG.shareSave;
+  /* 每轮命中率(该轮全部调用,业务加权):输入与已缓存分别汇总再相除 */
+  B.hitIO = function (n, side) {
+    var own = B.alpha * (n - 1), ownT = (B.alpha + B.dyn) * (n - 1), inF, hitF;
+    if (side === 'cur') { inF = B.sp + B.dyn + B.sess + B.tools + B.hist + own + B.u; hitF = B.sp; }
+    else { inF = B.tools + B.sp + B.sess + B.hist + ownT + B.dyn + B.u; hitF = (n === 1) ? B.tools + B.sp : inF - (B.dyn + B.u + B.ans); }
+    var pLoop = B.mix.qa + B.mix.task;                      // 有 loop 的业务占比
+    return { IN: inF + pLoop * (inF + B.loopW), HIT: hitF + pLoop * inF };
+  };
+  B.hit = function (n, side) { var o = B.hitIO(n, side); return o.HIT / o.IN; };
+  (function () {
+    var s = { cur: { IN: 0, HIT: 0 }, tgt: { IN: 0, HIT: 0 } };
+    B.rounds.forEach(function (rw) {
+      for (var k = 1; k <= rw.n; k++) ['cur', 'tgt'].forEach(function (side) { var o = B.hitIO(k, side); s[side].IN += rw.share * o.IN; s[side].HIT += rw.share * o.HIT; });
+    });
+    agg.curHitAll = s.cur.HIT / s.cur.IN; agg.tgtHitAll = s.tgt.HIT / s.tgt.IN;
+  })();
+  B.agg = agg;
+
+  /* P2 演示会话:按 demoSpec 逐 Q 生成调用(首调 + 有工具则 1 次 loop) */
+  var demo = { calls: [] }, curIn = 0, tgtIn = 0, own = 0, ownT = 0;
+  B.demoSpec.forEach(function (sp, qi) {
+    var k = qi + 1, isFirst = (k === 1);
+    var nw = B.dyn + B.u + (isFirst ? 0 : B.ans);
+    curIn = B.sp + B.dyn + B.sess + B.tools + B.hist + own + B.u;
+    tgtIn = B.tools + B.sp + B.sess + B.hist + ownT + B.dyn + B.u;
+    demo.calls.push({
+      q: sp.q, type: sp.type, kind: isFirst ? 'sfirst' : 'qfirst',
+      t1: sp.q + ' 调①', t2: (isFirst ? '会话首调' : '首调') + ' · ' + sp.name,
+      cur: { input: curIn, hit: B.sp, waste: isFirst ? B.tools : B.tools + B.sess + B.hist + own, first: isFirst ? B.sess + B.hist : 0, nw: nw,
+             parts: isFirst ? { tools: B.tools } : { tools: B.tools, sess: B.sess, hist: B.hist, own: own } },
+      tgt: { input: tgtIn, hit: isFirst ? B.tools + B.sp : tgtIn - nw, waste: 0, first: isFirst ? B.sess + B.hist : 0, nw: nw }
+    });
+    var ln = B.loopNew[sp.type];
+    if (ln > 0) {
+      demo.calls.push({
+        q: sp.q, type: sp.type, kind: 'loop',
+        t1: sp.q + ' 调②', t2: 'loop · ' + B.loopLabel[sp.type],
+        cur: { input: curIn + ln, hit: curIn, waste: 0, first: 0, nw: ln },
+        tgt: { input: tgtIn + ln, hit: tgtIn, waste: 0, first: 0, nw: ln }
+      });
+      curIn += ln; tgtIn += ln;
+    }
+    own += B.u + ln + B.ans;           // 当前侧沉淀(动态不在 UAT)
+    ownT += B.dyn + B.u + ln + B.ans;  // 目标侧沉淀(动态留在 U 里)
+  });
+
+  demo.curTot = 0; demo.tgtTot = 0; demo.curWaste = 0; demo.curNew = 0; demo.tgtNew = 0; demo.curIn = 0; demo.tgtIn = 0; demo.curHitSum = 0; demo.tgtHitSum = 0;
+  demo.qFirstCurLo = Infinity; demo.qFirstCurHi = 0;
+  demo.calls.forEach(function (c) {
+    c.cur.real = c.cur.waste + c.cur.first + c.cur.nw; c.tgt.real = c.tgt.waste + c.tgt.first + c.tgt.nw;
+    demo.curTot += c.cur.real; demo.tgtTot += c.tgt.real; demo.curWaste += c.cur.waste;
+    demo.curNew += c.cur.first + c.cur.nw; demo.tgtNew += c.tgt.first + c.tgt.nw;
+    demo.curIn += c.cur.input; demo.tgtIn += c.tgt.input; demo.curHitSum += c.cur.hit; demo.tgtHitSum += c.tgt.hit;
+    if (c.kind === 'qfirst') { demo.qFirstCurLo = Math.min(demo.qFirstCurLo, c.cur.real); demo.qFirstCurHi = Math.max(demo.qFirstCurHi, c.cur.real); }
+  });
+  demo.saveRate = (demo.curTot - demo.tgtTot) / demo.curTot;
+  demo.curHit = demo.curHitSum / demo.curIn; demo.tgtHit = demo.tgtHitSum / demo.tgtIn;
+  demo.nQ = B.demoSpec.length; demo.nCalls = demo.calls.length;
+  B.demo = demo;
+})(BASELINE);
+
+/* ===================== 渲染 ===================== */
+(function () {
+  var B = BASELINE;
+  function fmt1(x) { return (Math.round(x * 10) / 10).toString(); }
+  function pct(x) { return Math.round(x * 100) + '%'; }
+
+  /* data-b 绑定 */
+  document.querySelectorAll('[data-b]').forEach(function (el) {
+    var expr = el.getAttribute('data-b');
+    try {
+      var v = new Function('B', 'with (B) { return (' + expr + '); }')(B);
+      if (typeof v === 'number') v = fmt1(v) + 'K';
+      el.textContent = v;
+    } catch (e) { el.textContent = '?'; console.error(expr, e); }
+  });
+
+  /* P1 轮数分布:单列横向柱状图(16 桶),条长线性、最小 2px,读数看右侧数字 */
+  (function () {
+    var el = document.getElementById('roundsBars'), R = B.rounds, mx = R[0].share, h = '';
+    function f(x) { return x.n <= 5 ? B.pct1(x.share) : x.raw.toFixed(2) + '%'; }
+    function col(x) { return x.n <= 5 ? '#3b5bdb' : (x.n <= 10 ? '#7c3aed' : '#5b21b6'); }
+    R.forEach(function (x) {
+      var w = Math.max(x.share / mx * 100, 0.6);
+      h += '<div class="hb"><span class="lb">' + x.name + '</span><span class="tr"><i style="width:' + w + '%; background:' + col(x) + ';"></i></span><span class="v">' + f(x) + '</span></div>';
+    });
+    el.innerHTML = h;
+  })();
+
+  /* P2 矩阵:前缀列 + 9 个 UAT 列;格色 H 已缓存 R 原位重写 D 被连带 N 新增 F 会话首调载入 . 尚不存在 */
+  (function () {
+    var cls = { H: 'hit', R: 'rw', D: 'drag', N: 'new', F: 'first', '.': 'na' };
+    var d = B.demo;
+    var uatCur = ['U1', 'A₁T₁', 'ans₁', 'U2', 'A₂T₂', 'ans₂', 'U3', 'ans₃', 'U4'];
+    var uatTgt = ['Δ+U1', 'A₁T₁', 'ans₁', 'Δ+U2', 'A₂T₂', 'ans₂', 'Δ+U3', 'ans₃', 'Δ+U4'];
+    var rowsCur = [
+      'H F N D F N . . . . . . . .',
+      'H H H H H H N . . . . . . .',
+      'H H R D D D D N N . . . . .',
+      'H H H H H H H H H N . . . .',
+      'H H R D D D D D D D N N . .',
+      'H H R D D D D D D D D D N N'
+    ];
+    var rowsTgt = [
+      'H H F F N . . . . . . . .',
+      'H H H H H N . . . . . . .',
+      'H H H H H H N N . . . . .',
+      'H H H H H H H H N . . . .',
+      'H H H H H H H H H N N . .',
+      'H H H H H H H H H H H N N'
+    ];
+    function acct(c, side) {
+      var s = side === 'cur' ? c.cur : c.tgt, out = '';
+      if (s.waste > 0) {
+        var p = s.parts || {};
+        var lab = p.own ? '固定项 ' + fmt1(p.tools + p.sess + p.hist) + ' + 本会话史 ' + fmt1(p.own) : 'Tools';
+        out += '<span class="o">白算 ' + fmt1(s.waste) + '</span><small style="color:var(--muted);">(' + lab + ')</small> + ';
+      } else if (side === 'tgt' && c.kind !== 'loop') {
+        out += '<span class="ok">白算 0</span> + ';
+      }
+      var nwLab = c.kind === 'loop' ? 'A+T' : (c.kind === 'sfirst' ? '动态+U1' : '动态+U+上轮ans');
+      if (s.first > 0) out += '<span class="bl">首调载入 ' + fmt1(s.first) + '</span> + ';
+      out += '<span class="bl">必算 ' + fmt1(s.nw) + '</span><small style="color:var(--muted);">(' + nwLab + ')</small>';
+      out += '<span class="re' + (side === 'cur' && s.waste > 0 ? ' bad' : '') + '">= ' + fmt1(s.real) + 'K</span>';
+      return out;
+    }
+    function render(id, opt) {
+      var el = document.getElementById(id), P = opt.prefix.length, U = opt.uat.length, h = '';
+      el.style.gridTemplateColumns = '5.6em repeat(' + P + ', 1fr) repeat(' + U + ', 1fr) 22em';
+      h += '<div class="g blank"></div>' + opt.groups;
+      h += '<div class="g ua" style="grid-column:' + (P + 2 - opt.histInUat) + ' / span ' + (U + opt.histInUat) + ';">UAT</div>';
+      h += '<div class="g ms" style="grid-column:' + (P + U + 2) + ';">本次调用账目:白算 + 必算 = 实算(K)</div>';
+      h += '<div class="rl">' + opt.title + '</div>';
+      opt.prefix.forEach(function (t) { h += '<div class="h">' + t + '</div>'; });
+      opt.uat.forEach(function (t, i) { h += '<div class="h' + (i === 0 ? ' uatstart' : '') + '"><b>' + t + '</b></div>'; });
+      h += '<div class="h"></div>';
+      opt.rows.forEach(function (line, ri) {
+        var c = d.calls[ri];
+        h += '<div class="rl">' + c.t1 + '<small>' + c.t2 + '</small></div>';
+        line.split(' ').forEach(function (k, i) { h += '<div class="c ' + cls[k] + (i === P ? ' uatstart' : '') + '"></div>'; });
+        h += '<div class="miss">' + acct(c, opt.side) + '</div>';
+      });
+      el.innerHTML = h;
+    }
+    render('mat-cur', {
+      side: 'cur', title: '当前', histInUat: 1,
+      groups: '<div class="g sp" style="grid-column:2 / span 3;">System Prompt</div><div class="g tl" style="grid-column:5;">Tools</div>',
+      prefix: ['<b>① 固定</b><br>' + fmt1(B.sp) + 'K', '<b>② 动态⚡</b><br><span class="q">' + fmt1(B.dyn) + 'K</span>', '<b>③ 会话级</b><br>' + fmt1(B.sess) + 'K', '<b>④ Tools</b><br>' + fmt1(B.tools) + 'K', '<b>⑤ 历史 10 轮</b><br>' + fmt1(B.hist) + 'K'],
+      uat: uatCur, rows: rowsCur
+    });
+    render('mat-tgt', {
+      side: 'tgt', title: '目标', histInUat: 1,
+      groups: '<div class="g tl" style="grid-column:2;">Tools</div><div class="g sp" style="grid-column:3 / span 2;">System Prompt</div>',
+      prefix: ['<b>① Tools</b><br>' + fmt1(B.tools) + 'K 全量', '<b>② 固定</b><br>' + fmt1(B.sp) + 'K', '<b>③ 会话级</b><br>' + fmt1(B.sess) + 'K', '<b>④ 历史 10 轮</b><br>' + fmt1(B.hist) + 'K'],
+      uat: uatTgt, rows: rowsTgt
+    });
+  })();
+
+  /* P3 分桶表 */
+  (function () {
+    var el = document.getElementById('bucket'), a = B.agg, h = '';
+    h += '<tr><th>会话长度</th><th class="n">占比</th><th class="n">当前 / 会话</th><th class="n">目标 / 会话</th><th class="n">降幅</th><th class="n">占当前算力</th><th class="n">占总节省</th></tr>';
+    a.groups.forEach(function (x) {
+      var m = x.multi ? '均 ' : '';
+      h += '<tr><td class="nm">' + x.name + '</td><td class="n">' + B.pct1(x.share) + '</td><td class="n">' + m + fmt1(x.cur) + 'K</td><td class="n">' + m + fmt1(x.tgt) + 'K</td><td class="n goodc">−' + pct(x.save) + '</td><td class="n">' + pct(x.shareCost) + '</td><td class="n">' + pct(x.shareSave) + '</td></tr>';
+    });
+    h += '<tr class="sum"><td>加权合计</td><td class="n">100%</td><td class="n">均 ' + fmt1(a.curTot) + 'K</td><td class="n">均 ' + fmt1(a.tgtTot) + 'K</td><td class="n goodc">−' + pct(a.saveRate) + '</td><td class="n">100%</td><td class="n">100%</td></tr>';
+    el.innerHTML = h;
+  })();
+
+  /* P3 三句话①:迷你横条宽度(满格 = 100%,轨道约 4.6em) */
+  (function () {
+    var k = document.querySelector('.three .k.mini'); if (!k) return;
+    var full = 8.2;
+    k.querySelector('.b1').style.width = (B.agg.longShare * full).toFixed(2) + 'em';
+    k.querySelector('.b2').style.width = (B.agg.longShareCost * full).toFixed(2) + 'em';
+  })();
+
+  /* P3 首调 TTFT 表 */
+  (function () {
+    var el = document.getElementById('ttftTbl'), h = '';
+    h += '<tr><th>轮次</th><th class="n">当前首调实算 → TTFT</th><th class="n">目标</th><th class="n">目标 + 预热</th></tr>';
+    [1, 2, 6, 12].forEach(function (n) {
+      var c = B.firstCur(n), t = B.firstTgt(n);
+      h += '<tr><td class="nm">Q' + n + (n === 1 ? '<small style="font-weight:500; color:var(--muted);"> 会话首调</small>' : '') + '</td>'
+         + '<td class="n badc">' + fmt1(c) + 'K · ' + B.sec(c) + '</td>'
+         + '<td class="n goodc">' + fmt1(t) + 'K · ' + B.sec(t) + '</td>'
+         + '<td class="n goodc"><b>' + B.preheatMs + ' ms</b></td></tr>';
+    });
+    el.innerHTML = h;
+  })();
+
+  /* P3 曲线(SVG) */
+  (function () {
+    var el = document.getElementById('curve');
+    var W = 720, H = 520, L = 52, R = 46;
+    var A = { t: 34, b: 300 }, P = { t: 352, b: 462 }, XL = 486;   // 上:实算;下:命中率;X 轴标签
+    var N = 6, maxY = Math.ceil(B.C(N) / 10) * 10;
+    var labelAt = { 1: 1, 2: 1, 4: 1, 6: 1 };
+    function x(n) { return L + (n - 1) / (N - 1) * (W - L - R); }
+    function y(v) { return A.t + (1 - v / maxY) * (A.b - A.t); }
+    function yh(p) { return P.t + (1 - (p - 0.5) / 0.5) * (P.b - P.t); }
+    var s = '<svg viewBox="0 0 ' + W + ' ' + H + '" preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg">';
+    for (var g = 0; g <= maxY; g += 10) {
+      s += '<line x1="' + L + '" y1="' + y(g) + '" x2="' + (W - R) + '" y2="' + y(g) + '" stroke="#e3e8f0" stroke-width="1"/>';
+      s += '<text x="' + (L - 6) + '" y="' + (y(g) + 4) + '" font-size="11" text-anchor="end" fill="#5c6b84" font-family="monospace">' + g + 'K</text>';
+    }
+    var area = 'M' + x(1) + ',' + y(B.C(1));
+    for (var n = 2; n <= N; n++) area += ' L' + x(n) + ',' + y(B.C(n));
+    for (n = N; n >= 1; n--) area += ' L' + x(n) + ',' + y(B.T(n));
+    area += ' Z';
+    s += '<path d="' + area + '" fill="rgba(5,150,105,.12)"/>';
+    var pc = '', pt = '';
+    for (n = 1; n <= N; n++) { pc += (n === 1 ? 'M' : ' L') + x(n) + ',' + y(B.C(n)); pt += (n === 1 ? 'M' : ' L') + x(n) + ',' + y(B.T(n)); }
+    s += '<path d="' + pc + '" fill="none" stroke="#dc2626" stroke-width="3"/>';
+    s += '<path d="' + pt + '" fill="none" stroke="#059669" stroke-width="3"/>';
+    function anc(n) { return n === 1 ? 'start' : (n === N ? 'end' : 'middle'); }
+    function lx(n) { return n === 1 ? x(n) + 7 : (n === N ? x(n) - 7 : x(n)); }
+    for (n = 1; n <= N; n++) {
+      s += '<circle cx="' + x(n) + '" cy="' + y(B.C(n)) + '" r="4" fill="#dc2626"/>';
+      s += '<circle cx="' + x(n) + '" cy="' + y(B.T(n)) + '" r="4" fill="#059669"/>';
+      s += '<text x="' + lx(n) + '" y="' + (y(B.C(n)) - 9) + '" font-size="11" text-anchor="' + anc(n) + '" fill="#dc2626" font-family="monospace" font-weight="700">' + fmt1(B.C(n)) + '</text>';
+      s += '<text x="' + lx(n) + '" y="' + (y(B.T(n)) + 18) + '" font-size="11" text-anchor="' + anc(n) + '" fill="#059669" font-family="monospace" font-weight="700">' + fmt1(B.T(n)) + '</text>';
+      if (labelAt[n]) {
+        var mid = (y(B.C(n)) + y(B.T(n))) / 2;
+        if (n === 1) s += '<text x="' + (x(n) + 12) + '" y="' + (mid + 5) + '" font-size="14" text-anchor="start" fill="#047857" font-weight="800">−' + pct(B.eta(n)) + '</text>';
+        else s += '<text x="' + x(n) + '" y="' + (mid + 5) + '" font-size="14" text-anchor="middle" fill="#047857" font-weight="800">−' + pct(B.eta(n)) + '</text>';
+      }
+    }
+    /* 上图图例 */
+    s += '<rect x="' + (L + 8) + '" y="' + (A.t - 22) + '" width="14" height="4" fill="#dc2626"/><text x="' + (L + 26) + '" y="' + (A.t - 17) + '" font-size="11" fill="#1f2a3d">当前每轮实算 C(n)</text>';
+    s += '<rect x="' + (L + 158) + '" y="' + (A.t - 22) + '" width="14" height="4" fill="#059669"/><text x="' + (L + 176) + '" y="' + (A.t - 17) + '" font-size="11" fill="#1f2a3d">目标每轮实算 T(n)</text>';
+    s += '<rect x="' + (L + 308) + '" y="' + (A.t - 25) + '" width="14" height="10" fill="rgba(5,150,105,.25)"/><text x="' + (L + 326) + '" y="' + (A.t - 17) + '" font-size="11" fill="#1f2a3d">阴影 = 每轮节省 ΔS(n) 与节省率 η;第 7 轮起按同一公式外推至 12 轮</text>';
+
+    /* 下图:命中率 */
+    s += '<line x1="' + L + '" y1="' + (P.t - 20) + '" x2="' + (W - R) + '" y2="' + (P.t - 20) + '" stroke="#dfe5ee" stroke-width="1" stroke-dasharray="3 3"/>';
+    s += '<text x="' + L + '" y="' + (P.t - 6) + '" font-size="11" fill="#1f2a3d" font-weight="700">cache 命中率 = 已缓存 ÷ 输入(该轮全部调用,业务加权)</text>';
+    s += '<rect x="' + (L + 330) + '" y="' + (P.t - 14) + '" width="14" height="4" fill="#dc2626"/><text x="' + (L + 348) + '" y="' + (P.t - 9) + '" font-size="11" fill="#1f2a3d">当前 · 随轮数下滑</text>';
+    s += '<rect x="' + (L + 470) + '" y="' + (P.t - 14) + '" width="14" height="4" fill="#059669"/><text x="' + (L + 488) + '" y="' + (P.t - 9) + '" font-size="11" fill="#1f2a3d">目标 · 随轮数上升</text>';
+    for (var gp = 0.5; gp <= 1.001; gp += 0.1) {
+      s += '<line x1="' + L + '" y1="' + yh(gp) + '" x2="' + (W - R) + '" y2="' + yh(gp) + '" stroke="#e3e8f0" stroke-width="1"/>';
+      s += '<text x="' + (L - 6) + '" y="' + (yh(gp) + 4) + '" font-size="11" text-anchor="end" fill="#5c6b84" font-family="monospace">' + Math.round(gp * 100) + '%</text>';
+    }
+    var hc = '', ht = '';
+    for (n = 1; n <= N; n++) { hc += (n === 1 ? 'M' : ' L') + x(n) + ',' + yh(B.hit(n, 'cur')); ht += (n === 1 ? 'M' : ' L') + x(n) + ',' + yh(B.hit(n, 'tgt')); }
+    s += '<path d="' + hc + '" fill="none" stroke="#dc2626" stroke-width="3"/>';
+    s += '<path d="' + ht + '" fill="none" stroke="#059669" stroke-width="3"/>';
+    for (n = 1; n <= N; n++) {
+      var hcv = B.hit(n, 'cur'), htv = B.hit(n, 'tgt');
+      s += '<circle cx="' + x(n) + '" cy="' + yh(hcv) + '" r="4" fill="#dc2626"/>';
+      s += '<circle cx="' + x(n) + '" cy="' + yh(htv) + '" r="4" fill="#059669"/>';
+      s += '<text x="' + lx(n) + '" y="' + (yh(hcv) + 17) + '" font-size="11" text-anchor="' + anc(n) + '" fill="#dc2626" font-family="monospace" font-weight="700">' + pct(hcv) + '</text>';
+      s += '<text x="' + lx(n) + '" y="' + (yh(htv) - 8) + '" font-size="11" text-anchor="' + anc(n) + '" fill="#059669" font-family="monospace" font-weight="700">' + pct(htv) + '</text>';
+      s += '<text x="' + x(n) + '" y="' + XL + '" font-size="12" text-anchor="middle" fill="#1f2a3d" font-weight="700">Q' + n + '</text>';
+    }
+    s += '<text x="' + (W - R) + '" y="' + (H - 8) + '" font-size="10" text-anchor="end" fill="#5c6b84">横轴:第 n 轮(Q 序号)· 上图纵轴:该轮全部调用的实算(K)· 下图纵轴:命中率;均按业务 47 / 28 / 25 加权</text>';
+    s += '</svg>';
+    el.innerHTML = s;
+  })();
+
+  /* 翻页 */
+  var slides = [].slice.call(document.querySelectorAll('.slide'));
+  var dotsBox = document.getElementById('dots');
+  var curIdx = 0;
+  slides.forEach(function (_, i) {
+    var d = document.createElement('i');
+    if (i === 0) d.classList.add('on');
+    d.onclick = function () { go(i); };
+    dotsBox.appendChild(d);
+  });
+  var dots = [].slice.call(dotsBox.children);
+  function go(i) {
+    curIdx = (i + slides.length) % slides.length;
+    slides.forEach(function (s, j) { s.classList.toggle('active', j === curIdx); });
+    dots.forEach(function (d, j) { d.classList.toggle('on', j === curIdx); });
+    document.getElementById('pg').textContent = (curIdx + 1) + ' / ' + slides.length;
+    if (location.hash !== '#p=' + (curIdx + 1)) history.replaceState(null, '', '#p=' + (curIdx + 1));
+  }
+  document.getElementById('prev').onclick = function () { go(curIdx - 1); };
+  document.getElementById('next').onclick = function () { go(curIdx + 1); };
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'ArrowRight' || e.key === ' ' || e.key === 'PageDown') go(curIdx + 1);
+    if (e.key === 'ArrowLeft' || e.key === 'PageUp') go(curIdx - 1);
+  });
+  var mh = /p=(\d+)/.exec(location.hash); if (mh) go(parseInt(mh[1], 10) - 1);
+  window.__go = go;
+})();
+</script>
+</body>
+</html>
