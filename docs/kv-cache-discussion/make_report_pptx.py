@@ -6,7 +6,7 @@ HTML 改基线,重跑本脚本即同步。
 
 用法:
     python3 make_report_pptx.py [源 HTML] [输出 .pptx]
-默认:源 = 目录下版本号最高的 `kv cache方案（汇报版）.v*.slides.html`,输出 = `kv cache方案（汇报版）.v1.pptx`
+默认:源 = 目录下版本号最高的 `kv cache方案（汇报版）.v*.slides.html`,输出 = `kv cache方案（汇报版）.v2.pptx`
 
 依赖:python-pptx、node(≥14)。
 """
@@ -75,7 +75,8 @@ JS_TAIL = r"""
            groups: B.agg.groups },
     perRound: [1, 2, 3, 4, 5, 6].map(function (n) { return { n: n, C: B.C(n), T: B.T(n), eta: B.eta(n), hitCur: B.hit(n, 'cur'), hitTgt: B.hit(n, 'tgt') }; }),
     sessN: [1, 2, 3, 4, 5, 6, 8, 10].map(function (n) { var o = B.sessN(n); o.n = n; return o; }),
-    ttft: [1, 2, 12].map(function (n) { return { n: n, cur: B.firstCur(n), tgt: B.firstTgt(n), curS: B.sec(B.firstCur(n)), tgtS: B.sec(B.firstTgt(n)) }; }),
+    rounds7: [1, 2, 3, 4, 5, 6, 10].map(function (n) { return { n: n, C: B.C(n), T: B.T(n), eta: B.eta(n), hitCur: B.hit(n, 'cur'), hitTgt: B.hit(n, 'tgt'), fCur: B.firstCur(n), fTgt: B.firstTgt(n), fCurS: B.sec(B.firstCur(n)), fTgtS: B.sec(B.firstTgt(n)) }; }),
+    qNew: B.qNew, loopNew: B.loopNew,
     demo: B.demo,
     hit: { h1: B.hit(1, 'tgt'), h6: B.hit(6, 'tgt'), h12: B.hit(12, 'tgt') }
   };
@@ -97,16 +98,19 @@ def load_data(html_path):
 
 
 # ---------------- 绘图小工具 ----------------
+import math
+
+
 def K1(x):
-    return f"{round(x * 10) / 10:g}K"
+    return f"{math.floor(x * 10 + 0.5) / 10:g}K"   # 四舍五入(避开 Python 银行家舍入,与 HTML 的 Math.round 一致)
 
 
 def K0(x):
-    return f"{round(x)}K"
+    return f"{math.floor(x + 0.5)}K"
 
 
 def pct(x):
-    return f"{round(x * 100)}%"
+    return f"{math.floor(x * 100 + 0.5)}%"
 
 
 def pct1(x):
@@ -363,7 +367,7 @@ def slide_p1(prs, D):
          size=6.3, color=MUTED, line_spacing=1.05)
 
     footer(s, "口径:Tools / System Prompt·固定 / 会话级 / 动态 / query / answer 取现网实测(token_breakdown.csv、prompt段内容变化对照);T 三类与 tool call 为工作值,两边同长。会话内缓存不被逐出、无裁剪;命中按块上报的粒度误差(DS 4K)不计。本页落档 16(优化后)/ 17(优化前)。",
-           "KV Cache 方案(汇报版)· PPT v1 · P1 数据基线")
+           "KV Cache 方案(汇报版)· PPT v2 · P1 数据基线")
 
 
 # ---------------- P2 ----------------
@@ -438,14 +442,14 @@ def slide_p2(prs, D):
         st = c[side]; out = []
         if st["waste"] > 0:
             p = st.get("parts") or {}
-            lab = (f"{round((p['tools'] + p['sess'] + p['hist']) * 10) / 10:g} + 本会话史 {round(p['own'] * 10) / 10:g}" if p.get("own") else "Tools")
-            out += [(f"白算 {round(st['waste'] * 10) / 10:g}", {"color": WARN, "bold": True}), (f"({lab}) + ", {"color": MUTED, "size": 5.8})]
+            lab = (f"{K1(p['tools'] + p['sess'] + p['hist'])[:-1]} + 本会话史 {K1(p['own'])[:-1]}" if p.get("own") else "Tools")
+            out += [(f"白算 {K1(st['waste'])[:-1]}", {"color": WARN, "bold": True}), (f"({lab}) + ", {"color": MUTED, "size": 5.8})]
         elif side == "tgt" and c["kind"] != "loop":
             out += [("白算 0", {"color": GOOD, "bold": True}), (" + ", {})]
         if st["first"] > 0:
-            out += [(f"首调载入 {round(st['first'] * 10) / 10:g}", {"color": ACCENT, "bold": True}), (" + ", {})]
-        out += [(f"必算 {round(st['nw'] * 10) / 10:g}", {"color": ACCENT, "bold": True}),
-                (f"  = {round(st['real'] * 10) / 10:g}K", {"bold": True, "mono": True, "color": (BAD if side == "cur" and st["waste"] > 0 else GOOD)}),
+            out += [(f"首调载入 {K1(st['first'])[:-1]}", {"color": ACCENT, "bold": True}), (" + ", {})]
+        out += [(f"必算 {K1(st['nw'])[:-1]}", {"color": ACCENT, "bold": True}),
+                (f"  = {K1(st['real'])[:-1]}K", {"bold": True, "mono": True, "color": (BAD if side == "cur" and st["waste"] > 0 else GOOD)}),
                 (f"   命中 {pct(st['hit'] / st['input'])}", {"color": TEXT, "size": 6, "bold": True})]
         return out
 
@@ -522,7 +526,7 @@ def slide_p2(prs, D):
         text(s, x + Inches(0.08), y3 + Inches(0.42), rw - Inches(0.16), Inches(0.44), note, size=5.4, color=MUTED, line_spacing=1.0)
 
     footer(s, "数字全部来自 P1 基线,逐调用推演;当前侧与三条实测会话一致(断点恒在 System Prompt·固定末、Q 首调 miss 14–34K、loop 白算 ≤1 块)。目标侧输入比当前略长(动态留在历史里),是只追加的代价,已计入命中率分母。目标序 Tools → System Prompt 需 chat template 支持(见 06)。",
-           "KV Cache 方案(汇报版)· PPT v1 · P2")
+           "KV Cache 方案(汇报版)· PPT v2 · P2")
 
 
 # ---------------- P3 ----------------
@@ -530,139 +534,140 @@ def slide_p3(prs, D):
     s = prs.slides.add_slide(prs.slide_layouts[6])
     b = D["base"]; agg = D["agg"]
     header(s, "03", [("轮数 × 业务:", {}), (f"当前每深一轮多烧 {K1(D['alpha'])},目标 Q2 起钉在 {K1(D['Tn'])}", {"color": ACCENT}),
-                     (f"——全业务加权 token −{pct(agg['saveRate'])}(成本 −{pct(agg['costSave'])}),cache 命中率 {pct(agg['curHitAll'])} → {pct(agg['tgtHitAll'])}", {})],
-           f"实测 session 分布(均 {D['sessAvg']:.2f} 轮)× 业务 47 / 28 / 25;每 session 计全部调用;第 {D['trimAt']} 轮起上下文裁剪", size=13.5)
+                     (f"——全量加权 token −{pct(agg['saveRate'])}(成本 −{pct(agg['costSave'])}),cache 命中率 {pct(agg['curHitAll'])} → {pct(agg['tgtHitAll'])}", {})],
+           f"左 = 第 n 轮(单轮)· 右 = L 轮的 session 与全量;业务 47 / 28 / 25 加权,第 {D['trimAt']} 轮起上下文裁剪", size=13.5)
 
-    # ---- 左:公式 ----
-    lx, lw = Inches(0.35), Inches(6.45)
-    rect(s, lx, Inches(0.9), lw, Inches(6.05))
-    fx = lx + Inches(0.1); fw = lw - Inches(0.2)
-    rect(s, fx, Inches(0.98), fw, Inches(1.02), fill=WHITE)
-    mix = b["mix"]
-    sedqa = b["u"] + D["firstExtra"]["qa"] + b["ans"]; sedtask = b["u"] + D["firstExtra"]["task"] + b["call"] + b["tool"] + b["ans"]; sedchat = b["u"] + b["ans"]
-    text(s, fx + Inches(0.08), Inches(1.0), fw - Inches(0.16), Inches(0.98), [
-        [("每轮节省  ", {"color": MUTED}), (f"ΔS(1) = {K1(b['tools'])}", {"mono": True, "bold": True, "color": ACCENT, "size": 9.5}), ("(Tools)   ", {"color": MUTED}),
-         (f"ΔS(n≥2) = {K1(D['fixed2'])} + {K1(D['alpha'])}×(n−1)", {"mono": True, "bold": True, "color": ACCENT, "size": 9.5})],
-        [(f"{K1(D['fixed2'])} 固定项", {"bold": True}), (f" = Tools {K1(b['tools'])} + 会话级 {K1(b['sess'])} + 历史 {K1(b['hist'])}(Q1 两边都必算,Q2 起当前白算、目标命中);", {"color": MUTED}),
-         (f"{K1(D['alpha'])} 沉淀速率", {"bold": True, "color": BAD}), (f" = 47%×{K1(sedqa)}(问答:伪造 A/T 检索 + 回复)+ 28%×{K1(sedchat)}(闲聊)+ 25%×{K1(sedtask)}(任务:skill + tool call + 工具 + 回复)", {"color": MUTED})],
-        [("当前第 n 轮实算 ", {"color": MUTED}), (f"C(n) = {K1(D['C2base'])} + {K1(D['alpha'])}(n−1)", {"bold": True}), (f",目标 T(n≥2) = {K1(D['Tn'])} 恒定;第 {D['trimAt']} 轮起裁剪封顶。", {"color": MUTED})],
-        [("两个口径:", {"bold": True}), (f"首调必算 {K1(D['qFirstNew'])}", {"bold": True, "color": GOOD}), (f"(闲聊基准;问答 +检索 {K1(D['firstExtra']['qa'])}、任务 +skill {K1(D['firstExtra']['task'])},决定 TTFT)→ 业务加权 + 任务第二次调用 {K1(D['loopW'])} = ", {"color": MUTED}),
-         (f"整轮实算 {K1(D['Tn'])}", {"bold": True, "color": GOOD}), ("(决定成本)", {"color": MUTED})],
-    ], size=6.5, line_spacing=1.08)
+    colw = Inches(6.25); gap = Inches(0.13)
+    lx = Inches(0.35); rx = lx + colw + gap
+    top = Inches(0.9); card_h = Inches(5.05)
+    key_y = top + Inches(0.38); key_h = Inches(0.62)
+    chart_y = key_y + key_h + Inches(0.06); chart_h = Inches(2.2)
+    tblh_y = chart_y + chart_h + Inches(0.02)
+    tbl_y = tblh_y + Inches(0.24)
 
-    # ---- 左:每轮实算折线 ----
+    def dim_title(x, tag, title, sub):
+        chip(s, x + Inches(0.1), top + Inches(0.09), Inches(1.15), Inches(0.2), tag, RGBColor(0xDB, 0xE4, 0xFB), color=ACCENT, size=7)
+        text(s, x + Inches(1.3), top + Inches(0.04), colw - Inches(1.4), Inches(0.3), [(title, {"bold": True, "size": 10.5}), ("  " + sub, {"size": 7, "color": MUTED})], anchor=MSO_ANCHOR.MIDDLE, wrap=False)
+
+    # ================= 左列:第 n 轮 =================
+    rect(s, lx, top, colw, card_h)
+    dim_title(lx, "第 n 轮", "单轮视角", "一轮 = 一个 Q,含该轮全部调用")
+    kb = rect(s, lx + Inches(0.1), key_y, colw - Inches(0.2), key_h, fill=WHITE)
+    fn = D["firstNew"]; fe = D["firstExtra"]; qn = D["qNew"]
+    text(s, 0, 0, 0, 0, [
+        [("目标每轮实算(Q≥2)= 首调必算 + 第二次调用:", {"bold": True, "color": TEXT}), ("闲聊 ", {}), (K1(fn["chat"]), {"bold": True, "color": GOOD}),
+         (f"(动态 {K1(b['dyn'])} + query {K1(b['u'])} + 上轮 answer {K1(b['ans'])})| 任务 {K1(fn['chat'])} + skill {K1(fe['task'])} + 工具 {K1(D['loopNew']['task'])} = ", {}), (K1(qn["task"]), {"bold": True, "color": GOOD}),
+         (f" | 问答 {K1(fn['chat'])} + 检索 {K1(fe['qa'])} = ", {}), (K1(qn["qa"]), {"bold": True, "color": GOOD}), (" → 按 47 / 28 / 25 加权 = ", {}), (K1(D["Tn"]), {"bold": True, "color": GOOD, "size": 9, "mono": True}), (",与轮数无关。", {})],
+        [(f"当前每轮 = {K1(D['Tn'])} + 白算:", {"bold": True, "color": TEXT}), ("固定项 ", {}), (K1(D["fixed2"]), {"bold": True, "color": BAD}), ("(Tools + 会话级 + 历史)+ 本会话史 ", {}), (K1(D["alpha"]), {"bold": True, "color": BAD}),
+         (f" × (n−1),每深一轮多烧 {K1(D['alpha'])};第 {D['trimAt']} 轮起裁剪封顶。", {})],
+    ], size=6.6, color=MUTED, anchor=MSO_ANCHOR.MIDDLE, line_spacing=1.1, shape=kb)
+
     cd = CategoryChartData()
     pr = D["perRound"]
-    cd.categories = [f"Q{p['n']}  −{pct(p['eta'])}" for p in pr]
+    cd.categories = [f"第 {p['n']} 轮  −{pct(p['eta'])}" for p in pr]
     cd.add_series("当前每轮实算 C(n)", [round(p["C"], 1) for p in pr])
     cd.add_series("目标每轮实算 T(n)", [round(p["T"], 1) for p in pr])
-    gf = s.shapes.add_chart(XL_CHART_TYPE.LINE_MARKERS, fx, Inches(2.05), fw, Inches(2.1), cd)
+    gf = s.shapes.add_chart(XL_CHART_TYPE.LINE_MARKERS, lx + Inches(0.1), chart_y, colw - Inches(0.2), chart_h, cd)
     ch = gf.chart
     ch.font.size = Pt(7); ch.font.name = FONT
     ch.has_legend = True; ch.legend.position = XL_LEGEND_POSITION.TOP; ch.legend.include_in_layout = False; ch.legend.font.size = Pt(7)
     ch.value_axis.has_major_gridlines = True; ch.value_axis.major_gridlines.format.line.color.rgb = GRID
     ch.value_axis.tick_labels.font.size = Pt(7); ch.value_axis.tick_labels.number_format = '0"K"'; ch.value_axis.tick_labels.number_format_is_linked = False
     ch.value_axis.maximum_scale = 60; ch.value_axis.minimum_scale = 0; ch.value_axis.format.line.fill.background()
-    ch.category_axis.tick_labels.font.size = Pt(8); ch.category_axis.tick_labels.font.bold = True; ch.category_axis.format.line.color.rgb = GRID
+    ch.category_axis.tick_labels.font.size = Pt(7.5); ch.category_axis.tick_labels.font.bold = True; ch.category_axis.format.line.color.rgb = GRID
     plot = ch.plots[0]; plot.has_data_labels = True
     plot.data_labels.font.size = Pt(7); plot.data_labels.font.bold = True; plot.data_labels.number_format = '0.0'; plot.data_labels.number_format_is_linked = False
-    for i, (ser, col, pos) in enumerate(zip(plot.series, (BAD, GOOD), (XL_LABEL_POSITION.ABOVE, XL_LABEL_POSITION.BELOW))):
+    for ser, col, pos in zip(plot.series, (BAD, GOOD), (XL_LABEL_POSITION.ABOVE, XL_LABEL_POSITION.BELOW)):
         ser.format.line.color.rgb = col; ser.format.line.width = Pt(2.25); ser.smooth = False
         ser.marker.style = XL_MARKER_STYLE.CIRCLE; ser.marker.size = 6
         ser.marker.format.fill.solid(); ser.marker.format.fill.fore_color.rgb = col; ser.marker.format.line.color.rgb = col
         ser.data_labels.font.color.rgb = col; ser.data_labels.position = pos; ser.data_labels.font.size = Pt(7); ser.data_labels.show_value = True
-    text(s, fx + Inches(0.1), Inches(4.12), fw - Inches(0.2), Inches(0.18), "横轴:第 n 轮及该轮节省率 η = ΔS / C;第 7 轮起同公式,第 10 轮起裁剪封顶", size=6, color=MUTED, align=PP_ALIGN.RIGHT)
 
-    # ---- 左:一条 session 省多少(柱) ----
-    text(s, fx, Inches(4.32), fw, Inches(0.24), [("一条 session 省多少", {"bold": True, "size": 9.5}), (f"   越长省越多;第 {D['trimAt']} 轮起裁剪封顶;红 = 当前 · 绿 = 目标;柱顶 = 降幅 / 目标 cache 命中率", {"size": 6.5, "color": MUTED})], anchor=MSO_ANCHOR.MIDDLE)
+    text(s, lx + Inches(0.1), tblh_y, colw - Inches(0.2), Inches(0.22), [("逐轮账", {"bold": True, "size": 8.5}), (f"  TTFT = 首调实算 × ≈{round(D['msPerK'])} ms/K(参考实测 14K ≈ 640 ms);预热后统一 {D['preheatMs']} ms;问答 / 任务另 +检索 / skill 两边相同", {"size": 6, "color": MUTED})], anchor=MSO_ANCHOR.MIDDLE, wrap=False)
+    rows = [["第 n 轮", "当前实算", "目标实算", "节省率 η", "该轮命中率 当前 → 目标", "首调 TTFT 当前 → 目标", "预热后"]]
+    for o in D["rounds7"]:
+        tag = "  会话首调" if o["n"] == 1 else ("  裁剪" if o["n"] >= D["trimAt"] else "")
+        rows.append([([[(f"第 {o['n']} 轮", {"bold": True}), (tag, {"size": 5.8, "color": MUTED})]], {}), (K1(o["C"]), {"mono": True, "color": BAD}), (K1(o["T"]), {"mono": True, "color": GOOD}),
+                     (f"−{pct(o['eta'])}", {"mono": True, "color": GOOD, "bold": True}),
+                     ([[(pct(o["hitCur"]), {"color": BAD, "mono": True}), (" → ", {"color": MUTED}), (pct(o["hitTgt"]), {"color": GOOD, "mono": True, "bold": True})]], {}),
+                     ([[(o["fCurS"], {"color": BAD, "mono": True}), (" → ", {"color": MUTED}), (o["fTgtS"], {"color": GOOD, "mono": True})]], {}),
+                     (f"{D['preheatMs']} ms", {"mono": True, "color": GOOD, "bold": True})])
+    table(s, lx + Inches(0.1), tbl_y, colw - Inches(0.2), [1.25, 0.9, 0.9, 0.85, 1.5, 1.5, 0.8], rows, row_h=0.2, hdr_h=0.22, body_size=6.8, header_size=6.6,
+          align=["l", "r", "r", "r", "r", "r", "r"])
+
+    # ================= 右列:L 轮的 session =================
+    rect(s, rx, top, colw, card_h)
+    dim_title(rx, "L 轮的 session", "session 视角", f"一条 L 轮的 session 全部调用累加;实测 {round(D['sessionN'] / 1000)}k 条")
+    kb2 = rect(s, rx + Inches(0.1), key_y, colw - Inches(0.2), key_h, fill=BANNER_BG, line=BANNER_BD)
+    text(s, 0, 0, 0, 0, [
+        [("全量  ", {"bold": True, "color": ACCENT, "size": 7}), (f"按实测 session 分布(均 {D['sessAvg']:.2f} 轮,{pct(agg['share1'])} 只有 1 轮)加权 → ", {"bold": True, "color": TEXT}),
+         ("token ", {"color": TEXT}), (f"−{pct(agg['saveRate'])}", {"bold": True, "color": GOOD, "size": 10, "mono": True}), ("(成本 ", {"color": TEXT}), (f"−{pct(agg['costSave'])}", {"bold": True, "color": GOOD, "mono": True}),
+         (")· cache 命中率 ", {"color": TEXT}), (pct(agg["curHitAll"]), {"bold": True, "color": BAD, "mono": True}), (" → ", {"color": MUTED}), (pct(agg["tgtHitAll"]), {"bold": True, "color": GOOD, "size": 10, "mono": True})],
+        [("每 session 的数已按业务加权,全量 = 再按 session 长度分布加权;新架构上线后 session 变长、收益向长 session 靠。", {"size": 6.2})],
+    ], size=7, color=MUTED, anchor=MSO_ANCHOR.MIDDLE, line_spacing=1.1, shape=kb2)
+
     sn = D["sessN"]
     cd2 = CategoryChartData()
     cd2.categories = [f"{o['n']} 轮" + ("·裁剪" if o["n"] >= D["trimAt"] else "") for o in sn]
     cd2.add_series("当前实算 / session", [round(o["cur"]) for o in sn])
     cd2.add_series("目标实算 / session", [round(o["tgt"]) for o in sn])
-    gf2 = s.shapes.add_chart(XL_CHART_TYPE.COLUMN_CLUSTERED, fx, Inches(4.55), fw, Inches(1.85), cd2)
+    gf2 = s.shapes.add_chart(XL_CHART_TYPE.COLUMN_CLUSTERED, rx + Inches(0.1), chart_y, colw - Inches(0.2), chart_h, cd2)
     c2 = gf2.chart
     c2.font.size = Pt(7); c2.font.name = FONT
-    c2.has_legend = False
+    c2.has_legend = True; c2.legend.position = XL_LEGEND_POSITION.TOP; c2.legend.include_in_layout = False; c2.legend.font.size = Pt(7)
     c2.value_axis.has_major_gridlines = True; c2.value_axis.major_gridlines.format.line.color.rgb = GRID
-    c2.value_axis.tick_labels.font.size = Pt(6.5); c2.value_axis.tick_labels.number_format = '0"K"'; c2.value_axis.tick_labels.number_format_is_linked = False
+    c2.value_axis.tick_labels.font.size = Pt(7); c2.value_axis.tick_labels.number_format = '0"K"'; c2.value_axis.tick_labels.number_format_is_linked = False
     c2.value_axis.maximum_scale = 600; c2.value_axis.format.line.fill.background()
     c2.category_axis.tick_labels.font.size = Pt(7.5); c2.category_axis.tick_labels.font.bold = True; c2.category_axis.format.line.color.rgb = GRID
-    p2 = c2.plots[0]; p2.gap_width = 60; p2.overlap = -10
-    p2.has_data_labels = True; p2.data_labels.font.size = Pt(6.5); p2.data_labels.font.bold = True; p2.data_labels.position = XL_LABEL_POSITION.OUTSIDE_END
+    p2 = c2.plots[0]; p2.gap_width = 70; p2.overlap = -10
+    p2.has_data_labels = True; p2.data_labels.font.size = Pt(6.5); p2.data_labels.position = XL_LABEL_POSITION.OUTSIDE_END
     for ser, col in zip(p2.series, (BAD, GOOD)):
         ser.format.fill.solid(); ser.format.fill.fore_color.rgb = col; ser.format.line.fill.background()
     for i, o in enumerate(sn):
         dl = p2.series[0].points[i].data_label; dl.has_text_frame = True; dl.text_frame.text = f"−{pct(o['save'])}"
-        dl.text_frame.paragraphs[0].runs[0].font.size = Pt(7); dl.text_frame.paragraphs[0].runs[0].font.bold = True; dl.text_frame.paragraphs[0].runs[0].font.color.rgb = RGBColor(0x04, 0x78, 0x57)
+        r0 = dl.text_frame.paragraphs[0].runs[0]; r0.font.size = Pt(8); r0.font.bold = True; r0.font.color.rgb = RGBColor(0x04, 0x78, 0x57)
         dl.position = XL_LABEL_POSITION.OUTSIDE_END
-        d2 = p2.series[1].points[i].data_label; d2.has_text_frame = True; d2.text_frame.text = f"{pct(o['hitTgt'])}"
-        d2.text_frame.paragraphs[0].runs[0].font.size = Pt(6.5); d2.text_frame.paragraphs[0].runs[0].font.color.rgb = ACCENT; d2.text_frame.paragraphs[0].runs[0].font.bold = True
+        d2 = p2.series[1].points[i].data_label; d2.has_text_frame = True; d2.text_frame.text = f"{round(o['tgt'])}K"
+        r1 = d2.text_frame.paragraphs[0].runs[0]; r1.font.size = Pt(6.5); r1.font.color.rgb = GOOD
         d2.position = XL_LABEL_POSITION.OUTSIDE_END
-    # 加权结论横带
-    bn = rect(s, fx, Inches(6.43), fw, Inches(0.44), fill=BANNER_BG, line=BANNER_BD, radius=0.15)
-    text(s, 0, 0, 0, 0, [(f"按实测分布(均 {D['sessAvg']:.2f} 轮,{pct(agg['share1'])} 只有 1 轮)加权 → ", {"bold": True}),
-                         ("token ", {}), (f"−{pct(agg['saveRate'])}", {"bold": True, "color": GOOD, "size": 11, "mono": True}),
-                         (" (成本 ", {}), (f"−{pct(agg['costSave'])}", {"bold": True, "color": GOOD, "size": 11, "mono": True}), (")  ·  cache 命中率 ", {}),
-                         (pct(agg["curHitAll"]), {"bold": True, "color": BAD, "mono": True}), (" → ", {"color": MUTED}), (pct(agg["tgtHitAll"]), {"bold": True, "color": GOOD, "mono": True, "size": 11}),
-                         ("     新架构上线后 session 变长、收益放大", {"size": 6.5, "color": MUTED})],
-         size=8, anchor=MSO_ANCHOR.MIDDLE, shape=bn)
 
-    # ---- 右:分桶表 ----
-    rx, rw = Inches(6.93), Inches(6.05)
-    y = card(s, rx, Inches(0.9), rw, Inches(2.32), "按 session 长度分桶", f"实测 {round(D['sessionN'] / 1000)}k 条;每 session 实算 = 各轮之和;6–9 / 10+ 为组内加权,10 轮+ 按 12 轮")
-    rows = [["session 长度", "占比", "当前 / session", "目标 / session", "降幅", "占当前算力", "cache 命中率 当前 → 目标"]]
+    text(s, rx + Inches(0.1), tblh_y, colw - Inches(0.2), Inches(0.22), [("按 session 长度分桶", {"bold": True, "size": 8.5}), ("  6–9 / 10+ 为组内加权,10 轮+ 按 12 轮;命中率 = session 累计;柱顶 = 降幅", {"size": 6, "color": MUTED})], anchor=MSO_ANCHOR.MIDDLE, wrap=False)
+    rows = [["L 轮的 session", "占比", "当前 / session", "目标 / session", "降幅", "占当前算力", "session 累计命中率"]]
     for g in agg["groups"]:
         m = "均 " if g["multi"] else ""
         rows.append([(g["name"], {"bold": True}), (pct1(g["share"]), {"mono": True}), (m + K1(g["cur"]), {"mono": True}), (m + K1(g["tgt"]), {"mono": True}),
                      (f"−{pct(g['save'])}", {"mono": True, "color": GOOD, "bold": True}), (pct(g["shareCost"]), {"mono": True}),
                      ([[(pct(g["hitCur"]), {"color": BAD, "mono": True}), (" → ", {"color": MUTED}), (pct(g["hitTgt"]), {"color": GOOD, "mono": True, "bold": True})]], {})])
-    rows.append([(f"加权(实测分布 · 均 {D['sessAvg']:.2f} 轮)", {"bold": True, "fill": SUM_BG}), ("100%", {"mono": True, "fill": SUM_BG, "bold": True}),
-                 ("均 " + K1(agg["curTot"]), {"mono": True, "fill": SUM_BG, "bold": True}), ("均 " + K1(agg["tgtTot"]), {"mono": True, "fill": SUM_BG, "bold": True}),
-                 (f"−{pct(agg['saveRate'])}", {"mono": True, "color": GOOD, "bold": True, "fill": SUM_BG}), ("100%", {"mono": True, "fill": SUM_BG, "bold": True}),
-                 ([[(pct(agg["curHitAll"]), {"color": BAD, "mono": True, "bold": True}), (" → ", {"color": MUTED}), (pct(agg["tgtHitAll"]), {"color": GOOD, "mono": True, "bold": True})]], {"fill": SUM_BG})])
-    table(s, rx + Inches(0.08), y, rw - Inches(0.16), [1.7, 0.8, 1.15, 1.15, 0.8, 1.0, 1.55], rows, row_h=0.2, hdr_h=0.22, body_size=7, header_size=6.8,
+    table(s, rx + Inches(0.1), tbl_y, colw - Inches(0.2), [1.9, 0.75, 1.1, 1.1, 0.75, 0.95, 1.45], rows, row_h=0.2, hdr_h=0.22, body_size=6.8, header_size=6.6,
           align=["l", "r", "r", "r", "r", "r", "r"])
 
-    # ---- 右:TTFT ----
-    y = card(s, rx, Inches(3.3), rw, Inches(1.62), "首调 TTFT 预估", f"首调实算 × ≈{round(D['msPerK'])} ms/K(参考实测 14K prefill ≈ 640 ms);loop 两边相同、不变")
-    tt = [["轮次", "当前首调实算 → TTFT", "目标", "目标 + 预热"]]
-    for o in D["ttft"]:
-        tt.append([(f"Q{o['n']}" + ("  会话首调" if o["n"] == 1 else ""), {"bold": True}), (f"{K1(o['cur'])} · {o['curS']}", {"mono": True, "color": BAD}),
-                   (f"{K1(o['tgt'])} · {o['tgtS']}", {"mono": True, "color": GOOD}), (f"{D['preheatMs']} ms", {"mono": True, "color": GOOD, "bold": True})])
-    table(s, rx + Inches(0.08), y, rw - Inches(0.16), [1.2, 2.0, 1.5, 1.2], tt, row_h=0.2, hdr_h=0.22, body_size=7, header_size=6.8, align=["l", "r", "r", "r"])
-    fe = D["firstExtra"]; ms = D["msPerK"]
-    text(s, rx + Inches(0.08), y + Inches(0.84), rw - Inches(0.16), Inches(0.42),
-         [("预热", {"bold": True}), (f" = 会话创建时 prefill 会话级 + 历史,每轮开口前(ASR 阶段)再灌上轮 answer,实时只剩动态 + query ≈{K1(b['dyn'] + b['u'])},含损耗按 {D['preheatMs']} ms 计;参考实测 14K 640 ms → 6K 预热 320 + 8K 实时 380 ms,感知 −40%、总算力 +10%、需 TTL 保住缓存,只改 TTFT 不改账。", {}),
-          ("业务必带两边相同、预热不覆盖", {"bold": True}), (f":问答 +检索 {K1(fe['qa'])} ≈ +{round(fe['qa'] * ms / 10) * 10} ms,任务 +skill {K1(fe['task'])} ≈ +{round(fe['task'] * ms / 10) * 10} ms。", {})],
-         size=5.8, color=MUTED, line_spacing=1.02)
-
-    # ---- 右:结论 ----
-    y0 = Inches(5.0)
-    y = card(s, rx, y0, rw, Inches(1.95), "结论")
+    # ================= 底部结论四格 =================
+    cy = top + card_h + Inches(0.1); chh = Inches(0.86)
     items = [
         ("bars", [("2 轮以上的 session 只占 ", {}), (pct(agg["longShare"]), {"bold": True}), (",却吃掉 ", {}), (pct(agg["longShareCost"]), {"bold": True}), (" 的算力", {"bold": True}),
-                  (f",贡献 {pct(agg['longShareSave'])} 的节省;越长省得越多,新架构上线后 session 变长、收益放大。", {})]),
-        (K1(D["qFirstNew"]), [("会话级可提前算,首调时延与轮数脱钩。", {"bold": True}), (f"Q≥2 首调钉在 {K1(D['qFirstNew'])} + 当轮检索 / skill;{pct(agg['share1'])} 的 session 只有 1 轮,预热后 TTFT ≈ {D['preheatMs']} ms + 业务必带,是短 session 的主要时延收益。", {})]),
-        ("白算 → 0", [("白算归零是验收线,必算是下一步。", {"bold": True}), (f"整轮必算 {K1(D['Tn'])} 与会话首调 {K1(b['sess'] + b['hist'])} 是剩下的成本:历史 {K1(b['hist'])} 整段载入改摘要、available skills 3K 升会话级。命中率受必算拖累,加权 {pct(agg['tgtHitAll'])}、长 session 90%+。", {})]),
-        ("效果不变", [("动态下沉 U、随轮追加已上线,对当前对话效果影响不大", {"bold": True}), (";后两步只改顺序不改内容,不引入新的效果风险。", {})]),
+                  (f",贡献 {pct(agg['longShareSave'])} 的节省;越长省得越多。", {})]),
+        (K1(D["qFirstNew"]), [("会话级可提前算,首调时延与轮数脱钩。", {"bold": True}), (f"{pct(agg['share1'])} 的 session 只有 1 轮,预热后 TTFT ≈ {D['preheatMs']} ms + 业务必带。", {})]),
+        ("白算 → 0", [("白算归零是验收线,必算是下一步", {"bold": True}), (f":历史 {K1(b['hist'])} 整段载入改摘要、available skills 3K 升会话级。", {})]),
+        ("效果不变", [("动态下沉 U 已上线,对话效果影响不大", {"bold": True}), (";后两步只改顺序不改内容,不引入效果风险。", {})]),
     ]
-    ih = Inches(0.36); gap = Inches(0.035); kx_w = Inches(1.45)
+    cw4 = (Inches(12.63) - Inches(0.36)) / 4
     for i, (k, runs) in enumerate(items):
-        yy = y + (ih + gap) * i
-        rect(s, rx + Inches(0.08), yy, rw - Inches(0.16), ih, fill=WHITE)
+        x = Inches(0.35) + (cw4 + Inches(0.12)) * i
+        rect(s, x, cy, cw4, chh)
+        kx_w = Inches(1.15)
         if k == "bars":
             for j, (lab, v, col) in enumerate((("会话", agg["longShare"], ACCENT), ("算力", agg["longShareCost"], BAD))):
-                by = yy + Inches(0.05) + Inches(0.14) * j
-                text(s, rx + Inches(0.12), by, Inches(0.36), Inches(0.13), lab, size=6, bold=True, anchor=MSO_ANCHOR.MIDDLE, margin=0.0, align=PP_ALIGN.RIGHT)
-                rect(s, rx + Inches(0.5), by + Inches(0.02), int(Inches(0.62) * v), Inches(0.09), fill=col, line=None, radius=0.3)
-                text(s, rx + Inches(1.1), by, Inches(0.4), Inches(0.13), pct(v), size=7, bold=True, mono=True, color=col, anchor=MSO_ANCHOR.MIDDLE, margin=0.0)
+                by = cy + Inches(0.22) + Inches(0.2) * j
+                text(s, x + Inches(0.1), by, Inches(0.32), Inches(0.16), lab, size=6.5, bold=True, anchor=MSO_ANCHOR.MIDDLE, margin=0.0)
+                rect(s, x + Inches(0.42), by + Inches(0.03), int(Inches(0.5) * v), Inches(0.1), fill=col, line=None, radius=0.3)
+                text(s, x + Inches(0.78), by, Inches(0.4), Inches(0.16), pct(v), size=7.5, bold=True, mono=True, color=col, anchor=MSO_ANCHOR.MIDDLE, margin=0.0)
         else:
-            text(s, rx + Inches(0.12), yy, kx_w, ih, [(k, {"bold": True, "size": 10.5, "color": ACCENT, "mono": True})], anchor=MSO_ANCHOR.MIDDLE, margin=0.0)
-        text(s, rx + Inches(0.1) + kx_w, yy, rw - Inches(0.28) - kx_w, ih, runs, size=6.6, anchor=MSO_ANCHOR.MIDDLE, line_spacing=1.03)
+            sub = "Q≥2 首调必算" if k == K1(D["qFirstNew"]) else (f"命中率 {pct(agg['curHitAll'])} → {pct(agg['tgtHitAll'])}" if k == "白算 → 0" else "")
+            text(s, x + Inches(0.1), cy, kx_w, chh, [[(k, {"bold": True, "size": 11, "color": ACCENT, "mono": True})]] + ([[(sub, {"size": 6, "color": MUTED, "bold": True})]] if sub else []), anchor=MSO_ANCHOR.MIDDLE, margin=0.0)
+        text(s, x + Inches(0.1) + kx_w, cy, cw4 - Inches(0.2) - kx_w, chh, runs, size=6.8, color=MUTED, anchor=MSO_ANCHOR.MIDDLE, line_spacing=1.06)
 
-    footer(s, f"口径:加权 = Σ(session 数 × 每 session 节省)/ Σ(session 数 × 当前每 session 实算),先汇总量再除;命中率同法,当前侧 {pct(agg['curHitAll'])} 与实测约 60% 相符。成本按计价折算 ≈{D['costFactor']:.2f} × token 降幅。裁剪:第 {D['trimAt']} 轮起上下文裁剪,本会话史累积封顶 {D['trimAt'] - 1} 轮;10 轮+ 桶按 12 轮计。前提:会话内缓存不被逐出(实测 2/21 次 loop 全 miss 属引擎侧逐出 / 路由,需会话粘性 + TTL,单独报警)。TTFT 按参考实测线性折算,待 E6 实测替换;当前平均实算约 12K/调用,目标 7K,上线后由日报替换推演。",
-           "KV Cache 方案(汇报版)· PPT v1 · P3 轮数收益")
+    footer(s, f"成本按计价折算 ≈{D['costFactor']:.2f} × token 降幅。裁剪:第 {D['trimAt']} 轮起上下文裁剪,本会话史累积封顶 {D['trimAt'] - 1} 轮;10 轮+ 桶按 12 轮计。前提:会话内缓存不被逐出(实测 2/21 次 loop 全 miss 属引擎侧逐出 / 路由,需会话粘性 + TTL,单独报警)。实测对照:当前命中率约 60%(推演 {pct(agg['curHitAll'])})、平均实算约 12K/调用,目标 7K;TTFT 待 prefill 吞吐实测(E6)替换;上线后由日报(引擎 cached_tokens + 应用边界埋点)替换推演。",
+           "KV Cache 方案(汇报版)· PPT v2 · P3 轮数收益")
 
 
 def main():
@@ -672,7 +677,7 @@ def main():
         def ver(p):
             m = re.search(r"\.v([\d.]+)\.slides", p); return tuple(int(x) for x in m.group(1).split("."))
         src = sorted(cands, key=ver)[-1]
-    out = sys.argv[2] if len(sys.argv) > 2 else os.path.join(HERE, "kv cache方案（汇报版）.v1.pptx")
+    out = sys.argv[2] if len(sys.argv) > 2 else os.path.join(HERE, "kv cache方案（汇报版）.v2.pptx")
     D = load_data(src)
     prs = Presentation()
     prs.slide_width, prs.slide_height = SLIDE_W, SLIDE_H
