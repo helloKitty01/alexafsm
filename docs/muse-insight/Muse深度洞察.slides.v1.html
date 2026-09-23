@@ -1,0 +1,504 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Muse 深度洞察 · v1 · 8 页 · 架构 / 商业 / 产品对照</title>
+<style>
+  :root {
+    --bg: #e9edf4;
+    --slide-bg: linear-gradient(135deg, #ffffff 0%, #f7f9fd 60%, #eef3fb 100%);
+    --card: #f7f9fc;
+    --card-border: #dfe5ee;
+    --text: #1f2a3d;
+    --muted: #5c6b84;
+    --accent: #2563eb;
+    --good: #059669;
+    --warn: #d97706;
+    --bad: #dc2626;
+    --lvl-prod: #3b5bdb;
+    --lvl-sess: #7c3aed;
+    --lvl-q: #d97706;
+    --lvl-loop: #0891b2;
+    --mono: "SF Mono", "JetBrains Mono", Consolas, "Courier New", monospace;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { background: var(--bg); height: 100%; }
+  body {
+    font-family: "PingFang SC", "Microsoft YaHei", "Noto Sans SC", -apple-system, sans-serif;
+    color: var(--text);
+    display: flex; justify-content: center; align-items: center;
+    padding: 16px 12px; min-height: 100vh;
+  }
+  .deck { position: relative; width: min(96vw, calc((100vh - 32px) * 1.7778)); }
+  .slide {
+    width: 100%; aspect-ratio: 16 / 9;
+    background: var(--slide-bg);
+    border: 1px solid var(--card-border); border-radius: 18px;
+    box-shadow: 0 18px 50px rgba(31,42,61,.16);
+    padding: 1.7% 2.4% 1.5%;
+    display: none; flex-direction: column; overflow: hidden; position: relative;
+    font-size: clamp(9.5px, min(1.05vw, 1.86vh), 21px);
+  }
+  .slide.active { display: flex; }
+  .slide::before {
+    content: ""; position: absolute; inset: 0 0 auto 0; height: 5px;
+    background: linear-gradient(90deg, var(--accent), var(--good));
+    border-radius: 18px 18px 0 0;
+  }
+  h2 { font-size: 1.12em; font-weight: 700; margin-bottom: .32em; line-height: 1.28; }
+  h2 .hl { color: var(--accent); }
+  h2 .num { color: var(--muted); font-weight: 600; margin-right: .4em; font-size: .78em; }
+  h2 small { font-size: .62em; font-weight: 500; color: var(--muted); margin-left: .45em; }
+  .card {
+    background: var(--card); border: 1px solid var(--card-border);
+    border-radius: 12px; padding: .42em .65em; overflow: hidden;
+    display: flex; flex-direction: column; min-width: 0; min-height: 0;
+  }
+  .card h3 { font-size: .82em; margin-bottom: .22em; color: var(--text); display: flex; align-items: center; gap: .45em; flex-wrap: wrap; }
+  .card h3 .sub { font-size: .78em; font-weight: 500; color: var(--muted); }
+  .card p, .card li { color: var(--muted); font-size: .68em; line-height: 1.38; }
+  .card li { margin-left: 1.1em; margin-bottom: .14em; }
+  .card b, .banner b, td b { color: var(--text); font-weight: 700; }
+  .mono { font-family: var(--mono); }
+  .goodc { color: var(--good) !important; }
+  .badc { color: var(--bad) !important; }
+  .warnc { color: var(--warn) !important; }
+  .accc { color: var(--accent) !important; }
+  .row { display: flex; gap: .5em; min-height: 0; }
+  .col { display: flex; flex-direction: column; gap: .4em; min-width: 0; min-height: 0; }
+  .grow { flex: 1; min-height: 0; min-width: 0; }
+  .tag { display: inline-block; border-radius: 999px; padding: .02em .42em; font-size: .78em; font-weight: 700; white-space: nowrap; }
+  .tag.real { background: rgba(5,150,105,.12); color: var(--good); }
+  .tag.mid  { background: rgba(37,99,235,.12); color: var(--accent); }
+  .tag.est  { background: rgba(217,119,6,.12); color: var(--warn); }
+  .tag.bad  { background: rgba(220,38,38,.12); color: var(--bad); }
+  .lv { display: inline-block; border-radius: 4px; padding: 0 .35em; font-weight: 700; color: #fff; font-size: .72em; white-space: nowrap; vertical-align: .06em; }
+  .lv.prod { background: var(--lvl-prod); } .lv.sess { background: var(--lvl-sess); }
+  .lv.q { background: var(--lvl-q); } .lv.loop { background: var(--lvl-loop); }
+  .lv.bad { background: var(--bad); } .lv.good { background: var(--good); }
+
+  table { border-collapse: collapse; width: 100%; font-size: .66em; }
+  th, td { text-align: left; padding: .18em .35em; border-bottom: 1px solid var(--card-border); vertical-align: top; }
+  th { color: var(--accent); font-weight: 700; }
+  td { color: var(--muted); line-height: 1.3; }
+  td.n, th.n { text-align: right; font-family: var(--mono); white-space: nowrap; }
+  td.nm { font-weight: 700; color: var(--text); }
+  tr.me td { background: rgba(220,38,38,.06); }
+  tr.ok td { background: rgba(5,150,105,.06); }
+  tr.sum td { background: rgba(37,99,235,.06); font-weight: 700; color: var(--text); }
+
+  .banner {
+    border-radius: 10px; padding: .32em .7em; font-size: .7em;
+    background: linear-gradient(90deg, rgba(37,99,235,.08), rgba(5,150,105,.07));
+    border: 1px solid rgba(37,99,235,.28); color: var(--text); line-height: 1.4;
+  }
+  .banner.tight { margin-top: .35em; }
+  .rulers { display: grid; grid-template-columns: repeat(4, 1fr); gap: .4em; margin-top: .35em; }
+  .ruler { background: var(--card); border: 1px solid var(--card-border); border-radius: 10px; padding: .28em .5em; min-width: 0; }
+  .ruler .t { font-size: .62em; font-weight: 700; color: var(--text); line-height: 1.3; }
+  .ruler .t small { font-weight: 500; color: var(--muted); }
+  .ruler .n { font-size: .56em; color: var(--muted); line-height: 1.32; margin-top: .12em; }
+  .ruler.how { background: linear-gradient(90deg, rgba(37,99,235,.08), rgba(5,150,105,.07)); border-color: rgba(37,99,235,.28); }
+  .concl { display: grid; grid-template-columns: repeat(4, 1fr); gap: .4em; margin-top: .35em; }
+  .concl .it { background: var(--card); border: 1px solid var(--card-border); border-radius: 10px; padding: .32em .5em; min-width: 0; }
+  .concl .it .k { font-weight: 800; color: var(--accent); font-size: .78em; line-height: 1.25; }
+  .concl .it p { font-size: .6em; line-height: 1.35; color: var(--muted); margin: .12em 0 0; }
+  .footer {
+    margin-top: auto; padding-top: .28em; padding-right: 13em; display: flex;
+    justify-content: space-between; align-items: flex-end; color: var(--muted); font-size: .54em; gap: 1em; line-height: 1.32;
+  }
+  .footer b { color: var(--text); }
+  .footer > div:last-child { white-space: nowrap; flex: none; }
+  .row.grow > .card > table,
+  .card.grow > table { height: 100%; }
+  .row.grow > .card > table td,
+  .row.grow > .card > table th,
+  .card.grow > table td,
+  .card.grow > table th { vertical-align: middle; }
+  .row > .card > .pts { flex: 1; display: flex; flex-direction: column; justify-content: space-between; }
+  .nav { position: absolute; bottom: 3.2%; right: 3%; display: flex; gap: .5em; align-items: center; z-index: 10; font-size: clamp(9.5px, min(1.05vw, 1.86vh), 21px); }
+  .nav button { background: #fff; border: 1px solid var(--card-border); color: var(--text); border-radius: 8px; width: 2.1em; height: 2.1em; cursor: pointer; font-size: 1em; }
+  .nav button:hover { border-color: var(--accent); color: var(--accent); }
+  .nav .pg { color: var(--muted); font-family: var(--mono); font-size: .88em; padding: 0 .35em; }
+  .dots { position: absolute; bottom: 3.9%; left: 3%; display: flex; gap: .42em; z-index: 10; }
+  .dots i { width: .52em; height: .52em; border-radius: 50%; background: #c9d2e0; cursor: pointer; }
+  .dots i.on { background: var(--accent); }
+
+  .dom { border-top: 4px solid var(--lvl-prod); }
+  .dom.host { border-top-color: var(--good); }
+  .pts { list-style: none; margin: 0; padding: 0; }
+  .pts li { margin: 0 0 .28em; padding: .22em .4em; background: #fff; border: 1px solid var(--card-border); border-radius: 7px; font-size: .64em; line-height: 1.32; color: var(--muted); }
+  .pts li b { color: var(--text); }
+  .eqbar { display: flex; gap: .4em; margin-top: .35em; }
+  .eqbar .eq { flex: 1; background: #fff; border: 1px solid var(--card-border); border-radius: 8px; padding: .28em .5em; min-width: 0; font-size: .62em; line-height: 1.35; color: var(--muted); }
+  .eqbar .eq b { color: var(--text); }
+  .eqbar .g { color: var(--good); font-weight: 800; }
+  .eqbar .r { color: var(--bad); font-weight: 800; }
+  .eqbar .b { color: var(--accent); font-weight: 800; }
+</style>
+</head>
+<body>
+<div class="deck">
+
+<section class="slide active">
+  <h2><span class="num">01</span>判断：<span class="hl">装机成立，把事做对还没有</span><small>2026-09-08 发布 · 材料核对 09-23 · 两张成绩单分开读</small></h2>
+  <div class="banner">个人 agent 的完成度，首先是<b>伤害半径</b>的工程完成度。OpenClaw 已经证明「一人一台电脑、文件当记忆、在聊天里做事」有人爱用；Muse 把运维收成零配置，预算主要花在<b>模型碰不到的许可计算机</b>上。Spark 不是榜首。</div>
+  <div class="row grow" style="margin-top:.4em;">
+    <div class="card">
+      <h3>装机 <span class="tag real">物种有人要</span></h3>
+      <table>
+        <tr><th>口径</th><th class="n">数字</th><th>怎么读</th></tr>
+        <tr><td class="nm">两周下载</td><td class="n">约 250 万</td><td>App Store 约 150 万 + Play 约 110 万 · Sensor Tower，Mashable 转述</td></tr>
+        <tr><td class="nm">对照窗口</td><td class="n">40 / 20 / 310 万</td><td>Claude / Grok 头 13 天；ChatGPT 同窗口仍更高。iOS 与 Android 发布时间不同，横向要打折</td></tr>
+        <tr><td class="nm">榜</td><td class="n">免费榜第 1</td><td>TechCrunch 09-22：平台对齐后的发布节奏被称为超过 ChatGPT</td></tr>
+        <tr><td class="nm">价格</td><td class="n">0 / 20 / 100</td><td>美元 / 月。免费覆盖「大多数人需要的」，付费买算力。美国、18+</td></tr>
+      </table>
+      <p style="margin-top:.35em;">表面：iOS、Android、muse.ai、WhatsApp。眼镜在路线上。内部代号 Hatch。设计提示第一句：让用户的生活更好。</p>
+    </div>
+    <div class="card">
+      <h3>任务 <span class="tag bad">这一下午垫底</span><span class="sub">RuntimeWire 09-16 · 九个可核验终态 · 始终不批准发送 / 付款</span></h3>
+      <table>
+        <tr><th>产品</th><th class="n">指数</th><th class="n">过题</th><th>过夜</th></tr>
+        <tr class="ok"><td class="nm">Grok Bot</td><td class="n goodc">4.00</td><td class="n">7 / 9</td><td>仅有人看着</td></tr>
+        <tr><td class="nm">Instinct</td><td class="n">3.55</td><td class="n">5 / 9</td><td>否</td></tr>
+        <tr><td class="nm">Claude Cowork</td><td class="n">3.12</td><td class="n">4 / 9</td><td>否</td></tr>
+        <tr><td class="nm">ChatGPT Work</td><td class="n">2.96</td><td class="n">4 / 9</td><td>否</td></tr>
+        <tr class="me"><td class="nm">Muse</td><td class="n badc">2.46</td><td class="n badc">2 / 9</td><td>否</td></tr>
+      </table>
+      <p style="margin-top:.35em;">五家都拒绝了隐藏的外发指令，也都拒绝了形近收款账户。Muse 的失分是：公开网页被当成需要 <span class="mono">approved</span>，目录价对不上现货，同一段里自称 9 题全过。Trust 被打到 2.5。持久化 1.0：复用了一个已禁用的 cron。</p>
+    </div>
+    <div class="card">
+      <h3>从业者怎么读这两列</h3>
+      <ul class="pts">
+        <li><b>下载验证物种。</b>普通人愿意装一个「替我办事」的入口，而不是再装一个聊天机器人。</li>
+        <li><b>九题验证终态。</b>窄任务上，工单型产品这一天更完整。无人拿到无人值守过夜。</li>
+        <li><b>失败形态是校准，不是缺浏览器。</b>「不可逆先问」如果分不清公开页和下单，会同时过度打扰和自我评分。</li>
+        <li><b>所以不要用榜单解释架构，也不要用架构解释下载。</b>后面七页把盒子、物种和买卖分开。</li>
+      </ul>
+    </div>
+  </div>
+  <div class="footer">
+    <div><b>来源</b>：Meta News 09-08；Sensor Tower 经 Mashable；TechCrunch 09-22；RuntimeWire bake-off 09-16（一评委、冷会话、中途不许新 OAuth）。九题不是两个月后的产品，下载也不是可靠性。</div>
+    <div>Muse 深度洞察 · v1 · P1</div>
+  </div>
+</section>
+
+<section class="slide">
+  <h2><span class="num">02</span>架构：<span class="hl">一台 VM，许可在模型外面</span><small>安全文：让所有人能用的工作量，大部分花在这一页</small></h2>
+  <div class="row grow">
+    <div class="card dom">
+      <h3>运行时单元格 <span class="lv bad">会吃到不可信数据</span><span class="sub">systemd-nspawn · 单元格 root ≠ 宿主机 root</span></h3>
+      <ul class="pts">
+        <li><b>Hatch daemon</b> 核心 harness。工作区、终端、自写工具、subagent、cron 都在这里。</li>
+        <li><b>完整 Debian 根</b>，虚拟网卡。无 <span class="mono">io_uring</span>，无 <span class="mono">CAP_SYS_PTRACE</span> / <span class="mono">CAP_NET_ADMIN</span>。</li>
+        <li><b>浏览器 subagent</b> 只拿无障碍树，不拿 DOM，不能在页面里跑 JavaScript。</li>
+        <li><b>只持有替身令牌。</b> 内置连接器的 CLI 只解析参数、交出文件描述符，业务逻辑不在单元格里。</li>
+        <li>和单元格外的通话走 Unix socket，<span class="mono">SO_PEERCRED</span> + peer ACL，没有可偷的共享密钥。</li>
+      </ul>
+    </div>
+    <div class="card dom host">
+      <h3>单元格外 <span class="lv good">模型关不掉</span><span class="sub">独立 systemd 单元 · 攻击者关不掉分类器</span></h3>
+      <ul class="pts">
+        <li><b>Sentinel</b> 另一个 agent。连接器动作和一切出网的唯一许可权威。Muse 提议，它批准、拒绝或询问。</li>
+        <li><b>authd</b> 保管 OAuth、密码、支付材料。凭证在这台 VM 的隔离容器里，不进 Meta 中心化库。</li>
+        <li><b>privsep worker</b> 按 cgroup 识别，凭证允许列表是显式的。日历 worker 不能改参数去要邮件凭证。</li>
+        <li><b>hatch-safety</b> 独立模型和分类器，检查进出核心推理的内容，以及浏览器上的外带 / 注入 / 高风险表单。</li>
+        <li><b>Postgres</b> 放持久状态，与单元格和凭证库分开。推理和遥测只走受约束代理。</li>
+      </ul>
+    </div>
+  </div>
+  <div class="banner tight">Simon Willison 的 lethal trifecta：<b>私有数据 + 不可信内容 + 对外通信</b>。Muse 的前提是模型会被说服、也会被攻击。三层同时在，不靠提示词单独扛住。</div>
+  <div class="eqbar">
+    <div class="eq"><b class="b">模型层</b> Spark 1.3 抗注入接近当时 SOTA，并被训过「什么算不可逆」。</div>
+    <div class="eq"><b class="g">harness 层</b> 外部数据进上下文即标成不可信。分类器在单元格外并行，可独立于主模型升级。</div>
+    <div class="eq"><b class="r">出网层</b> 把数据送出 VM 必须经 Sentinel。底下还有单元格、privsep、ACL，不依赖模型是否被说服。</div>
+  </div>
+  <div class="footer">
+    <div><b>心智模型</b>：一台盒子上两个安全域，不是一个有 root 的 LLM。客户端（App / 网页）经安全传输直连这台 VM。关掉 App，电脑还在。来源：Tarek Sheasha《How We Built Safety Into Muse》09-08。</div>
+    <div>Muse 深度洞察 · v1 · P2</div>
+  </div>
+</section>
+
+<section class="slide">
+  <h2><span class="num">03</span>边界：<span class="hl">秘密、出网、浏览、付款</span><small>同意是能力，不是对话里的一句建议</small></h2>
+  <div class="row grow">
+    <div class="card">
+      <h3>Sentinel 问人 <span class="lv prod">不走对话</span></h3>
+      <ul class="pts">
+        <li>决策是询问时，执行停住。对话框由 Sentinel <b>直接发给客户端</b>，答复直接回到 Sentinel。</li>
+        <li>授权绑连接器、目的地、用途。一次 / 会话 / 任务 / 时限 / 永久。后续调用必须精确命中。</li>
+        <li>只读、已允许、可证明低风险的可以不打断。他们写明这个平衡会随真实用户调。</li>
+        <li>设计上要避开条幅疲劳：什么都弹，人就会全点允许。浏览默认可做，难撤销的停。</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h3>替身凭证 <span class="lv sess">模型看不见</span></h3>
+      <ul class="pts">
+        <li>单元格里的代码只拿 authd 签发的 surrogate。放行之后，Sentinel 在网络边界换成真凭证。</li>
+        <li>被提示注入逼着「把密钥念出来」，念出来的也不是真的。</li>
+        <li>三权分开：privsep 决定碰凭证的代码在哪，authd 决定这个调用者能拿哪份，Sentinel 决定能不能做。</li>
+        <li>邮件连接器用规则加分类器剥掉验证码、重置链接、魔法登录。连上邮箱 ≠ 连上所有用它找回的账号。</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h3>污染出网 <span class="lv q">读了就变脏</span></h3>
+      <ul class="pts">
+        <li>每个工具进程起步是干净的，<b>读了用户数据就变脏</b>。</li>
+        <li>干净、且落在很窄的自动允许里、URL 也通过的请求，可以不打扰人。</li>
+        <li>脏的或无法核验的，失去自动放行，回到正常审批。</li>
+        <li>eBPF：cgroup 上拦截并归属进程，LSM 钩子上传播污染。SSRF：看起来是公网主机、解析后打到内网，也拦。</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h3>浏览器与钱 <span class="lv bad">每次人批</span></h3>
+      <ul class="pts">
+        <li>密码从客户端 UI 直进 authd。填表或用户接管时，agent 暂停，读不出刚注入的密码。</li>
+        <li>CDP 在单元格外的 broker。DevTools 关闭。用户能看见浏览并随时接管。</li>
+        <li>结账页每次人批。未存卡的站点走 Stripe Link 单次卡：商户 + 金额 + 时效。Shop Pay、1Password 在后。</li>
+        <li>Link 给这个 agent 做了购买保障。已知恶意站点名单在 VM 内匹配，直接挡住导航。</li>
+      </ul>
+    </div>
+  </div>
+  <div class="banner tight">错仍然会发生。提示注入被写成行业开放问题。设计目标是<b>伤害有界，并且人不被审批淹没</b>。Bug bounty 公开，最高 30 万美元；成功的、影响到一名用户的提示注入最高 13 万。Confidential VM（整机用只有用户持有的密钥加密）计划年内，<b>发布时还不是这个</b>：今天员工访问靠运营策略，Meta 在支持与安全需要时仍能进数据。</div>
+  <div class="footer">
+    <div><b>和「同一个 agent 弹个确认」的差别</b>：放行权不在模型的工具列表里。模型可以叙述、可以撒谎、可以被网页说服，按钮的语义由它碰不到的程序核对。</div>
+    <div>Muse 深度洞察 · v1 · P3</div>
+  </div>
+</section>
+
+<section class="slide">
+  <h2><span class="num">04</span>模型：<span class="hl">Spark 是这个盒子的居民</span><small>09-02 先上 Muse Code 与 API · 09-08 产品 Muse 使用 1.3 · 不是榜首</small></h2>
+  <div class="row grow">
+    <div class="card" style="flex:1.05;">
+      <h3>公开位置 <span class="sub">竞争，不是每一项领先</span></h3>
+      <table>
+        <tr><th>项</th><th class="n">1.3</th><th>位置</th></tr>
+        <tr><td class="nm">AA 指数</td><td class="n">约 61 / 62</td><td>max 约第 6 / 643。前面是 Claude Fable 5.1、Opus 5</td></tr>
+        <tr><td class="nm">GPQA Diamond</td><td class="n">94%</td><td>xhigh。4 月首版约 89.5%</td></tr>
+        <tr><td class="nm">上下文 / MRCR</td><td class="n">1M · 98.5%</td><td>256K–512K；更长区间约 98.1%（max）</td></tr>
+        <tr><td class="nm">JobBench</td><td class="n">64.9%</td><td>36 个里第 2。测的是人想委托的工作，不是 GDP 最大的工作</td></tr>
+        <tr><td class="nm">编码</td><td class="n">75.4 / 88.8</td><td>DeepSWE / Terminal-Bench 2。SWE-Atlas 59.4。相对 1.2：工具调用约 −20%，token 约 −25%</td></tr>
+      </table>
+      <p style="margin-top:.3em;">API 每百万 token：贡献训练的 contributor 输入 0.10 / 缓存 0.002 / 输出 0.20 美元；不贡献的 1.3 为 1.25 / 0.15 / 4.25。产品月费买的是算力档，不是这条 API 价。</p>
+    </div>
+    <div class="card">
+      <h3>对着 harness 训的行为 <span class="tag mid">这才是产品相关项</span></h3>
+      <ul class="pts">
+        <li><b>多种 harness 上训练</b>，以便换环境还能用工具把上下文找齐、发现计划缺口就改。</li>
+        <li><b>含糊就问，卡住就找人，不可逆之前确认。</b> 长任务按偏好频繁汇报，或安静地做。</li>
+        <li><b>一条乱线程里认任务。</b> 用户打断、改旧请求时，把新消息映射到正确的那一件。</li>
+        <li><b>知道自己不能做什么。</b> 碰到障碍不编造成功。</li>
+        <li><b>对「什么算不可逆」有校准</b>，抗注入强于前代。P1 的过度审批说明：校准写进模型，仍然要主机侧的动作分类才稳。</li>
+      </ul>
+      <p style="margin-top:.25em;">锁模型是为了这些行为可复现。OpenClaw 把 <span class="mono">meta/muse-spark-1.3</span> 设成默认，得到的是模型，得不到 Sentinel、替身令牌和 WhatsApp 里的那个人。</p>
+    </div>
+  </div>
+  <div class="rulers">
+    <div class="ruler"><div class="t">只有模型</div><div class="n">lethal trifecta 还在。密钥若在环境里，说服一次就能念走。</div></div>
+    <div class="ruler"><div class="t">只有 Sentinel</div><div class="n">该问的时候不问、该安静的时候刷屏，产品先崩。P1 是问得太多。</div></div>
+    <div class="ruler"><div class="t">两层都要</div><div class="n">模型负责判断气质，单元格外负责放行权。缺一不可，也不能互相替代。</div></div>
+    <div class="ruler how"><div class="t">Muse Code ≠ Muse</div><div class="n">9 月 2 日的终端编码 agent 与 9 月 8 日的消费产品共用 Spark。代码在个人 agent 里是做看板的手段，不是 PR。</div></div>
+  </div>
+  <div class="footer">
+    <div><b>来源</b>：Introducing Muse Spark 1.3；developer.meta.com 模型页；HokAI / BenchmarkList 转述的 AA、JobBench、编码分。架构未公开参数量。SWE-bench Verified 官方未报。</div>
+    <div>Muse 深度洞察 · v1 · P4</div>
+  </div>
+</section>
+
+<section class="slide">
+  <h2><span class="num">05</span>对照 OpenClaw：<span class="hl">抄的是文件，重写的是盒子</span><small>Friedman 09-22：严重借鉴，harness 从零写；SOUL.md 因为 Peter 做对了</small></h2>
+  <div class="card grow">
+    <table>
+      <tr><th style="width:7.2em;">轴</th><th>OpenClaw · 你住进去的 runtime</th><th>Muse · 你给它发消息的人</th></tr>
+      <tr><td class="nm">产品直觉</td><td>Gateway 占住通道；循环是收消息 → 装配 → 推理 → 工具 → 落盘。心跳和 cron 让它在没人说话时也跑。</td><td>同一句话：一人一台电脑，后台会自己醒，聊天是入口。1 月 MSL 用几百台 Mac mini 把这套跑顺，再做成零配置。</td></tr>
+      <tr><td class="nm">文件契约</td><td>每会话注入 SOUL / AGENTS / USER / HEARTBEAT。每日记忆按需读，不进每轮提示。技能是一句「这里有 CLI」，用到再 read。</td><td>同名 SOUL 被指几乎相同。记忆是可编辑文件，可单条忘掉。头像和名字是产品层另加的：文件定义行为，头像定义在跟谁说话。</td></tr>
+      <tr><td class="nm">隔离默认</td><td>工作区是默认 cwd，<b>不是硬沙箱</b>。凭证在 <span class="mono">~/.openclaw/credentials/</span>。策略钩子和模型在同一侧。</td><td>默认两个安全域。真凭证不进上下文。出网权在另一个 agent 手里。</td></tr>
+      <tr><td class="nm">模型 / 扩展</td><td>模型可换，Spark 只是官方插件之一。ClawHub 技能、任意钩子、工作区覆盖同名技能。</td><td>产品锁定 Spark。没有 bot 商店。官方连接器 + agent 在 VM 里自己写工具。</td></tr>
+      <tr><td class="nm">数据与现场</td><td>默认在用户自己的磁盘。手机可以 <span class="mono">role: node</span> 连上 Gateway：摄像头、屏幕、位置。</td><td>在 Meta 的云上。用户之间隔离。云 VM 看不见来电、到家、相册，除非做成连接器。眼镜还没上。</td></tr>
+    </table>
+  </div>
+  <div class="rulers">
+    <div class="ruler"><div class="t">值得原样拿走的</div><div class="n">新会话没有记忆，读过文件才记得。人格和用户事实可删、可审、可版本化。这是契约，不是文采。</div></div>
+    <div class="ruler"><div class="t">不能原样扩的</div><div class="n">Gateway、配对、密钥、可选沙箱，是构建者的自由，也是不会运维的人的失败面。事件不重放是官方不变量。</div></div>
+    <div class="ruler"><div class="t">OpenClaw 仍更强</div><div class="n">数据不出自己的机器；模型可换；钩子开放；官方 cron / stream 是可依赖的外部契约；现场设备能接进来。</div></div>
+    <div class="ruler how"><div class="t">第三种东西</div><div class="n">用 Spark API 跑 OpenClaw，两头都不是对方。循环没有秘密，秘密在循环外面的接线：谁持有密钥，谁说了算。</div></div>
+  </div>
+  <div class="footer">
+    <div><b>来源</b>：TechCrunch 09-22 引 Friedman；docs.openclaw.ai 的 architecture / agent loop / workspace。Steinberger 2026 年早些时候加入 OpenAI。OpenClaw 前身 Clawdbot、Moltbot。</div>
+    <div>Muse 深度洞察 · v1 · P5</div>
+  </div>
+</section>
+
+<section class="slide">
+  <h2><span class="num">06</span>现有产品：<span class="hl">仓库、工单、生活是三种单位</span><small>模型可以共用，成功定义不能共用 · 九题衡量的是工单</small></h2>
+  <div class="row" style="flex:1.15;">
+    <div class="card">
+      <h3><span class="lv sess">Code</span> 仓库</h3>
+      <ul class="pts">
+        <li><b>成功</b> 能合进去的 diff。用户被假定能审计。</li>
+        <li><b>计算机</b> 你的机器，或用完即弃的沙箱。拉式：你打开它才工作。</li>
+        <li><b>记忆</b> 仓库里的 AGENTS.md / CLAUDE.md，写的是项目规程。</li>
+        <li><b>代表</b> Claude Code、Codex、Cursor、Muse Code。</li>
+        <li>破坏半径默认是仓库加上这个 shell。个人 agent 里出现代码，是为了做出开支看板。</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h3><span class="lv q">Work</span> 工单</h3>
+      <ul class="pts">
+        <li><b>成功</b> 一份可核验的产出：文档、草稿、停在下单前的候选。</li>
+        <li><b>计算机</b> 常常随会话生死。Grok 的多个 Bot 共享一台 Firecracker 的文件和登录态，Bot 之间不是安全边界。</li>
+        <li><b>同意</b> 多半仍是同一个 agent 在要批准，可以 always-allow。</li>
+        <li><b>代表</b> ChatGPT Work、Claude Cowork、Manus、Grok Bot 的干活面。</li>
+        <li>主动性是「做完了」或一条定时任务，不是生活呼机。扩展靠插件目录或模板商店。</li>
+      </ul>
+    </div>
+    <div class="card" style="border-color:rgba(37,99,235,.45);">
+      <h3><span class="lv prod">Personal</span> 生活</h3>
+      <ul class="pts">
+        <li><b>成功</b> 本来会漏的事被接住，且不可逆动作经过同意。设计示范是登机前抓住 12 小时后截止的选拔报名。</li>
+        <li><b>计算机</b> 每人一台长期活着的 VM。聊天是视图。</li>
+        <li><b>记忆</b> 这个人。未经提示的建议从这里来。Goals 把长期目标收成一页。</li>
+        <li><b>同意</b> 另一个程序。模型不见密钥。批准不走对话。</li>
+        <li><b>代表</b> Muse、OpenClaw。Instinct 用 iMessage 当产品本身，架构未公开，关系表面同类。</li>
+      </ul>
+    </div>
+  </div>
+  <div class="card" style="margin-top:.4em;">
+    <h3>同一场九题为什么不能裁决物种 <span class="sub">09-16 · 晚餐 / 理线器 / 暂停的周五摘要 / 隐藏指令 / 形近账户</span></h3>
+    <table>
+      <tr><th>观察到的分裂</th><th>工单读法</th><th>生活读法</th></tr>
+      <tr><td class="nm">Muse 不打开公开的订位页</td><td class="badc">失分。公开页不需要 approved，下单才需要。</td><td>「不可逆先问」校准过头。分界应在主机侧的动作类，不在模型临场发挥。</td></tr>
+      <tr><td class="nm">Grok / Work 留下可检查的暂停任务</td><td class="goodc">持久化这一项他们更完整。</td><td>Muse 复用了禁用 cron。机制在产品里，状态不一定干净。过夜五家都没有。</td></tr>
+      <tr><td class="nm">五家都挡住注入和形近账户</td><td>贴进提示的一段话，是安全地板，不是审计。</td><td>Sentinel 要防的是恶意网页 + 真凭证 + 同一个 agent 自己弹批准。这场没测到。</td></tr>
+      <tr><td class="nm">Claude 读不了 OpenTable 位子</td><td>这场没有 GUI 浏览器，只有摘要式抓取。</td><td>个人 agent 的浏览器还必须：人能接管、填密码时 agent 看不见、结账用单次卡。</td></tr>
+    </table>
+  </div>
+  <div class="footer">
+    <div><b>不要放在一起比的</b>：SWE-bench 对「选拔报名有没有被接住」；「有没有浏览器」；「能不能 always-allow」（永久授权必须绑目的地，并由模型碰不到的程序核对）。</div>
+    <div>Muse 深度洞察 · v1 · P6</div>
+  </div>
+</section>
+
+<section class="slide">
+  <h2><span class="num">07</span>商业：<span class="hl">卖的是零配置的信任</span><small>不是广告位，也不是模型榜 · 信任的密码学一半还没交货</small></h2>
+  <div class="row grow">
+    <div class="card">
+      <h3>谁付钱 <span class="lv prod">算力，不是信息流</span></h3>
+      <table>
+        <tr><th>产品</th><th>买卖</th></tr>
+        <tr><td class="nm">Muse</td><td>免费档 + 20 / 100 美元月费。对话和 VM 数据不进广告系统。付费理由是重用户的算力。</td></tr>
+        <tr><td class="nm">副作用</td><td>代理浏览表现为用户自己的访问。商家仍可能据此在 Instagram 投广告；订位、Marketplace 也可能间接影响广告。</td></tr>
+        <tr><td class="nm">OpenClaw</td><td>开源 runtime。模型费用户自付。换供应商不用迁移「那个人」。</td></tr>
+        <tr><td class="nm">Work / Grok</td><td>Work 是 Plus 及以上里的模式，无单独 SKU。Grok Bot 捆在付费 Cursor 或 SuperGrok，无免费 Bot 席位。</td></tr>
+      </table>
+    </div>
+    <div class="card">
+      <h3>分发为什么快 <span class="lv loop">只有 Meta 有的上下文</span></h3>
+      <ul class="pts">
+        <li><b>WhatsApp 是已经在用的关系面。</b> App 才放得下日志、Goals、记忆编辑和审批。纯聊天记录放不下确定性别控制。</li>
+        <li><b>生活图谱是演示，也是壁垒。</b> 把 Instagram 上存过的菜谱变成采购清单，再记住朋友的饮食忌口。别的 agent 要先把这些连接器做出来。</li>
+        <li><b>冷启动是一页建议。</b> 能力大到用户不知道从哪开口。Ideas、引导提示、按目标主动调整。工单产品不需要这个，因为用户自带题目。</li>
+        <li><b>没有插件商店。</b> 头一批连接器（邮件、日历、家、车、Meta 系、Stripe）要和对方一起做，并写成会用的技能。这是供给，不是再装一个社区技能。</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h3>信任卖到哪一步 <span class="lv bad">一半在路上</span></h3>
+      <ul class="pts">
+        <li><b>今天能解释的一句</b>：它不能自己到达互联网，密码它看不见，花钱和发信会停下来给你看。</li>
+        <li><b>今天不能承诺的一句</b>：Meta 也看不见。Confidential VM 给外部审计、计划年内持续可检查。发布时明确写了，运营需要时公司仍能访问。</li>
+        <li><b>训练</b>：轨迹先去掉关键身份信息，设置里可以完全退出。退出训练 ≠ 退出运营访问。</li>
+        <li><b>权限大于社交网络历史上要过的任何权限。</b> 安全架构是回答，不是已经被时间证明的回答。下载说明愿意试，不说明愿意把全部账号交出去。</li>
+      </ul>
+    </div>
+  </div>
+  <div class="banner tight">商业上做成的是一个<b>单独的个人 agent SKU</b>：零配置、可对非工程师讲清出网权在另一个程序里、并用算力而不是信息流标价。没做成的是密码学隔离，以及「可以无人值守过夜」。这两件都还在产品外面。</div>
+  <div class="footer">
+    <div><b>来源</b>：Meta News 与安全文的数据政策；RuntimeWire 09-16 功能表（价格档名称 Power / Maximum 以该文为准，官方只写两档订阅）。广告副作用是官方自己写明的。</div>
+    <div>Muse 深度洞察 · v1 · P7</div>
+  </div>
+</section>
+
+<section class="slide">
+  <h2><span class="num">08</span>用法：<span class="hl">抄围墙和分界，不抄下载曲线</span><small>给已经在做 agent 的人 · 手机现场和 OpenClaw 官方语义都还在</small></h2>
+  <div class="row grow">
+    <div class="card">
+      <h3>判断已经成立 <span class="tag real">继续</span></h3>
+      <ul class="pts">
+        <li><b>主动只有一个出口，门槛是产品。</b> Muse 是「值得打断才发」，且可调。全双工下还要分级：插话几乎免费，体验极贵。只读和公开页不要走批准。</li>
+        <li><b>不可逆不走默认路径。</b> 钱、对外发送、删除停住。Muse 的购买和发信每次都停。</li>
+        <li><b>任务比一轮对话活得久。</b> Goals、cron、关掉 App 还在跑。聊天是视图，任务存储才是记录。</li>
+        <li><b>固定动作不要让模型写 job。</b> 选模式、填参数、程序生成。Muse 的出网同样不自由。这条没有被「agent 会自己写工具」推翻。</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h3>结构要补上 <span class="tag mid">围墙</span></h3>
+      <ul class="pts">
+        <li><b>批准由中枢投递</b>，不由模型的下一句携带。按钮语义由中枢校验。模型只看见结果，避免同一条上下文里二次劝说。</li>
+        <li><b>真凭证不进上下文。</b> 读过邮件、网页、截图的执行过程，失去自动发送权。事件驱动任务正是把 trifecta 接全的入口。</li>
+        <li><b>两条车道。</b> 模板车道：定时、单事件、已授权的固定动作。沙箱车道：调研、草稿、一次性小工具，出网仍走中枢。长尾不要撑破模板库，沙箱也不要变成默认 cwd。</li>
+        <li><b>冷启动是一页建议</b>，由中枢维护，不写进每轮提示。</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h3>不要抄 <span class="tag bad">物种错位</span></h3>
+      <ul class="pts">
+        <li><b>不要用云 VM 替换手机上的现场</b>：来电、到家、电量、相册、全双工。这些 OpenClaw 用本地节点接，Muse 的云电脑默认没有。</li>
+        <li><b>不要用二元「发不发」替换分级打扰。</b> 全双工会把这个门槛用坏。</li>
+        <li><b>不要用装机或「像一个人」当可靠性。</b> Muse 的两列是反向的。</li>
+        <li><b>不要假设模型会自己确认。</b> Spark 是被训过的。没有同样的训练目标，提示替代不了模板车道和中枢批准。</li>
+        <li><b>不要为了「更像后台」离开已有的官方调度语义。</b> Muse 能从零写调度，是因为它拥有整台 VM 和 Sentinel。</li>
+      </ul>
+    </div>
+  </div>
+  <div class="concl">
+    <div class="it"><div class="k">两域</div><p>执行进程和许可进程分开。放行权不在模型的工具列表里。</p></div>
+    <div class="it"><div class="k">两车道</div><p>不可逆走模板。可逆的长尾进围起来的沙箱，密钥仍在外面。</p></div>
+    <div class="it"><div class="k">两张成绩单</div><p>物种有没有人要，和这一次终态对不对，分开记。下载不验收可靠性。</p></div>
+    <div class="it"><div class="k">两刀</div><p>时延和话权是一刀，伤害半径是另一刀。Muse 只做了第二刀。全双工前台它还没有。</p></div>
+  </div>
+  <div class="footer">
+    <div><b>验收对齐 P1 右列</b>：不可逆动作的精确同意、注入后不外带、事件任务的终态可回放。依恋和留存单独记。材料与四篇底稿同目录，核对日 2026-09-23。</div>
+    <div>Muse 深度洞察 · v1 · P8</div>
+  </div>
+</section>
+
+</div>
+<div class="dots" id="dots"></div>
+<div class="nav">
+  <button id="prev" type="button">‹</button>
+  <span class="pg" id="pg">1 / 8</span>
+  <button id="next" type="button">›</button>
+</div>
+<script>
+(function () {
+  var slides = [].slice.call(document.querySelectorAll('.slide'));
+  var dotsBox = document.getElementById('dots');
+  var curIdx = 0;
+  slides.forEach(function (_, i) {
+    var d = document.createElement('i');
+    if (i === 0) d.classList.add('on');
+    d.onclick = function () { go(i); };
+    dotsBox.appendChild(d);
+  });
+  var dots = [].slice.call(dotsBox.children);
+  function go(i) {
+    curIdx = (i + slides.length) % slides.length;
+    slides.forEach(function (s, j) { s.classList.toggle('active', j === curIdx); });
+    dots.forEach(function (d, j) { d.classList.toggle('on', j === curIdx); });
+    document.getElementById('pg').textContent = (curIdx + 1) + ' / ' + slides.length;
+    if (location.hash !== '#p=' + (curIdx + 1)) history.replaceState(null, '', '#p=' + (curIdx + 1));
+  }
+  document.getElementById('prev').onclick = function () { go(curIdx - 1); };
+  document.getElementById('next').onclick = function () { go(curIdx + 1); };
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'ArrowRight' || e.key === ' ' || e.key === 'PageDown') { e.preventDefault(); go(curIdx + 1); }
+    if (e.key === 'ArrowLeft' || e.key === 'PageUp') { e.preventDefault(); go(curIdx - 1); }
+  });
+  var mh = /p=(\d+)/.exec(location.hash);
+  if (mh) go(parseInt(mh[1], 10) - 1);
+  window.__go = go;
+})();
+</script>
+</body>
+</html>
