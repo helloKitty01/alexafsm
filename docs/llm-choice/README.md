@@ -8,3 +8,4 @@
 | [02-输入输出为什么分开.md](./02-输入输出为什么分开.md) | 输入 / 缓存写 / 缓存读 / 输出四条价的原因；Cursor Ultra 的 Fable 单价与 API 相同，优惠是 $200 订阅里的额度面值 |
 | [03-Claude-Code与Cursor与API.md](./03-Claude-Code与Cursor与API.md) | Claude Code 的 Fable：Pro 按 API 另计，Max 最多占每周额度的一半；和 Cursor、直接 API 的差额 |
 | [04-和DeepSeek-V4.md](./04-和DeepSeek-V4.md) | V4.1-Flash / V4-Pro 与 Fable 的单价、同一次调用的金额，以及不能用 Claude / Cursor 额度去折 |
+| [05-和Codex-Astra.md](./05-和Codex-Astra.md) | GPT-6 Astra 的 API 价与同一次调用；Codex / 聊天额度；和 Fable、DeepSeek 的差额 |
