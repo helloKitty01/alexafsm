@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Muse 深度洞察 · v2 · 7 页</title>
+<style>
+  :root {
+    --bg: #e9edf4;
+    --slide-bg: linear-gradient(180deg, #ffffff 0%, #f6f8fc 100%);
+    --card: #f4f7fb;
+    --line: #d5deea;
+    --text: #1a2436;
+    --muted: #5c6b82;
+    --accent: #2563eb;
+    --good: #059669;
+    --bad: #dc2626;
+    --warn: #d97706;
+    --mono: "SF Mono", "JetBrains Mono", Consolas, monospace;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { background: var(--bg); height: 100%; }
+  body {
+    font-family: "PingFang SC", "Microsoft YaHei", "Noto Sans SC", -apple-system, sans-serif;
+    color: var(--text);
+    display: flex; justify-content: center; align-items: center;
+    padding: 16px 12px; min-height: 100vh;
+  }
+  .deck { position: relative; width: min(96vw, calc((100vh - 32px) * 1.7778)); }
+  .slide {
+    width: 100%; aspect-ratio: 16 / 9;
+    background: var(--slide-bg);
+    border: 1px solid var(--line); border-radius: 16px;
+    box-shadow: 0 16px 40px rgba(26,36,54,.12);
+    padding: 1.7% 2.5% 1.35%;
+    display: none; flex-direction: column;
+    overflow: hidden; position: relative;
+    font-size: clamp(14px, min(1.12vw, 2vh), 22px);
+  }
+  .slide.active { display: flex; }
+  .slide::before {
+    content: ""; position: absolute; left: 0; right: 0; top: 0; height: 4px;
+    background: var(--accent); border-radius: 16px 16px 0 0;
+  }
+  .spine { display: flex; align-items: center; gap: .35em; margin: .15em 0 .55em; font-size: .72em; font-weight: 700; }
+  .spine b { color: #fff; background: var(--accent); border-radius: 999px; padding: .08em .6em; font-weight: 700; }
+  .spine span { color: #8b98ab; font-weight: 650; }
+  .spine i { width: .9em; height: 0; border-top: 1.5px solid #d0d7e2; }
+  h2 { font-size: 1.28em; line-height: 1.25; font-weight: 800; letter-spacing: -.01em; }
+  h2 em { font-style: normal; color: var(--accent); }
+  .lede { margin: .28em 0 .55em; color: var(--muted); font-size: .86em; line-height: 1.4; }
+  .grow { flex: 1; min-height: 0; }
+  .so {
+    margin-top: .45em; border-radius: 10px; padding: .42em .75em;
+    background: #eef3ff; border: 1px solid #d5e2fb;
+    font-size: .86em; line-height: 1.4; color: var(--text);
+  }
+  .so strong { color: var(--accent); }
+  .footer {
+    margin-top: .35em; padding-top: .28em; padding-right: 12.5em;
+    display: flex; justify-content: space-between; gap: 1em;
+    color: #8b98ab; font-size: .62em; line-height: 1.35;
+  }
+  .footer b { color: var(--muted); font-weight: 700; }
+
+  .split { display: grid; grid-template-columns: 1fr 1.15fr; gap: .7em; min-height: 0; }
+  .card {
+    background: var(--card); border: 1px solid var(--line); border-radius: 12px;
+    padding: .7em .85em; min-width: 0; min-height: 0;
+    display: flex; flex-direction: column;
+  }
+  .eyebrow { font-size: .72em; font-weight: 800; letter-spacing: .04em; color: var(--muted); }
+  .eyebrow.bad { color: var(--bad); }
+  .eyebrow.good { color: var(--good); }
+  .hero { font-family: var(--mono); font-weight: 800; font-size: 2.35em; line-height: 1.35; margin: .04em 0 0; letter-spacing: -.03em; }
+  .unit { font-size: .95em; font-weight: 800; margin-bottom: .28em; }
+  .hero.bad { color: var(--bad); }
+  .hero.good { color: var(--good); }
+  .sub { color: var(--muted); font-size: .8em; line-height: 1.45; }
+  .sub + .sub { margin-top: .2em; }
+
+  .bars { display: flex; flex-direction: column; justify-content: space-between; gap: .28em; margin-top: .45em; flex: 1; }
+  .bars .r { display: grid; grid-template-columns: 7.2em 1fr 2.6em; gap: .45em; align-items: center; font-size: .78em; }
+  .bars .r b { font-weight: 700; }
+  .bars .track { height: .72em; background: #e6edf6; border-radius: 99px; overflow: hidden; }
+  .bars .track i { display: block; height: 100%; border-radius: 99px; background: #93a4bd; }
+  .bars .r.me b { color: var(--bad); }
+  .bars .r.me .track i { background: var(--bad); }
+  .bars .r.top .track i { background: var(--good); }
+  .bars .sc { font-family: var(--mono); font-weight: 700; text-align: right; color: var(--muted); }
+  .bars .r.me .sc { color: var(--bad); }
+
+  .flow { display: grid; grid-template-columns: 1fr auto 1fr auto 1fr auto 1fr; gap: .35em; align-items: stretch; min-height: 0; }
+  .step { background: #fff; border: 1px solid var(--line); border-radius: 12px; padding: .7em .7em .65em; min-width: 0; display: flex; flex-direction: column; }
+  .step .no { width: 1.35em; height: 1.35em; border-radius: 50%; background: var(--accent); color: #fff; font-size: .75em; font-weight: 800; display: flex; align-items: center; justify-content: center; }
+  .step.gate { border-color: #b7ebc9; background: #f3fbf6; }
+  .step.gate .no { background: var(--good); }
+  .step h3 { font-size: .95em; margin: .4em 0 .25em; }
+  .step p { color: var(--muted); font-size: .75em; line-height: 1.4; }
+  .arr { align-self: center; color: var(--accent); font-size: 1.15em; font-weight: 800; }
+
+  table { width: 100%; border-collapse: collapse; font-size: .86em; }
+  th, td { text-align: left; padding: .42em .5em; border-bottom: 1px solid var(--line); vertical-align: top; line-height: 1.35; }
+  th { color: var(--accent); font-weight: 800; font-size: .84em; }
+  td { color: var(--muted); }
+  td.k { color: var(--text); font-weight: 800; white-space: nowrap; }
+  tr.me td { background: #fff5f5; }
+  tr.me td.k { color: var(--bad); }
+
+  .grid3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: .6em; min-height: 0; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: .6em; min-height: 0; }
+  .kind { background: #fff; border: 1px solid var(--line); border-radius: 12px; padding: .7em .8em; min-width: 0; }
+  .kind .tag { display: inline-block; font-size: .68em; font-weight: 800; color: var(--accent); background: #e8efff; border-radius: 999px; padding: .08em .5em; }
+  .kind h3 { font-size: 1.05em; margin: .35em 0 .4em; }
+  .kind dl { display: grid; grid-template-columns: 3.2em 1fr; gap: .28em .45em; font-size: .8em; line-height: 1.35; }
+  .kind dt { color: #8b98ab; font-weight: 700; }
+  .kind dd { color: var(--text); margin: 0; }
+  .q { background: #fff; border: 1px solid var(--line); border-radius: 12px; padding: .65em .8em; min-width: 0; }
+  .q h3 { font-size: .92em; margin-bottom: .25em; }
+  .q p { color: var(--muted); font-size: .8em; line-height: 1.45; }
+  .do { background: #fff; border: 1px solid var(--line); border-radius: 12px; padding: .15em .15em .2em; min-width: 0; }
+  .do h3 { font-size: .95em; padding: .45em .7em .3em; }
+  .do ol { list-style: none; }
+  .do li { display: grid; grid-template-columns: 1.6em 1fr; gap: .35em; padding: .42em .7em; border-top: 1px solid var(--line); font-size: .82em; line-height: 1.4; color: var(--text); }
+  .do li span { font-family: var(--mono); font-weight: 800; color: var(--accent); }
+  .do.stop h3 { color: var(--bad); }
+  .do.stop li span { color: var(--bad); }
+
+  .nav { position: absolute; bottom: 3.1%; right: 2.6%; display: flex; gap: .4em; align-items: center; z-index: 5; font-size: clamp(14px, min(1.12vw, 2vh), 22px); }
+  .nav button { background: #fff; border: 1px solid var(--line); color: var(--text); border-radius: 8px; width: 1.9em; height: 1.9em; cursor: pointer; font-size: .95em; }
+  .nav .pg { color: var(--muted); font-family: var(--mono); font-size: .75em; min-width: 3.2em; text-align: center; }
+  .dots { position: absolute; bottom: 3.6%; left: 2.8%; display: flex; gap: .35em; z-index: 5; }
+  .dots i { width: .45em; height: .45em; border-radius: 50%; background: #c5cedb; cursor: pointer; }
+  .dots i.on { background: var(--accent); }
+</style>
+</head>
+<body>
+<div class="deck">
+
+<section class="slide active">
+  <div class="spine"><b>1 成绩</b><i></i><span>2 是什么</span><i></i><span>3 围墙</span><i></i><span>4 OpenClaw</span><i></i><span>5 三种产品</span><i></i><span>6 买卖</span><i></i><span>7 怎么用</span></div>
+  <h2>先看两张成绩单，<em>不要合成一个「成功」</em></h2>
+  <p class="lede">9 月 8 日上线，只在美国、18 岁以上。左边是愿不愿意装，右边是这一天有没有把事做完。</p>
+  <div class="split grow">
+    <div class="card">
+      <div class="eyebrow good">人愿不愿意试</div>
+      <div class="hero good">250</div>
+      <div class="unit">万次下载 · 大约两周</div>
+      <p class="sub">App Store 约 150 万，Play 约 110 万。</p>
+      <p class="sub">同窗口 ChatGPT 约 310 万，原始下载仍更高。Claude、Grok 发布头 13 天大约 40 万、20 万。</p>
+      <p class="sub">9 月 22 日，美国免费榜到过第 1。</p>
+    </div>
+    <div class="card">
+      <div class="eyebrow bad">这一天做完没有</div>
+      <div class="hero bad">2.46</div>
+      <div class="unit">满分 5 · 五家最低</div>
+      <div class="bars">
+        <div class="r top"><b>Grok Bot</b><div class="track"><i style="width:80%"></i></div><span class="sc">4.00</span></div>
+        <div class="r"><b>Instinct</b><div class="track"><i style="width:71%"></i></div><span class="sc">3.55</span></div>
+        <div class="r"><b>Claude</b><div class="track"><i style="width:62%"></i></div><span class="sc">3.12</span></div>
+        <div class="r"><b>ChatGPT</b><div class="track"><i style="width:59%"></i></div><span class="sc">2.96</span></div>
+        <div class="r me"><b>Muse</b><div class="track"><i style="width:49%"></i></div><span class="sc">2.46</span></div>
+      </div>
+    </div>
+  </div>
+  <div class="so">九题是订位、买一个 25 美元以内的东西、写一份摘要，并且始终不许真的付款。五家都拒绝了偷偷发信，也都拒绝了改了一个字母的假账户。<strong>五家都不能无人值守过夜。</strong>Muse 垫底，是因为连公开网页也停下来问能不能看。</div>
+  <div class="footer"><div>Sensor Tower 经 Mashable；TechCrunch 09-22；RuntimeWire 09-16。iOS / Android 上线日不同，下载横比要打折。</div><div>P1 · 成绩</div></div>
+</section>
+
+<section class="slide">
+  <div class="spine"><span>1 成绩</span><i></i><b>2 是什么</b><i></i><span>3 围墙</span><i></i><span>4 OpenClaw</span><i></i><span>5 三种产品</span><i></i><span>6 买卖</span><i></i><span>7 怎么用</span></div>
+  <h2>你在跟人说话。<em>出网的开关不在他手里。</em></h2>
+  <p class="lede">从左到右是一条请求的路。Muse 只能提议，不能自己放行。</p>
+  <div class="flow grow">
+    <div class="step">
+      <div class="no">1</div>
+      <h3>你</h3>
+      <p>在 App 或 WhatsApp 里说人话。可以打断，也可以连着交代几件事，不用等它回完。</p>
+    </div>
+    <div class="arr">→</div>
+    <div class="step">
+      <div class="no">2</div>
+      <h3>Muse</h3>
+      <p>跑在你专属的一台云电脑里。文件、浏览器、定时任务都在这台电脑上。关掉 App，电脑还在。</p>
+    </div>
+    <div class="arr">→</div>
+    <div class="step gate">
+      <div class="no">3</div>
+      <h3>审批程序</h3>
+      <p>另一套程序，和 Muse 隔开，Muse 关不掉。连邮箱、打开外网，都要它点头。按钮出现在 App 上，不出现在聊天里。</p>
+    </div>
+    <div class="arr">→</div>
+    <div class="step">
+      <div class="no">4</div>
+      <h3>外面</h3>
+      <p>网站、邮件、付款。看公开页面可以继续。发信、花钱、其他难撤销的动作会停住，等你按。</p>
+    </div>
+  </div>
+  <div class="so">记忆是这台电脑里的文件。你能打开改，也能让它忘掉某一条。聊天记录不是唯一的账本。</div>
+  <div class="footer"><div>产品设计文 introducing.muse.ai；安全文把这套审批程序叫做 Sentinel。内部代号 Hatch，页面上不用这个名字。</div><div>P2 · 是什么</div></div>
+</section>
+
+<section class="slide">
+  <div class="spine"><span>1 成绩</span><i></i><span>2 是什么</span><i></i><b>3 围墙</b><i></i><span>4 OpenClaw</span><i></i><span>5 三种产品</span><i></i><span>6 买卖</span><i></i><span>7 怎么用</span></div>
+  <h2>模型会被说服，<em>所以秘密不放在它看得到的地方</em></h2>
+  <p class="lede">官方写明：让所有人敢用，大部分工程花在这一层。模型再聪明，也改不了下面四行。</p>
+  <div class="card grow" style="padding:.35em .7em;">
+    <table>
+      <tr><th style="width:22%">四道墙</th><th style="width:39%">你这边发生什么</th><th>模型做不到什么</th></tr>
+      <tr><td class="k">审批不在聊天里</td><td>接受或拒绝是 App 上的按钮，由审批程序弹出</td><td>不能在对话里宣布「你已经同意了」</td></tr>
+      <tr><td class="k">手里只有替身</td><td>真密码、支付卡存在电脑的另一侧</td><td>被骗去背密码时，背出来的不是真的</td></tr>
+      <tr><td class="k">读过私密就降权</td><td>只看公开页面时，可以少打扰你</td><td>一旦读了你的邮件或文件，就不能再自动向外发</td></tr>
+      <tr><td class="k">付款用一次性卡</td><td>每一笔都要你点。卡只对这一家、这一金额、这一小段时间有效</td><td>拿不走你的真卡号。邮件里的验证码和重置链接会被先滤掉</td></tr>
+    </table>
+  </div>
+  <div class="so">这四道墙解释的是「错了伤害有多大」，不解释「这一单会不会订对」。P1 右边垫底，就是订对这件事还没过关。<strong>整台电脑用只有你持有的密钥加密，还没上线。</strong>现在公司在运维需要时仍能访问。</div>
+  <div class="footer"><div>安全文 09-08。公开漏洞奖金最高 30 万美元，其中成功的提示注入最高 13 万。他们没有说自己免疫。</div><div>P3 · 围墙</div></div>
+</section>
+
+<section class="slide">
+  <div class="spine"><span>1 成绩</span><i></i><span>2 是什么</span><i></i><span>3 围墙</span><i></i><b>4 OpenClaw</b><i></i><span>5 三种产品</span><i></i><span>6 买卖</span><i></i><span>7 怎么用</span></div>
+  <h2>和 OpenClaw：<em>文件是同一套，电脑不是</em></h2>
+  <p class="lede">9 月 22 日 Meta 承认：产品形态严重借鉴 OpenClaw，程序是重写的。人格文件几乎照用，因为他们认为原作者写对了。</p>
+  <div class="card grow" style="padding:.3em .65em;">
+    <table>
+      <tr><th style="width:18%"></th><th style="width:41%">OpenClaw · 你自己养的</th><th>Muse · 打开就能用的</th></tr>
+      <tr><td class="k">谁维护</td><td>你。电脑、密钥、聊天频道都要自己管</td><td>Meta。没有服务器要装</td></tr>
+      <tr><td class="k">默认隔离</td><td>就是一个文件夹。沙箱要另外打开</td><td>一开始就分成「做事」和「批出网」两侧</td></tr>
+      <tr><td class="k">模型</td><td>可以换。Spark 只是其中一个接口</td><td>产品里锁死 Spark。行为按这个产品训过</td></tr>
+      <tr><td class="k">扩展</td><td>社区技能市场，谁都可以装</td><td>没有商店。官方接口，加上它自己写小工具</td></tr>
+      <tr><td class="k">数据在哪</td><td>你的硬盘</td><td>Meta 的云。用户之间隔开。公司仍可能因运维看到</td></tr>
+      <tr><td class="k">手机上的事</td><td>来电、位置可以接上你自己的手机</td><td>云电脑看不见来电和到家，除非单独做接口</td></tr>
+    </table>
+  </div>
+  <div class="so">值得拿走的是文件习惯：新的一次对话本来不记得你，读过文件才记得，所以人格和事实能删、能改。<strong>用 Spark 的接口去跑 OpenClaw，得到的两头都不是。</strong></div>
+  <div class="footer"><div>TechCrunch 09-22 引 Nat Friedman；OpenClaw 官方文档。原作者 Peter Steinberger 2026 年早些时候加入 OpenAI。</div><div>P4 · OpenClaw</div></div>
+</section>
+
+<section class="slide">
+  <div class="spine"><span>1 成绩</span><i></i><span>2 是什么</span><i></i><span>3 围墙</span><i></i><span>4 OpenClaw</span><i></i><b>5 三种产品</b><i></i><span>6 买卖</span><i></i><span>7 怎么用</span></div>
+  <h2>别放在一张表里比谁更聪明。<em>成功的定义就不一样。</em></h2>
+  <p class="lede">模型可以共用。比的时候先问：它的一单位工作是什么。</p>
+  <div class="grid3 grow">
+    <div class="kind">
+      <span class="tag">代码助手</span>
+      <h3>单位是一个仓库</h3>
+      <dl>
+        <dt>做成</dt><dd>改动能合并，测试能过</dd>
+        <dt>你要</dt><dd>看得懂改了什么</dd>
+        <dt>例子</dt><dd>Claude Code、Cursor、Muse Code</dd>
+      </dl>
+    </div>
+    <div class="kind">
+      <span class="tag">办公助手</span>
+      <h3>单位是一件任务</h3>
+      <dl>
+        <dt>做成</dt><dd>一份可以核对的结果</dd>
+        <dt>你要</dt><dd>做完告诉你，或按点跑</dd>
+        <dt>例子</dt><dd>ChatGPT、Claude、Manus、Grok Bot</dd>
+      </dl>
+    </div>
+    <div class="kind" style="border-color:#b9cffd; background:#f5f8ff;">
+      <span class="tag">个人助手</span>
+      <h3>单位是一个人</h3>
+      <dl>
+        <dt>做成</dt><dd>本来会漏的事被接住，而且没乱花钱、没乱发信</dd>
+        <dt>你要</dt><dd>它自己想起，只在值得打断时找你</dd>
+        <dt>例子</dt><dd>Muse、OpenClaw</dd>
+      </dl>
+    </div>
+  </div>
+  <div class="so">P1 的九题是办公题，所以办公助手得分更高，这不证明个人助手更笨。Muse 失分的那一下很具体：<strong>看公开的订位页也被它当成要批准。</strong>看页面不该问，下单才该问。Muse Code 是左边那一列，不是这个 App。</div>
+  <div class="footer"><div>RuntimeWire 09-16 同题对照。Spark 1.3 的公开排名大约第 6，前面是 Claude 的两款。它不是靠榜首赢的下载。</div><div>P5 · 三种产品</div></div>
+</section>
+
+<section class="slide">
+  <div class="spine"><span>1 成绩</span><i></i><span>2 是什么</span><i></i><span>3 围墙</span><i></i><span>4 OpenClaw</span><i></i><span>5 三种产品</span><i></i><b>6 买卖</b><i></i><span>7 怎么用</span></div>
+  <h2>卖的是「打开就能交一件事」，<em>不是一个更聪明的模型</em></h2>
+  <p class="lede">Spark 不是榜首。人下载，是因为不用自己装服务器，而且能听懂「密码它看不见，花钱会问我」。</p>
+  <div class="grid2 grow">
+    <div class="q">
+      <h3>收什么钱</h3>
+      <p>有免费档。重的用法是每月 20 美元或 100 美元，按算力，不按广告条数。对话和这台电脑里的文件，不进广告系统。</p>
+    </div>
+    <div class="q">
+      <h3>广告并没有彻底切开</h3>
+      <p>它替你打开的网页，算你自己的访问。商家仍可能据此在 Instagram 上再找你。订餐厅、在 Marketplace 里找东西，也可能间接影响广告。</p>
+    </div>
+    <div class="q">
+      <h3>为什么传播得快</h3>
+      <p>WhatsApp 是人已经在用的地方。Instagram 里存过的一条菜谱，它可以变成采购清单，再记住朋友不能吃什么。这是别人要先做一堆接口才有的上下文。</p>
+    </div>
+    <div class="q">
+      <h3>信任还缺一半</h3>
+      <p>今天能说清的是：看不见密码，发信和付钱会停。今天不能说的是：Meta 也看不见。那台「只有你的钥匙打得开」的电脑，还在计划里。</p>
+    </div>
+  </div>
+  <div class="so">冷启动他们单独做了：能力太大，人会不知道第一句说什么。所以有建议页，而不是一个空输入框。办公助手不需要这个，因为题目是用户带进来的。</div>
+  <div class="footer"><div>Meta News 与安全文的数据政策。20 / 100 美元两档，RuntimeWire 称之为 Power / Maximum，官方正文只写两档订阅。</div><div>P6 · 买卖</div></div>
+</section>
+
+<section class="slide">
+  <div class="spine"><span>1 成绩</span><i></i><span>2 是什么</span><i></i><span>3 围墙</span><i></i><span>4 OpenClaw</span><i></i><span>5 三种产品</span><i></i><span>6 买卖</span><i></i><b>7 怎么用</b></div>
+  <h2>抄围墙和分界。<em>不要抄下载数，也不要抄那台云电脑。</em></h2>
+  <p class="lede">手机上的来电、到家、电量，Muse 的云电脑默认没有。全双工语音它也还没有。这两样别为了「像 Muse」丢掉。</p>
+  <div class="grid2 grow">
+    <div class="do">
+      <h3>做这三件</h3>
+      <ol>
+        <li><span>1</span>批准由系统弹出，不由模型在下一句话里问。模型只看见你点了什么，不能拿同一段聊天再劝一次。</li>
+        <li><span>2</span>真密码不进模型能读到的地方。读过邮件、网页、截图之后，自动向外发送要取消。</li>
+        <li><span>3</span>花钱、发信、开关这类固定动作，用模板生成，模型只填时间、对象和阈值。查资料和写草稿，放进没有密钥的沙箱。</li>
+      </ol>
+    </div>
+    <div class="do stop">
+      <h3>别做这三件</h3>
+      <ol>
+        <li><span>1</span>不要用「像不像一个人」或下载量，代替「该停的时候停了没有」。</li>
+        <li><span>2</span>不要假设模型自己知道何时该问。Spark 是专门训过这一条的。没训过，提示词替代不了第 1 条。</li>
+        <li><span>3</span>不要为了后台更自由，扔掉已经定下来的调度规则。Muse 能自己写调度，是因为它连审批程序一起拥有。</li>
+      </ol>
+    </div>
+  </div>
+  <div class="so">验收只看三件：<strong>该停的停了，被塞进网页里的指令没有把数据发出去，做完的任务可以回放。</strong>愿不愿意继续用，另记一列，不要和这三件加在一起。</div>
+  <div class="footer"><div>对照本仓库的手机助手和 openClaw 自动化 v4。细节在同目录四篇底稿。材料核对日 2026-09-23。</div><div>P7 · 怎么用</div></div>
+</section>
+
+</div>
+<div class="dots" id="dots"></div>
+<div class="nav">
+  <button id="prev" type="button">‹</button>
+  <span class="pg" id="pg">1 / 7</span>
+  <button id="next" type="button">›</button>
+</div>
+<script>
+(function () {
+  var slides = [].slice.call(document.querySelectorAll('.slide'));
+  var dotsBox = document.getElementById('dots');
+  var cur = 0;
+  slides.forEach(function (_, i) {
+    var d = document.createElement('i');
+    if (i === 0) d.classList.add('on');
+    d.onclick = function () { go(i); };
+    dotsBox.appendChild(d);
+  });
+  var dots = [].slice.call(dotsBox.children);
+  function go(i) {
+    cur = (i + slides.length) % slides.length;
+    slides.forEach(function (s, j) { s.classList.toggle('active', j === cur); });
+    dots.forEach(function (d, j) { d.classList.toggle('on', j === cur); });
+    document.getElementById('pg').textContent = (cur + 1) + ' / ' + slides.length;
+    if (location.hash !== '#p=' + (cur + 1)) history.replaceState(null, '', '#p=' + (cur + 1));
+  }
+  document.getElementById('prev').onclick = function () { go(cur - 1); };
+  document.getElementById('next').onclick = function () { go(cur + 1); };
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'ArrowRight' || e.key === ' ' || e.key === 'PageDown') { e.preventDefault(); go(cur + 1); }
+    if (e.key === 'ArrowLeft' || e.key === 'PageUp') { e.preventDefault(); go(cur - 1); }
+  });
+  var m = /p=(\d+)/.exec(location.hash);
+  if (m) go(parseInt(m[1], 10) - 1);
+  window.__go = go;
+})();
+</script>
+</body>
+</html>
