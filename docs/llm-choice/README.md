@@ -9,3 +9,4 @@
 | [03-Claude-Code与Cursor与API.md](./03-Claude-Code与Cursor与API.md) | Claude Code 的 Fable：Pro 按 API 另计，Max 最多占每周额度的一半；和 Cursor、直接 API 的差额 |
 | [04-和DeepSeek-V4.md](./04-和DeepSeek-V4.md) | V4.1-Flash / V4-Pro 与 Fable 的单价、同一次调用的金额，以及不能用 Claude / Cursor 额度去折 |
 | [05-和Codex-Astra.md](./05-和Codex-Astra.md) | GPT-6 Astra 的 API 价与同一次调用；Codex / 聊天额度。智力指数并列，是因为幻灯片上 Fable 领先、终端上 Astra 领先 |
+| [06-幻灯片表格谁强.md](./06-幻灯片表格谁强.md) | GDPval 上谁接近 Fable：v2.1 的 Opus 5.5，v2 的 Opus 5、Muse Spark 1.3、Qwen、Grok、GLM |
