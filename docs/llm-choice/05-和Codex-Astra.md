@@ -58,4 +58,19 @@ Cursor 这次打开的价目表没有 GPT-6 Astra 一行。Codex 的额度不能
 
 编码 agent 指数（09-09，各自官方壳）：Astra + Codex 与 Fable 5.1 + Claude Code 都是 62。Astra max 大约每个编码任务 $7.09，大约比 Fable 便宜 40%。那是 Artificial Analysis 的任务成本，不是上面这张 $10.90 的示意调用。综合智力指数 v4.3 里，Astra 和 Fable 5.1 并列 53。Opus 5.5 后来的指数是 58，Terminal-Bench 4.0 与 Astra（xhigh）同为 59.6%。这些不是同一次评测。
 
+并列发生在把不同题目加总之后。同一张 [Astra（max）对 Fable 5.1（max）](https://artificialanalysis.ai/models/comparisons/gpt-6-astra-vs-claude-fable-5-1) 的对照里，智力指数都是 53，分项方向相反：
+
+| 分项 | Astra max | Fable 5.1 max |
+| --- | --- | --- |
+| GDPval-AA v2（文档、幻灯片、表格、图，盲比 Elo） | 1580 | 1724 |
+| Terminal-Bench 4.0 | 59% | 52% |
+| AutomationBench-AA | 68% | 59% |
+| 智力指数单任务成本 | $3.26 | $7.63 |
+
+GDPval 要求模型交出真正的交付物，里面包括幻灯片。144 分 Elo 大约相当于盲比里 10 次赢 7 次，是清楚的领先，不是另一个物种。排行榜上同一配置的最高一行写成 1764，和对照页的 1724 不是同一次抓取，方向不变：办公交付物上 Fable 在前，终端和自动化上 Astra 在前。加总之后两边抵消，指数就并列。
+
+HTML 汇报页更靠近 GDPval，不靠近 Terminal-Bench。版式溢出、卡片挤在一起、字号不齐，都是看一眼就失败的错误。终端题错了往往还要跑完才知道。所以同样不是「全面碾压」，幻灯片上的体感会比 7/10 更陡。Anthropic 把幻灯片写进了 Fable 5.1 的目标：从空白页做成一套幻灯片，并用视觉对照设计稿检查自己的输出。Codex 的 Astra 优化的是仓库里的多步修改。壳不同，默认花的输出 token 也不同：这套智力指数里 Fable max 大约 7.8 万输出 token，Astra max 大约 2.7 万。多出来的 token 很多花在交付物的打磨上，所以幻灯片更完整，单任务也大约贵一倍多。
+
+effort 会把这个差距放大或抹平。Fable 默认 high，思考关不掉。GDPval 排行榜上 Fable 的 medium 大约 1579，和 Astra 的 max（1580）贴在一起。Codex 里若为了省五小时额度把 Astra 放在 low 或 medium，看到的就不是 max 对 max。一次性营销网页的民间盲测有过相反的视觉偏好，那和带版式约束的汇报页不是同一件事。
+
 短上下文、同形 token 时，Astra 的 API 账单略高于 Fable，不是更便宜的 Fable。Codex 订阅省钱的那一段，是 Plus / Pro 套餐里的消息额度；额度用完之后，边际价格回到和 Fable 同一档的标价，并且在 272K 以上整次加价。高量可重试的步骤仍然是 Flash 或 Luna，不是把 Astra 的 effort 拉到 max。
