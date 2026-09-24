@@ -2,7 +2,7 @@
 
 2026-09-15，TypeSafe AI 结束隐身，发布第一款 System One 模型 Jev。它不生成句子。程序把一段状态和一组事先写好的问题送进去，它并行返回选择、分数或是非概率。发布后几天，Vercel AI Gateway、AI SDK 的 `evaluate`，以及 LangChain / LangSmith 都接上了。多家报道引 Vercel 的说法：上线 24 小时内，近 13% 的付费团队用过它，快过该网关以往任何模型。
 
-本目录回答三件事：这股热度量的是什么、模型实际交出的是哪种函数、以及它和本仓库的手机助手 / OpenClaw 自动化该怎么接。对照对象是 [phone-assistant-automation/](../phone-assistant-automation/)、[openclaw-automation/](../openclaw-automation/) 和 [llm-choice/](../llm-choice/) 里已经写过的「输出比输入贵」这件事。
+本目录回答三件事：这股热度量的是什么、模型实际交出的是哪种函数、以及它和本仓库的手机助手 / OpenClaw 自动化该怎么接。对照对象是 [phone-assistant-automation/](../../../phone-assistant-automation/)、[openclaw-automation/](../../../openclaw-automation/) 和 [llm-choice/](../../../llm-choice/) 里已经写过的「输出比输入贵」这件事。
 
 一手材料（核对日期 2026-09-24）：
 
